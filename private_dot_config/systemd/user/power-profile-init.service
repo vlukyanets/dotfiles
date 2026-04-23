@@ -1,0 +1,32 @@
+# =============================================================================
+# ~/.config/systemd/user/power-profile-init.service
+#
+# Detects AC/battery state at login and seeds POWER_PROFILE in the systemd
+# user environment so that swayidle.service (and anything else that reads
+# the variable) starts with the correct profile instead of a blank value.
+# =============================================================================
+
+[Unit]
+Description=Initialize POWER_PROFILE from current AC state
+After=graphical-session.target
+PartOf=graphical-session.target
+Before=swayidle.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c '\
+    for f in /sys/class/power_supply/*/online; do \
+        [ -f "$f" ] || continue; \
+        online=$(cat "$f"); \
+        if [ "$online" = "1" ]; then \
+            systemctl --user set-environment POWER_PROFILE=ac; \
+            logger -t power-profile-init "AC detected — POWER_PROFILE=ac"; \
+            exit 0; \
+        fi; \
+    done; \
+    systemctl --user set-environment POWER_PROFILE=battery; \
+    logger -t power-profile-init "battery detected — POWER_PROFILE=battery"'
+
+[Install]
+WantedBy=graphical-session.target

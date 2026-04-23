@@ -1,0 +1,23 @@
+SUBSYSTEM=="power_supply", KERNEL=="AC", ATTR{online}=="1", \
+    RUN+="/usr/local/bin/power-profile-switch ac"
+
+SUBSYSTEM=="power_supply", KERNEL=="AC", ATTR{online}=="0", \
+    RUN+="/usr/local/bin/power-profile-switch battery"
+
+SUBSYSTEM=="power_supply", KERNEL=="AC0", ATTR{online}=="1", \
+    RUN+="/usr/local/bin/power-profile-switch ac"
+
+SUBSYSTEM=="power_supply", KERNEL=="AC0", ATTR{online}=="0", \
+    RUN+="/usr/local/bin/power-profile-switch battery"
+
+SUBSYSTEM=="power_supply", KERNEL=="ACAD", ATTR{online}=="1", \
+    RUN+="/usr/local/bin/power-profile-switch ac"
+
+SUBSYSTEM=="power_supply", KERNEL=="ACAD", ATTR{online}=="0", \
+    RUN+="/usr/local/bin/power-profile-switch battery"
+
+SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ATTR{online}=="1", \
+    RUN+="/usr/local/bin/power-profile-switch ac"
+
+SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ATTR{online}=="0", \
+    RUN+="/usr/local/bin/power-profile-switch battery"

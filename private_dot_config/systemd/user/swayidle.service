@@ -1,0 +1,27 @@
+# =============================================================================
+# ~/.config/systemd/user/swayidle.service
+#
+# Manages swayidle as a user service.  The ExecStart calls the dispatcher
+# script which reads $POWER_PROFILE from the systemd user environment
+# (set by power-profile-switch via `systemctl --user set-environment`).
+# =============================================================================
+
+[Unit]
+Description=Idle manager for Niri (swayidle)
+Documentation=man:swayidle(1)
+PartOf=graphical-session.target
+After=graphical-session.target power-profile-init.service
+Requisite=graphical-session.target
+Wants=power-profile-init.service
+
+[Service]
+Type=simple
+ExecStart=%h/.config/swayidle/swayidle-launch
+Restart=on-failure
+RestartSec=3s
+
+# Pass the user environment so POWER_PROFILE is visible
+PassEnvironment=POWER_PROFILE WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS
+
+[Install]
+WantedBy=graphical-session.target
