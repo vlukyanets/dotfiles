@@ -1,0 +1,17 @@
+[hyper-lin]
+paru     = true
+nvidia   = true
+identity = "~/.ssh/id_ed25519"
+
+[hyper-lin.pacman]
+multilib_enabled = true
+parallel         = 4
+
+[echo-server]
+paru     = true
+nvidia   = true
+identity = "~/.ssh/id_ed25519"
+
+[echo-server.pacman]
+multilib_enabled = true
+parallel         = 2

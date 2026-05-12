@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "==> Configuring pacman..."
+
+PACMAN_CONF="/etc/pacman.conf"
+
+# ── Parallel downloads ────────────────────────────────────────────────────────
+# Uncomment and set ParallelDownloads if not already active
+if grep -qE '^#?ParallelDownloads' "${PACMAN_CONF}"; then
+    sudo sed -i 's/^#\?ParallelDownloads\s*=.*/ParallelDownloads = {{ .pacman.parallel }}/' "${PACMAN_CONF}"
+    echo "==> pacman: ParallelDownloads = {{ .pacman.parallel }}"
+fi
+
+# ── Multilib repository ───────────────────────────────────────────────────────
+{{ if .pacman.multilib_enabled -}}
+if grep -qE '^#\[multilib\]' "${PACMAN_CONF}"; then
+    sudo sed -i '/^#\[multilib\]/{
+        s/^#//
+        n
+        s/^#//
+    }' "${PACMAN_CONF}"
+    echo "==> pacman: multilib repository enabled"
+    sudo pacman -Sy
+else
+    echo "==> pacman: multilib repository already enabled"
+fi
+{{- else -}}
+echo "==> pacman: multilib repository disabled (skipped)"
+{{- end }}

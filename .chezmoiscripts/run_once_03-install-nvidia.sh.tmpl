@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+{{ if not .nvidia_enabled -}}
+echo "==> NVIDIA driver installation skipped (disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> NVIDIA driver installation..."
+
+# ── Ensure lspci is available ────────────────────────────────────────────────
+if ! command -v lspci &>/dev/null; then
+    sudo pacman -S --needed --noconfirm pciutils
+fi
+
+# ── Detect NVIDIA GPU and select driver ──────────────────────────────────────
+GPU=$(lspci 2>/dev/null | grep -iE 'vga|3d controller|display controller' | grep -i nvidia | head -1)
+
+if [[ -z "${GPU}" ]]; then
+    echo "No NVIDIA GPU detected. Skipping."
+    exit 0
+fi
+
+echo "Detected GPU: ${GPU}"
+
+DRIVER_PACKAGE=""
+NVIDIA_LIB32=""
+
+# Modern: RTX (20xx/30xx/40xx/50xx), GTX 16xx (Turing), MX 3xx/4xx/5xx+ (Turing/Ampere)
+if echo "${GPU}" | grep -qiE 'RTX [2-9][0-9]{3}|GTX 16[0-9]{2}|MX[3-9][0-9]{2}'; then
+    DRIVER_PACKAGE="nvidia-dkms"
+    NVIDIA_LIB32="lib32-nvidia-utils"
+
+# Pascal (GTX 10xx) / Maxwell (GTX 9xx) — 580xx legacy
+# MX 1xx/2xx (Maxwell/Pascal mobile), xxxMX (920MX/930MX/940MX)
+elif echo "${GPU}" | grep -qiE 'GTX 10[0-9]{2}|GTX 9[0-9]{2}|MX[12][0-9]{2}|[0-9]{3}MX'; then
+    DRIVER_PACKAGE="nvidia-580xx-dkms"
+    NVIDIA_LIB32="lib32-nvidia-580xx-utils"
+
+# Kepler (GTX 600/700) — 470xx legacy
+elif echo "${GPU}" | grep -qiE 'GTX [67][0-9]{2}'; then
+    DRIVER_PACKAGE="nvidia-470xx-dkms"
+    NVIDIA_LIB32="lib32-nvidia-470xx-utils"
+
+# Fermi (GTX 400/500) — 390xx legacy
+elif echo "${GPU}" | grep -qiE 'GTX [45][0-9]{2}'; then
+    DRIVER_PACKAGE="nvidia-390xx-dkms"
+    NVIDIA_LIB32="lib32-nvidia-390xx-utils"
+
+# Tesla/Curie (GeForce 8/9/100/200/300) — 340xx legacy, no lib32
+elif echo "${GPU}" | grep -qiE 'GeForce [89][0-9]{2}|GeForce [123][0-9]{2}'; then
+    DRIVER_PACKAGE="nvidia-340xx-dkms"
+    NVIDIA_LIB32=""
+
+# Unknown/future — fall back to current driver
+else
+    echo "WARNING: unrecognised NVIDIA GPU generation, falling back to nvidia-dkms."
+    DRIVER_PACKAGE="nvidia-dkms"
+    NVIDIA_LIB32="lib32-nvidia-utils"
+fi
+
+echo "Driver: ${DRIVER_PACKAGE} ${NVIDIA_LIB32}"
+
+# ── Guard: already installed? ────────────────────────────────────────────────
+if pacman -Qq "${DRIVER_PACKAGE}" &>/dev/null; then
+    echo "${DRIVER_PACKAGE} already installed. Skipping."
+    exit 0
+fi
+
+# ── Auto-detect and install matching kernel headers (required for DKMS) ──────
+KERNEL_RELEASE=$(uname -r)
+if   [[ "${KERNEL_RELEASE}" == *"-zen"*      ]]; then HEADERS_PKG="linux-zen-headers"
+elif [[ "${KERNEL_RELEASE}" == *"-lts"*      ]]; then HEADERS_PKG="linux-lts-headers"
+elif [[ "${KERNEL_RELEASE}" == *"-hardened"* ]]; then HEADERS_PKG="linux-hardened-headers"
+else                                                  HEADERS_PKG="linux-headers"
+fi
+
+if ! pacman -Qq "${HEADERS_PKG}" &>/dev/null; then
+    echo "--> Installing ${HEADERS_PKG}..."
+    sudo pacman -S --needed --noconfirm "${HEADERS_PKG}"
+fi
+
+# ── Install driver (and optional lib32) ──────────────────────────────────────
+install_packages() {
+    local pkgs=("${DRIVER_PACKAGE}")
+    [[ -n "${NVIDIA_LIB32}" ]] && pkgs+=("${NVIDIA_LIB32}")
+
+    if [[ "${DRIVER_PACKAGE}" == "nvidia-dkms" ]]; then
+        sudo pacman -S --needed --noconfirm "${pkgs[@]}"
+    else
+        # Legacy drivers are AUR packages — requires paru
+        {{ if .paru_enabled -}}
+        if ! command -v paru &>/dev/null; then
+            echo "ERROR: paru required for ${DRIVER_PACKAGE} but not found."
+            exit 1
+        fi
+        paru -S --needed --noconfirm "${pkgs[@]}"
+        {{- else -}}
+        echo "ERROR: ${DRIVER_PACKAGE} is an AUR package. Enable paru in .chezmoidata.toml or install manually."
+        exit 1
+        {{- end }}
+    fi
+}
+
+install_packages
+
+echo "==> NVIDIA driver installed. Reboot required."

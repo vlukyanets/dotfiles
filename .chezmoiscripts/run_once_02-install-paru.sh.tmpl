@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+{{ if not .paru_enabled -}}
+echo "==> paru installation skipped (disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+if command -v paru &>/dev/null; then
+    echo "paru already installed, skipping."
+    exit 0
+fi
+
+echo "==> Installing paru AUR helper..."
+
+# ── Step 1: rustup ───────────────────────────────────────────────────────────
+if ! command -v rustup &>/dev/null; then
+    echo "--> Installing rustup via pacman..."
+    sudo pacman -S --needed --noconfirm rustup
+fi
+
+if ! rustup toolchain list | grep -q stable; then
+    rustup default stable
+fi
+
+# rustup installed via pacman doesn't create ~/.cargo/env; source it only if present
+[[ -f "${HOME}/.cargo/env" ]] && source "${HOME}/.cargo/env"
+
+# ensure cargo is on PATH regardless (rustup toolchain installs to ~/.rustup/toolchains)
+export PATH="${HOME}/.cargo/bin:${PATH}"
+
+# ── Step 2: base-devel (required by makepkg) ─────────────────────────────────
+if ! pacman -Qq base-devel &>/dev/null; then
+    echo "--> Installing base-devel..."
+    sudo pacman -S --needed --noconfirm base-devel
+fi
+
+# ── Step 3: Clone and build paru ─────────────────────────────────────────────
+PARU_BUILD_DIR="$(mktemp -d)"
+trap 'rm -rf "${PARU_BUILD_DIR}"' EXIT
+
+git clone --depth=1 https://aur.archlinux.org/paru.git "${PARU_BUILD_DIR}/paru"
+cd "${PARU_BUILD_DIR}/paru"
+makepkg -si --noconfirm
+
+echo "==> paru installed."

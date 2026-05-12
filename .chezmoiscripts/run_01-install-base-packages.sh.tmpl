@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "==> Installing base packages..."
+
+sudo pacman -S --needed --noconfirm \
+    base \
+    base-devel \
+    btrfs-progs \
+    cryptsetup \
+    intel-ucode \
+    linux-firmware \
+    sbctl \
+    systemd-ukify \
+    curl \
+    wget \
+    networkmanager \
+    openssh \
+    nano \
+    vim \
+    less
+
+echo "==> Base packages installed."

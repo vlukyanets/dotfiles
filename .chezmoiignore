@@ -1,0 +1,6 @@
+# Encrypted source files — chezmoi should not deploy these to ~
+*.age
+
+# Repo-only files — not deployed to ~
+README.md
+bootstrap.sh

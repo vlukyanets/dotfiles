@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+REPO_ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+
+mapfile -d '' age_files < <(git -C "$REPO_ROOT" ls-files -z '*.age')
+[ ${#age_files[@]} -gt 0 ] || exit 0
+
+AGE="${AGE_CMD:-age}"
+if ! command -v "$AGE" &>/dev/null; then
+    echo "post-checkout: $AGE not found — skipping decryption (set AGE_CMD to override)" >&2
+    exit 0
+fi
+
+# Identity resolution: AGE_IDENTITY env var → chezmoi config → default path.
+IDENTITY="${AGE_IDENTITY:-}"
+if [ -z "$IDENTITY" ] && command -v chezmoi &>/dev/null; then
+    _raw=$(chezmoi dump-config 2>/dev/null \
+           | sed -n 's/.*"identity"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    IDENTITY="${_raw/#\~/$HOME}"
+fi
+: "${IDENTITY:=$HOME/.ssh/id_ed25519}"
+
+if [ ! -f "$IDENTITY" ]; then
+    echo "post-checkout: identity not found at $IDENTITY — skipping decryption (set AGE_IDENTITY to override)" >&2
+    exit 0
+fi
+
+count=0
+for aged in "${age_files[@]}"; do
+    out="${REPO_ROOT}/${aged%.age}"
+    "$AGE" -d -i "$IDENTITY" -o "$out" "$REPO_ROOT/$aged"
+    echo "post-checkout: decrypted $aged → ${aged%.age}"
+    (( count++ )) || true
+done
+echo "post-checkout: $count file(s) decrypted"

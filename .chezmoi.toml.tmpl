@@ -1,0 +1,39 @@
+{{- $hostname := .chezmoi.hostname -}}
+{{- $identity := env "AGE_IDENTITY" | default (joinPath .chezmoi.homeDir ".ssh/id_ed25519") -}}
+
+{{- $paru            := false -}}
+{{- $nvidia          := false -}}
+{{- $multilibEnabled := false -}}
+{{- $parallel        := 1 -}}
+
+{{- if stat (joinPath .chezmoi.sourceDir ".chezmoidata.toml") -}}
+{{-   $allHosts := fromToml (include ".chezmoidata.toml") -}}
+{{-   if hasKey $allHosts $hostname -}}
+{{-     $cfg             := get $allHosts $hostname -}}
+{{-     $paru             = get $cfg "paru" -}}
+{{-     $nvidia           = get $cfg "nvidia" -}}
+{{-     $pacman          := get $cfg "pacman" | default dict -}}
+{{-     $multilibEnabled  = get $pacman "multilib_enabled" | default false -}}
+{{-     $parallel         = get $pacman "parallel" | default 1 -}}
+{{-   end -}}
+{{- else -}}
+{{-   $paru            = promptBoolOnce . "paru_enabled"            "Enable paru AUR helper installation" -}}
+{{-   $nvidia          = promptBoolOnce . "nvidia_enabled"          "Enable NVIDIA driver installation" -}}
+{{-   $multilibEnabled = promptBoolOnce . "pacman_multilib_enabled" "Enable pacman multilib repository" -}}
+{{-   $parallel        = promptIntOnce  . "pacman_parallel"         "Pacman parallel downloads count" -}}
+{{- end -}}
+
+encryption = "age"
+
+[age]
+    command        = "{{ env "AGE_CMD" | default "age" }}"
+    identity       = "{{ $identity }}"
+    recipientsFile = "{{ .chezmoi.sourceDir }}/.age-recipients"
+
+[data]
+    paru_enabled   = {{ $paru }}
+    nvidia_enabled = {{ $nvidia }}
+
+[data.pacman]
+    multilib_enabled = {{ $multilibEnabled }}
+    parallel         = {{ $parallel }}
