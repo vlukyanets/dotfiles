@@ -4,3 +4,8 @@
 # Repo-only files — not deployed to ~
 README.md
 bootstrap.sh
+
+# p10k config — only deployed when ohmyzsh is enabled for this host
+{{- if not .ohmyzsh_enabled }}
+.p10k.zsh
+{{- end }}

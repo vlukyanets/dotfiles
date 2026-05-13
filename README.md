@@ -9,7 +9,7 @@ Minimal chezmoi dotfiles targeting Arch Linux.
 | `curl` | Download bootstrap script | `sudo pacman -S curl` |
 | `git` | Clone repo, run hooks | `sudo pacman -S git` |
 | `openssh` | SSH key pair used as age identity | `sudo pacman -S openssh` |
-| `age` | Encrypt / decrypt `.age` files | `sudo pacman -S age` |
+| `age` / `rage` | Encrypt / decrypt `.age` files | `sudo pacman -S age` or `sudo pacman -S rage-encryption` |
 | `chezmoi` | Apply dotfiles | see Bootstrap below |
 
 An SSH key pair must exist before running bootstrap (`ssh-keygen -t ed25519` if not).
@@ -38,9 +38,10 @@ Scripts run in order on first `chezmoi apply`:
 | Script | Condition | What it does |
 |---|---|---|
 | `run_once_00-configure-pacman` | always | Sets `ParallelDownloads` (host-configured); enables `[multilib]` repo if enabled |
-| `run_once_01-install-base-packages` | always | Installs essential system packages via pacman |
+| `run_01-install-base-packages` | always | Installs essential system packages via pacman (runs on every `chezmoi apply`) |
 | `run_once_02-install-paru` | `paru` | Installs rustup (pacman) then builds paru from AUR |
 | `run_once_03-install-nvidia` | `nvidia` | Detects GPU, installs matching DKMS driver + lib32 |
+| `run_once_04-install-zsh` | `ohmyzsh` | Installs zsh, oh-my-zsh, powerlevel10k, zsh-autosuggestions, zsh-syntax-highlighting; sets zsh as default shell |
 
 ## Host feature flags
 
@@ -48,6 +49,7 @@ Scripts run in order on first `chezmoi apply`:
 |---|---|---|
 | `paru` | bool | Install rustup + paru AUR helper |
 | `nvidia` | bool | Install NVIDIA DKMS driver and lib32 utils |
+| `ohmyzsh` | bool | Install zsh, oh-my-zsh, powerlevel10k theme, autosuggestions and syntax-highlighting plugins |
 | `pacman.multilib_enabled` | bool | Enable pacman `[multilib]` repository |
 | `pacman.parallel` | int | `ParallelDownloads` value in `pacman.conf` (default: `1`) |
 
@@ -73,25 +75,6 @@ Detection uses `lspci` model name matching:
 Legacy drivers (anything other than `nvidia-dkms`) are AUR packages and require `paru = true`.
 
 Kernel headers are auto-detected from `uname -r` (`linux`, `linux-lts`, `linux-zen`, `linux-hardened`).
-
-## Adding a new host
-
-Decrypt `hosts.toml.age`, add the entry, re-encrypt, and commit:
-
-```sh
-rage -d -i ~/.ssh/id_ed25519 -o hosts.toml hosts.toml.age
-# edit hosts.toml — add entry, e.g.:
-# [new-machine]
-# paru   = true
-# nvidia = false
-# [new-machine.pacman]
-# multilib_enabled = true
-# parallel         = 5
-rage -R .age-recipients -o hosts.toml.age hosts.toml
-git add hosts.toml.age && git commit
-```
-
-Any `pacman` key omitted by a host falls back to its default (`multilib_enabled = false`, `parallel = 1`).
 
 ## Managing encryption recipients
 

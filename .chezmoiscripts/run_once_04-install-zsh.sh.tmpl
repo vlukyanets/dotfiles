@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+{{ if not .ohmyzsh_enabled -}}
+echo "==> ZSH/oh-my-zsh installation skipped (disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> Installing ZSH environment..."
+
+# ── zsh ───────────────────────────────────────────────────────────────────────
+if ! command -v zsh &>/dev/null; then
+    echo "--> Installing zsh..."
+    sudo pacman -S --needed --noconfirm zsh
+fi
+
+# ── oh-my-zsh ─────────────────────────────────────────────────────────────────
+if [[ ! -d "${HOME}/.oh-my-zsh" ]]; then
+    echo "--> Installing oh-my-zsh..."
+    RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+fi
+
+ZSH_CUSTOM="${ZSH_CUSTOM:-${HOME}/.oh-my-zsh/custom}"
+
+# ── powerlevel10k ─────────────────────────────────────────────────────────────
+if [[ ! -d "${ZSH_CUSTOM}/themes/powerlevel10k" ]]; then
+    echo "--> Cloning powerlevel10k..."
+    git clone --depth=1 https://github.com/romkatv/powerlevel10k "${ZSH_CUSTOM}/themes/powerlevel10k"
+fi
+
+# ── zsh-autosuggestions ───────────────────────────────────────────────────────
+if [[ ! -d "${ZSH_CUSTOM}/plugins/zsh-autosuggestions" ]]; then
+    echo "--> Cloning zsh-autosuggestions..."
+    git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions "${ZSH_CUSTOM}/plugins/zsh-autosuggestions"
+fi
+
+# ── zsh-syntax-highlighting ───────────────────────────────────────────────────
+if [[ ! -d "${ZSH_CUSTOM}/plugins/zsh-syntax-highlighting" ]]; then
+    echo "--> Cloning zsh-syntax-highlighting..."
+    git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting "${ZSH_CUSTOM}/plugins/zsh-syntax-highlighting"
+fi
+
+# ── set default shell ─────────────────────────────────────────────────────────
+ZSH_PATH="$(command -v zsh)"
+CURRENT_SHELL="$(getent passwd "${USER}" | cut -d: -f7)"
+if [[ "${CURRENT_SHELL}" != "${ZSH_PATH}" ]]; then
+    echo "--> Setting default shell to ${ZSH_PATH}..."
+    sudo usermod -s "${ZSH_PATH}" "${USER}"
+fi
+
+echo "==> ZSH environment installed."
