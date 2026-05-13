@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+{{ if not .advanced_tools_enabled -}}
+echo "==> Advanced tools installation skipped (disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> Installing advanced tools..."
+
+paru -S --needed --noconfirm \
+    curl \
+    wget \
+    eza \
+    fd \
+    fzf \
+    ncdu \
+    duf \
+    btop \
+    jq \
+    yq \
+    rsync \
+    tree \
+    tmux \
+    zellij \
+    neovim \
+    just \
+    fastfetch \
+    ripgrep
+
+echo "==> Advanced tools installed."

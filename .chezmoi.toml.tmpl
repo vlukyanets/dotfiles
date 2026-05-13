@@ -3,9 +3,11 @@
 
 {{- $paru            := false -}}
 {{- $nvidia          := false -}}
-{{- $ohmyzsh         := false -}}
+{{- $zsh             := false -}}
 {{- $multilibEnabled := false -}}
 {{- $parallel        := 1 -}}
+{{- $baseTools       := false -}}
+{{- $advancedTools   := false -}}
 
 {{- if stat (joinPath .chezmoi.sourceDir ".chezmoidata.toml") -}}
 {{-   $allHosts := fromToml (include ".chezmoidata.toml") -}}
@@ -13,17 +15,21 @@
 {{-     $cfg             := get $allHosts $hostname -}}
 {{-     $paru             = get $cfg "paru" -}}
 {{-     $nvidia           = get $cfg "nvidia" -}}
-{{-     $ohmyzsh          = get $cfg "ohmyzsh" | default false -}}
+{{-     $zsh              = get $cfg "zsh" | default false -}}
 {{-     $pacman          := get $cfg "pacman" | default dict -}}
 {{-     $multilibEnabled  = get $pacman "multilib_enabled" | default false -}}
 {{-     $parallel         = get $pacman "parallel" | default 1 -}}
+{{-     $baseTools        = get $cfg "base_tools_enabled"    | default false -}}
+{{-     $advancedTools    = get $cfg "advanced_tools_enabled" | default false -}}
 {{-   end -}}
 {{- else -}}
 {{-   $paru            = promptBoolOnce . "paru_enabled"            "Enable paru AUR helper installation" -}}
 {{-   $nvidia          = promptBoolOnce . "nvidia_enabled"          "Enable NVIDIA driver installation" -}}
-{{-   $ohmyzsh         = promptBoolOnce . "ohmyzsh_enabled"         "Enable oh-my-zsh + powerlevel10k installation" -}}
+{{-   $zsh             = promptBoolOnce . "zsh_enabled"             "Enable zsh + oh-my-zsh + powerlevel10k installation" -}}
 {{-   $multilibEnabled = promptBoolOnce . "pacman_multilib_enabled" "Enable pacman multilib repository" -}}
 {{-   $parallel        = promptIntOnce  . "pacman_parallel"         "Pacman parallel downloads count" -}}
+{{-   $baseTools       = promptBoolOnce . "base_tools_enabled"      "Install base CLI tools (eza, fzf, htop, tmux…)" -}}
+{{-   $advancedTools   = promptBoolOnce . "advanced_tools_enabled"  "Install advanced tools (neovim, zellij, ripgrep…)" -}}
 {{- end -}}
 
 encryption = "age"
@@ -34,13 +40,12 @@ encryption = "age"
     recipientsFile = "{{ .chezmoi.sourceDir }}/.age-recipients"
 
 [data]
-    paru_enabled    = {{ $paru }}
-    nvidia_enabled  = {{ $nvidia }}
-    ohmyzsh_enabled = {{ $ohmyzsh }}
+    paru_enabled           = {{ $paru }}
+    nvidia_enabled         = {{ $nvidia }}
+    zsh_enabled            = {{ $zsh }}
+    base_tools_enabled     = {{ $baseTools }}
+    advanced_tools_enabled = {{ $advancedTools }}
 
 [data.pacman]
     multilib_enabled = {{ $multilibEnabled }}
     parallel         = {{ $parallel }}
-
-[data.zsh]
-    ohmyzsh_enabled  = {{ $ohmyzsh }}

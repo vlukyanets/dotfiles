@@ -1,7 +1,8 @@
 [hyper-lin]
-paru     = true
-nvidia   = true
-ohmyzsh  = true
+paru                   = true
+nvidia                 = true
+zsh                    = true
+advanced_tools_enabled = true
 identity = "~/.ssh/id_ed25519"
 
 [hyper-lin.pacman]
@@ -9,10 +10,11 @@ multilib_enabled = true
 parallel         = 4
 
 [echo-server]
-paru     = true
-nvidia   = true
-ohmyzsh  = true
-identity = "~/.ssh/id_ed25519"
+paru               = true
+nvidia             = true
+zsh                = true
+base_tools_enabled = true
+identity           = "~/.ssh/id_ed25519"
 
 [echo-server.pacman]
 multilib_enabled = true

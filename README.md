@@ -41,7 +41,9 @@ Scripts run in order on first `chezmoi apply`:
 | `run_01-install-base-packages` | always | Installs essential system packages via pacman (runs on every `chezmoi apply`) |
 | `run_once_02-install-paru` | `paru` | Installs rustup (pacman) then builds paru from AUR |
 | `run_once_03-install-nvidia` | `nvidia` | Detects GPU, installs matching DKMS driver + lib32 |
-| `run_once_04-install-zsh` | `ohmyzsh` | Installs zsh, oh-my-zsh, powerlevel10k, zsh-autosuggestions, zsh-syntax-highlighting; sets zsh as default shell |
+| `run_once_04-install-zsh` | `zsh` | Installs zsh, oh-my-zsh, powerlevel10k, zsh-autosuggestions, zsh-syntax-highlighting; sets zsh as default shell |
+| `run_once_05-install-base-tools` | `base_tools_enabled` | Installs base CLI tools: `curl wget eza fd fzf htop jq yq rsync tree tmux` |
+| `run_once_06-install-advanced-tools` | `advanced_tools_enabled` | Installs advanced CLI tools: `curl wget eza fd fzf ncdu duf btop jq yq rsync tree tmux zellij neovim just fastfetch ripgrep` |
 
 ## Host feature flags
 
@@ -49,7 +51,9 @@ Scripts run in order on first `chezmoi apply`:
 |---|---|---|
 | `paru` | bool | Install rustup + paru AUR helper |
 | `nvidia` | bool | Install NVIDIA DKMS driver and lib32 utils |
-| `ohmyzsh` | bool | Install zsh, oh-my-zsh, powerlevel10k theme, autosuggestions and syntax-highlighting plugins |
+| `zsh` | bool | Install zsh, oh-my-zsh, powerlevel10k theme, autosuggestions and syntax-highlighting plugins |
+| `base_tools_enabled` | bool | Install base CLI toolkit (`eza`, `fzf`, `htop`, `tmux`, and more) |
+| `advanced_tools_enabled` | bool | Install advanced CLI toolkit (`neovim`, `zellij`, `ripgrep`, `btop`, and more) |
 | `pacman.multilib_enabled` | bool | Enable pacman `[multilib]` repository |
 | `pacman.parallel` | int | `ParallelDownloads` value in `pacman.conf` (default: `1`) |
 

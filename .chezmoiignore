@@ -5,7 +5,8 @@
 README.md
 bootstrap.sh
 
-# p10k config — only deployed when ohmyzsh is enabled for this host
-{{- if not .ohmyzsh_enabled }}
+# ZSH files
+{{- if not .zsh_enabled }}
+.zshrc
 .p10k.zsh
 {{- end }}

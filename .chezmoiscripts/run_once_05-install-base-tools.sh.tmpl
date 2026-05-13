@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+{{ if not .base_tools_enabled -}}
+echo "==> Base tools installation skipped (disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> Installing base tools..."
+
+paru -S --needed --noconfirm \
+    curl \
+    wget \
+    eza \
+    fd \
+    fzf \
+    htop \
+    jq \
+    yq \
+    rsync \
+    tree \
+    tmux
+
+echo "==> Base tools installed."
