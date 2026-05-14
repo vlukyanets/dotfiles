@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "==> Installing PipeWire..."
+
+sudo pacman -S --needed --noconfirm \
+    pipewire \
+    pipewire-alsa \
+    pipewire-pulse \
+    pipewire-jack \
+    wireplumber
+
+echo "==> Enabling PipeWire user services..."
+
+systemctl --user enable --now pipewire.service
+systemctl --user enable --now pipewire-pulse.service
+systemctl --user enable --now wireplumber.service
+
+echo "==> PipeWire installed and services enabled."
