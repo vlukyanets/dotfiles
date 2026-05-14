@@ -36,10 +36,11 @@ fi
 
 paru -S --needed --noconfirm \
     onlyoffice-bin \
-    zoom
+    zoom \
+    clock-rs-git
 
 {{- else -}}
-echo "==> Skipping AUR desktop programs (paru disabled): onlyoffice-bin, zoom"
+echo "==> Skipping AUR desktop programs (paru disabled): onlyoffice-bin, zoom, clock-rs-git"
 {{- end }}
 
 echo "==> Desktop programs installed."
