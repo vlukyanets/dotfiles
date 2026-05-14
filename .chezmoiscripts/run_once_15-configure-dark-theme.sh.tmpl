@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+{{ if not .niri_enabled -}}
+echo "==> Dark theme configuration skipped (niri disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> Installing GTK dark theme packages..."
+
+sudo pacman -S --needed --noconfirm \
+    gnome-themes-extra \
+    gtk3 \
+    gsettings-desktop-schemas \
+    dconf
+
+echo "==> Applying dark theme via gsettings..."
+
+gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"
+gsettings set org.gnome.desktop.interface gtk-theme    "Adwaita-dark"
+
+echo "==> Dark theme configured."
