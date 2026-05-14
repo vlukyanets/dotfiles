@@ -15,6 +15,9 @@ source $ZSH/oh-my-zsh.sh
 
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
+export AGE_CMD="{{ env "AGE_CMD" | default "age" }}"
+export AGE_IDENTITY="{{ env "AGE_IDENTITY" | default (joinPath .chezmoi.homeDir ".ssh/id_ed25519") }}"
+
 if command -v nvim &>/dev/null; then
     export EDITOR=nvim
 elif command -v vim &>/dev/null; then
