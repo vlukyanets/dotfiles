@@ -1,6 +1,6 @@
 # dotfiles (chezmoi)
 
-Minimal chezmoi dotfiles targeting Arch Linux.
+Modular chezmoi dotfiles targeting Arch Linux. Supports multiple hosts with per-host feature flags, age-encrypted secrets, and automatic mirror/driver selection.
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ Two environment variables control encryption behaviour:
 | Variable | Default | Purpose |
 |---|---|---|
 | `AGE_CMD` | `age` | age-compatible binary to use (`rage`, etc.) |
-| `AGE_IDENTITY` | chezmoi config → `~/.ssh/id_ed25519` | SSH private key used for decryption |
+| `AGE_IDENTITY` | `~/.ssh/id_ed25519` | SSH private key used for decryption |
 
 ## Bootstrap
 
@@ -27,37 +27,93 @@ Two environment variables control encryption behaviour:
 bash <(curl -fsLS https://raw.githubusercontent.com/vlukyanets/dotfiles/main/bootstrap.sh)
 ```
 
-The script installs missing prerequisites (`age`, `chezmoi`), clones the repo, decrypts age-encrypted files, and runs `chezmoi apply`. Known hostnames are configured automatically; unknown machines are prompted for each feature flag.
+The script installs missing prerequisites (`age`, `chezmoi`), clones the repo, and runs `chezmoi apply`. Known hostnames are configured automatically from `.chezmoidata.toml`; unknown machines are prompted interactively for each feature flag.
 
 After the first apply, git hooks are active — encrypted files decrypt on checkout and re-encrypt before commit automatically.
 
 ## Install scripts
 
-Scripts run in order on first `chezmoi apply`:
+Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-run only if their content changes (which happens automatically when the package list or any rendered template value changes).
 
 | Script | Condition | What it does |
 |---|---|---|
-| `run_once_00-configure-pacman` | always | Sets `ParallelDownloads` (host-configured); enables `[multilib]` repo if enabled |
-| `run_01-install-base-packages` | always | Installs essential system packages via pacman (runs on every `chezmoi apply`) |
-| `run_once_02-install-paru` | `paru` | Installs rustup (pacman) then builds paru from AUR |
-| `run_once_03-install-nvidia` | `nvidia` | Detects GPU, installs matching DKMS driver + lib32 |
-| `run_once_04-install-zsh` | `zsh` | Installs zsh, oh-my-zsh, powerlevel10k, zsh-autosuggestions, zsh-syntax-highlighting; sets zsh as default shell |
-| `run_once_05-install-base-tools` | `base_tools_enabled` | Installs base CLI tools: `curl wget eza fd fzf htop jq yq rsync tree tmux` |
-| `run_once_06-install-advanced-tools` | `advanced_tools_enabled` | Installs advanced CLI tools: `curl wget eza fd fzf ncdu duf btop jq yq rsync tree tmux zellij neovim just fastfetch ripgrep` |
-| `run_once_07-install-niri` | `niri_enabled` | Installs niri Wayland compositor, xwayland-satellite, swayidle, swaylock, greetd + tuigreet, noctalia-shell, power-profiles-daemon, FiraCode Nerd Font; enables acpid, power-profiles-daemon, greetd |
+| `before_00-configure-git-hooks` | always | Configures `.githooks` path in the source repo |
+| `00-configure-pacman` | always | Sets `ParallelDownloads`; enables `[multilib]` if configured |
+| `01-install-base-packages` | always | Installs essential system packages via pacman |
+| `02-install-reflector` | always | Installs reflector; writes `/etc/xdg/reflector/reflector.conf` from host data; enables daily timer |
+| `03-install-paru` | `paru` | Installs rustup (pacman) then builds paru from AUR; sets `MAKEFLAGS=-j$(nproc)` |
+| `04-install-nvidia` | `nvidia` | Detects GPU generation via `lspci`; installs matching DKMS driver + kernel headers + lib32 |
+| `05-install-zsh` | `zsh` | Installs zsh, oh-my-zsh, powerlevel10k, autosuggestions, syntax-highlighting; sets default shell |
+| `06-install-base-tools` | `base_tools_enabled` | `eza fd fzf htop jq yq rsync tree tmux` |
+| `07-install-advanced-tools` | `advanced_tools_enabled` | `ncdu duf btop zellij neovim just fastfetch ripgrep` and more |
+| `08-install-niri` | `niri_enabled` | Niri compositor, swaylock, greetd/tuigreet, fonts, `wl-clipboard`; deploys ACPI/udev/greetd system configs |
+| `09-install-noctalia-shell` | `niri_enabled` + `paru` | Installs noctalia-shell, pipewire-jack, qt6-multimedia-ffmpeg from AUR |
+| `10-configure-pipewire` | always | Installs PipeWire stack; enables pipewire, pipewire-pulse, wireplumber user services |
+| `11-install-desktop-programs` | `niri_enabled` | GUI apps via pacman + AUR (see below) |
+| `12-install-rbw` | always | Installs `rbw` + `pinentry` (Bitwarden CLI) |
+| `13-install-libvirt` | `libvirt_enabled` | QEMU/KVM stack; enables libvirtd; adds user to `libvirt` and `kvm` groups |
+| `14-install-dev-tools` | `dev_tools_enabled` | Full dev toolchain; `visual-studio-code-bin` via paru if enabled |
+| `15-configure-dark-theme` | `niri_enabled` | Installs Adwaita-dark; applies via `gsettings` |
+| `16-install-ai-clients` | `ai.clients.*` | Installs enabled AI clients from AUR via paru |
+
+### Desktop programs (script 11)
+
+| Source | Packages |
+|---|---|
+| pacman | `kitty` `firefox` `discord` `telegram-desktop` `evince` `qbittorrent` `tailscale` `cava` `cmatrix` `obsidian` `termusic` `doublecmd-qt6` |
+| AUR (paru) | `onlyoffice-bin` `zoom` |
+
+### Development tools (script 14)
+
+| Source | Packages |
+|---|---|
+| pacman | `base-devel` `gcc` `clang` `gdb` `lldb` `llvm` `python` `python-pip` `nodejs` `npm` `rustup` `dotnet-sdk` `go` `ninja` `meson` `cmake` `just` |
+| AUR (paru) | `visual-studio-code-bin` |
+
+### AI clients (script 16)
+
+| Source | Packages |
+|---|---|
+| AUR (paru) | `lmstudio` `claude-desktop-bin` |
 
 ## Host feature flags
 
-| Flag | Type | Effect |
-|---|---|---|
-| `paru` | bool | Install rustup + paru AUR helper |
-| `nvidia` | bool | Install NVIDIA DKMS driver and lib32 utils |
-| `zsh` | bool | Install zsh, oh-my-zsh, powerlevel10k theme, autosuggestions and syntax-highlighting plugins |
-| `base_tools_enabled` | bool | Install base CLI toolkit (`eza`, `fzf`, `htop`, `tmux`, and more) |
-| `advanced_tools_enabled` | bool | Install advanced CLI toolkit (`neovim`, `zellij`, `ripgrep`, `btop`, and more) |
-| `niri_enabled` | bool | Install niri desktop environment; deploy kitty, niri, noctalia, swayidle, swaylock configs |
-| `pacman.multilib_enabled` | bool | Enable pacman `[multilib]` repository |
-| `pacman.parallel` | int | `ParallelDownloads` value in `pacman.conf` (default: `1`) |
+Flags are set per-host in `.chezmoidata.toml`. Unknown hosts are prompted interactively.
+
+### Top-level flags
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `paru` | bool | `false` | Build and install paru AUR helper |
+| `nvidia` | bool | `false` | Auto-detect and install NVIDIA DKMS driver |
+| `zsh` | bool | `false` | Install zsh + oh-my-zsh + powerlevel10k |
+| `base_tools_enabled` | bool | `false` | Install base CLI toolkit |
+| `advanced_tools_enabled` | bool | `false` | Install advanced CLI toolkit |
+| `niri_enabled` | bool | `false` | Install niri desktop environment and all desktop scripts |
+| `libvirt_enabled` | bool | `false` | Install QEMU/KVM virtualisation stack |
+| `dev_tools_enabled` | bool | `false` | Install development toolchain |
+
+### `[hostname.pacman]`
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `multilib_enabled` | bool | `false` | Enable pacman `[multilib]` repository |
+| `parallel` | int | `1` | `ParallelDownloads` value in `pacman.conf` |
+
+### `[hostname.reflector]`
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `countries` | string | `""` | Comma-separated country list (empty = no filter) |
+| `sort` | string | `"age"` | Sort method: `age`, `rate`, `country`, `score`, `delay` |
+| `servers` | int | `5` | Number of mirrors to select (`--latest`) |
+
+### `[hostname.ai.clients]`
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `lmstudio` | bool | `false` | Install LM Studio (local AI model runner) |
+| `claude` | bool | `false` | Install Claude desktop client |
 
 ## Base packages
 
@@ -68,19 +124,17 @@ Always installed regardless of host:
 
 ## GPU driver selection
 
-Detection uses `lspci` model name matching:
+Detection uses `lspci` model name matching. Kernel headers are auto-detected from `uname -r`.
 
 | GPU generation | Examples | Driver | lib32 |
 |---|---|---|---|
-| Turing / Ampere / Ada / Blackwell (RTX 20xx+, GTX 16xx) | RTX 3070, GTX 1660 | `nvidia-dkms` | `lib32-nvidia-utils` |
-| Pascal / Maxwell (GTX 10xx, GTX 9xx, MX 1xx/2xx) | GTX 1080, GTX 970 | `nvidia-580xx-dkms` | `lib32-nvidia-580xx-utils` |
+| Turing / Ampere / Ada+ (RTX 20xx+, GTX 16xx) | RTX 3070, GTX 1660 | `nvidia-dkms` | `lib32-nvidia-utils` |
+| Pascal / Maxwell (GTX 10xx, GTX 9xx, MX 1–2xx) | GTX 1080, GTX 970 | `nvidia-580xx-dkms` | `lib32-nvidia-580xx-utils` |
 | Kepler (GTX 600/700) | GTX 780, GTX 660 | `nvidia-470xx-dkms` | `lib32-nvidia-470xx-utils` |
 | Fermi (GTX 400/500) | GTX 580, GTX 460 | `nvidia-390xx-dkms` | `lib32-nvidia-390xx-utils` |
 | Tesla / Curie (GeForce 8/9/100–300) | 9800 GT, 8600 GT | `nvidia-340xx-dkms` | — |
 
-Legacy drivers (anything other than `nvidia-dkms`) are AUR packages and require `paru = true`.
-
-Kernel headers are auto-detected from `uname -r` (`linux`, `linux-lts`, `linux-zen`, `linux-hardened`).
+Legacy drivers (anything except `nvidia-dkms`) are AUR packages and require `paru = true`.
 
 ## Managing encryption recipients
 
