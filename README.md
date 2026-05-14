@@ -41,20 +41,21 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `00-configure-pacman` | always | Sets `ParallelDownloads`; enables `[multilib]` if configured |
 | `01-install-base-packages` | always | Installs essential system packages via pacman |
 | `02-install-reflector` | always | Installs reflector; writes `/etc/xdg/reflector/reflector.conf` from host data; enables daily timer |
-| `03-install-paru` | `paru` | Installs rustup (pacman) then builds paru from AUR; sets `MAKEFLAGS=-j$(nproc)` |
-| `04-install-nvidia` | `nvidia` | Detects GPU generation via `lspci`; installs matching DKMS driver + kernel headers + lib32 |
-| `05-install-zsh` | `zsh` | Installs zsh, oh-my-zsh, powerlevel10k, autosuggestions, syntax-highlighting; sets default shell |
-| `06-install-base-tools` | `base_tools_enabled` | `eza fd fzf htop jq yq rsync tree tmux` |
-| `07-install-advanced-tools` | `advanced_tools_enabled` | `ncdu duf btop zellij neovim just fastfetch ripgrep` and more |
-| `08-install-niri` | `niri_enabled` | Niri compositor, swaylock, greetd/tuigreet, fonts, `wl-clipboard`; deploys ACPI/udev/greetd system configs |
-| `09-install-noctalia-shell` | `niri_enabled` + `paru` | Installs noctalia-shell, pipewire-jack, qt6-multimedia-ffmpeg from AUR |
-| `10-configure-pipewire` | always | Installs PipeWire stack; enables pipewire, pipewire-pulse, wireplumber user services |
-| `11-install-desktop-programs` | `niri_enabled` | GUI apps via pacman + AUR (see below) |
-| `12-install-rbw` | `rbw_enabled` | Installs `rbw` + `pinentry` (Bitwarden CLI) |
-| `13-install-libvirt` | `libvirt_enabled` | QEMU/KVM stack; enables libvirtd; adds user to `libvirt` and `kvm` groups |
-| `14-install-dev-tools` | `dev_tools_enabled` | Full dev toolchain; `visual-studio-code-bin` via paru if enabled |
-| `15-configure-dark-theme` | `niri_enabled` | Installs Adwaita-dark; applies via `gsettings` |
-| `16-install-ai-clients` | `ai.clients.*` | Installs enabled AI clients from AUR via paru |
+| `03-install-system-config` | always | Installs `terminus-font`; deploys `/etc/modprobe.d/`, `/etc/ssh/sshd_config`, `locale.conf`, `locale.gen` (runs `locale-gen`), `vconsole.conf` |
+| `04-install-paru` | `paru` | Installs rustup (pacman) then builds paru from AUR; sets `MAKEFLAGS=-j$(nproc)` |
+| `05-install-nvidia` | `nvidia` | Detects GPU generation via `lspci`; installs matching DKMS driver + kernel headers + lib32 |
+| `06-install-zsh` | `zsh` | Installs zsh, oh-my-zsh, powerlevel10k, autosuggestions, syntax-highlighting; sets default shell |
+| `07-install-base-tools` | `base_tools_enabled` | `eza fd fzf htop jq yq rsync tree tmux` |
+| `08-install-advanced-tools` | `advanced_tools_enabled` | `ncdu duf btop zellij neovim just fastfetch ripgrep` and more |
+| `09-install-niri` | `niri_enabled` | Niri compositor, swaylock, greetd/tuigreet, fonts, `wl-clipboard`; deploys ACPI/udev/greetd system configs |
+| `10-install-noctalia-shell` | `niri_enabled` + `paru` | Installs noctalia-shell, pipewire-jack, qt6-multimedia-ffmpeg from AUR |
+| `11-install-pipewire` | always | Installs PipeWire stack; enables pipewire, pipewire-pulse, wireplumber user services |
+| `12-install-desktop-programs` | `niri_enabled` | GUI apps via pacman + AUR (see below) |
+| `13-install-rbw` | `rbw_enabled` | Installs `rbw` + `pinentry` (Bitwarden CLI) |
+| `14-install-libvirt` | `libvirt_enabled` | QEMU/KVM stack; enables libvirtd; adds user to `libvirt` and `kvm` groups |
+| `15-install-dev-tools` | `dev_tools_enabled` | Full dev toolchain; `visual-studio-code-bin` via paru if enabled |
+| `16-configure-dark-theme` | `niri_enabled` | Installs Adwaita-dark; applies via `gsettings` |
+| `17-install-ai-clients` | `ai.clients.*` | Installs enabled AI clients from AUR via paru |
 
 ### Desktop programs (script 11)
 

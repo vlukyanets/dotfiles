@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "==> Installing system configuration packages..."
+
+sudo pacman -S --needed --noconfirm terminus-font
+
+echo "==> Installing system configuration files..."
+
+# /etc/modprobe.d/  (root:root 644)
+sudo mkdir -p /etc/modprobe.d
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/modprobe.d/nobeep.conf" /etc/modprobe.d/nobeep.conf
+sudo chown root:root /etc/modprobe.d/nobeep.conf
+sudo chmod 644 /etc/modprobe.d/nobeep.conf
+
+# /etc/ssh/sshd_config  (root:root 600)
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/ssh/sshd_config" /etc/ssh/sshd_config
+sudo chown root:root /etc/ssh/sshd_config
+sudo chmod 600 /etc/ssh/sshd_config
+
+# /etc/locale.conf  (root:root 644)
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/locale.conf" /etc/locale.conf
+sudo chown root:root /etc/locale.conf
+sudo chmod 644 /etc/locale.conf
+
+# /etc/locale.gen  (root:root 644)
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/locale.gen" /etc/locale.gen
+sudo chown root:root /etc/locale.gen
+sudo chmod 644 /etc/locale.gen
+sudo locale-gen
+
+# /etc/vconsole.conf  (root:root 644)
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/vconsole.conf" /etc/vconsole.conf
+sudo chown root:root /etc/vconsole.conf
+sudo chmod 644 /etc/vconsole.conf
+
+echo "==> System configuration installed."
+
+# chezmoi:tracking modprobe.d/nobeep.conf={{ include "system/etc/modprobe.d/nobeep.conf" | sha256sum }}
+# chezmoi:tracking ssh/sshd_config={{ include "system/etc/ssh/sshd_config" | sha256sum }}
+# chezmoi:tracking locale.conf={{ include "system/etc/locale.conf" | sha256sum }}
+# chezmoi:tracking locale.gen={{ include "system/etc/locale.gen" | sha256sum }}
+# chezmoi:tracking vconsole.conf={{ include "system/etc/vconsole.conf" | sha256sum }}

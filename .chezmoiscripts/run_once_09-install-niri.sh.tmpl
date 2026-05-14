@@ -38,21 +38,19 @@ sudo cp "{{ .chezmoi.sourceDir }}/system/etc/greetd/config.toml" /etc/greetd/con
 sudo chown root:greeter /etc/greetd/config.toml
 sudo chmod 644 /etc/greetd/config.toml
 
-# /etc/acpi events and actions  (root:root 644 / 755)
-sudo mkdir -p /etc/acpi/events /etc/acpi/actions
-sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/events/ac-adapter"    /etc/acpi/events/ac-adapter
-sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/events/power-button"  /etc/acpi/events/power-button
-sudo chmod 644 /etc/acpi/events/ac-adapter /etc/acpi/events/power-button
-sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/actions/ac-adapter.sh"   /etc/acpi/actions/ac-adapter.sh
-sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/actions/power-button.sh" /etc/acpi/actions/power-button.sh
-sudo chmod 755 /etc/acpi/actions/ac-adapter.sh /etc/acpi/actions/power-button.sh
-sudo chown -R root:root /etc/acpi/events /etc/acpi/actions
+# /etc/acpi  (root:root)
+sudo mkdir -p /etc/acpi/events
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/events/lid" /etc/acpi/events/lid
+sudo chmod 644 /etc/acpi/events/lid
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/lid.sh" /etc/acpi/lid.sh
+sudo chmod 755 /etc/acpi/lid.sh
+sudo chown -R root:root /etc/acpi/events /etc/acpi/lid.sh
 
-# /etc/udev/rules.d/60-backlight.rules  (root:root 644)
+# /etc/udev/rules.d/99-power-profile.rules  (root:root 644)
 sudo mkdir -p /etc/udev/rules.d
-sudo cp "{{ .chezmoi.sourceDir }}/system/etc/udev/rules.d/60-backlight.rules" /etc/udev/rules.d/60-backlight.rules
-sudo chown root:root /etc/udev/rules.d/60-backlight.rules
-sudo chmod 644 /etc/udev/rules.d/60-backlight.rules
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/udev/rules.d/99-power-profile.rules" /etc/udev/rules.d/99-power-profile.rules
+sudo chown root:root /etc/udev/rules.d/99-power-profile.rules
+sudo chmod 644 /etc/udev/rules.d/99-power-profile.rules
 sudo udevadm control --reload-rules
 
 # /usr/local/bin/power-profile-switch.sh  (root:root 755)
@@ -63,9 +61,7 @@ sudo chmod 755 /usr/local/bin/power-profile-switch.sh
 echo "==> Niri and desktop environment installed (pacman packages + system config)."
 
 # chezmoi:tracking greetd/config.toml={{ include "system/etc/greetd/config.toml" | sha256sum }}
-# chezmoi:tracking acpi/events/ac-adapter={{ include "system/etc/acpi/events/ac-adapter" | sha256sum }}
-# chezmoi:tracking acpi/events/power-button={{ include "system/etc/acpi/events/power-button" | sha256sum }}
-# chezmoi:tracking acpi/actions/ac-adapter.sh={{ include "system/etc/acpi/actions/ac-adapter.sh" | sha256sum }}
-# chezmoi:tracking acpi/actions/power-button.sh={{ include "system/etc/acpi/actions/power-button.sh" | sha256sum }}
-# chezmoi:tracking udev/60-backlight.rules={{ include "system/etc/udev/rules.d/60-backlight.rules" | sha256sum }}
+# chezmoi:tracking acpi/events/lid={{ include "system/etc/acpi/events/lid" | sha256sum }}
+# chezmoi:tracking acpi/lid.sh={{ include "system/etc/acpi/lid.sh" | sha256sum }}
+# chezmoi:tracking udev/99-power-profile.rules={{ include "system/etc/udev/rules.d/99-power-profile.rules" | sha256sum }}
 # chezmoi:tracking power-profile-switch.sh={{ include "system/usr/local/bin/power-profile-switch.sh" | sha256sum }}
