@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "==> Installing rbw (Bitwarden CLI)..."
+
+sudo pacman -S --needed --noconfirm \
+    rbw \
+    pinentry
+
+echo "==> rbw installed."
