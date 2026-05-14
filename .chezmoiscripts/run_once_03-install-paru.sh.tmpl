@@ -43,4 +43,9 @@ git clone --depth=1 https://aur.archlinux.org/paru.git "${PARU_BUILD_DIR}/paru"
 cd "${PARU_BUILD_DIR}/paru"
 makepkg -si --noconfirm
 
+echo "==> Configuring makepkg..."
+
+# Set parallel compilation based on available CPU cores
+sudo sed -i 's/^#\?MAKEFLAGS=.*/MAKEFLAGS="-j$(nproc)"/' /etc/makepkg.conf
+
 echo "==> paru installed."
