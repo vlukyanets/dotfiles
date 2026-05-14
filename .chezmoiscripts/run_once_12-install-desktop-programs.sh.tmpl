@@ -25,6 +25,7 @@ sudo pacman -S --needed --noconfirm \
 echo "==> Enabling tailscale service..."
 
 sudo systemctl enable --now tailscaled.service
+sudo tailscale set --operator="${USER}"
 
 {{ if .paru_enabled -}}
 echo "==> Installing AUR desktop programs..."
