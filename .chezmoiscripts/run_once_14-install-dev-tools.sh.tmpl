@@ -31,4 +31,18 @@ echo "==> Setting up Rust stable toolchain..."
 
 rustup default stable
 
+{{ if .paru_enabled -}}
+echo "==> Installing AUR development tools..."
+
+if ! command -v paru &>/dev/null; then
+    echo "ERROR: paru is required for AUR packages but not found."
+    exit 1
+fi
+
+paru -S --needed --noconfirm visual-studio-code-bin
+
+{{- else -}}
+echo "==> Skipping AUR development tools (paru disabled): visual-studio-code-bin"
+{{- end }}
+
 echo "==> Development tools installed."
