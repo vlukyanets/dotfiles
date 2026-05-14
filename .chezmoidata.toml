@@ -6,6 +6,7 @@ advanced_tools_enabled = true
 niri_enabled           = true
 libvirt_enabled        = true
 dev_tools_enabled      = true
+rbw_enabled            = true
 identity               = "~/.ssh/id_ed25519"
 
 [hyper-lin.pacman]
@@ -28,6 +29,7 @@ zsh                = true
 base_tools_enabled = true
 libvirt_enabled    = false
 dev_tools_enabled  = false
+rbw_enabled        = false
 identity           = "~/.ssh/id_ed25519"
 
 [echo-server.pacman]

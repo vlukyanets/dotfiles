@@ -1,62 +1,65 @@
 {{- $hostname := .chezmoi.hostname -}}
 {{- $identity := env "AGE_IDENTITY" | default (joinPath .chezmoi.homeDir ".ssh/id_ed25519") -}}
 
-{{- $paru            := false -}}
-{{- $nvidia          := false -}}
-{{- $zsh             := false -}}
-{{- $multilibEnabled := false -}}
-{{- $parallel        := 1 -}}
-{{- $baseTools       := false -}}
-{{- $advancedTools   := false -}}
-{{- $niri            := false -}}
-{{- $libvirt         := false -}}
-{{- $devTools        := false -}}
-{{- $aiLmstudio      := false -}}
-{{- $aiClaude    := false -}}
-{{- $reflectorCountries   := "" -}}
-{{- $reflectorSort        := "age" -}}
-{{- $reflectorServers     := 5 -}}
+{{- $paru               := false -}}
+{{- $nvidia             := false -}}
+{{- $zsh                := false -}}
+{{- $multilibEnabled    := false -}}
+{{- $parallel           := 1 -}}
+{{- $baseTools          := false -}}
+{{- $advancedTools      := false -}}
+{{- $niri               := false -}}
+{{- $libvirt            := false -}}
+{{- $devTools           := false -}}
+{{- $rbw                := false -}}
+{{- $aiLmstudio         := false -}}
+{{- $aiClaude           := false -}}
+{{- $reflectorCountries := "" -}}
+{{- $reflectorSort      := "age" -}}
+{{- $reflectorServers   := 5 -}}
 
 {{- if stat (joinPath .chezmoi.sourceDir ".chezmoidata.toml") -}}
 {{-   $allHosts := fromToml (include ".chezmoidata.toml") -}}
 {{-   if hasKey $allHosts $hostname -}}
-{{-     $cfg             := get $allHosts $hostname -}}
-{{-     $paru             = get $cfg "paru" -}}
-{{-     $nvidia           = get $cfg "nvidia" -}}
-{{-     $zsh              = get $cfg "zsh" | default false -}}
-{{-     $pacman          := get $cfg "pacman" | default dict -}}
-{{-     $multilibEnabled  = get $pacman "multilib_enabled" | default false -}}
-{{-     $parallel         = get $pacman "parallel" | default 1 -}}
-{{-     $baseTools        = get $cfg "base_tools_enabled"    | default false -}}
-{{-     $advancedTools    = get $cfg "advanced_tools_enabled" | default false -}}
-{{-     $niri             = get $cfg "niri_enabled"    | default false -}}
-{{-     $libvirt          = get $cfg "libvirt_enabled" | default false -}}
-{{-     $devTools         = get $cfg "dev_tools_enabled" | default false -}}
-{{-     $ai              := get $cfg "ai" | default dict -}}
-{{-     $aiClients       := get $ai "clients" | default dict -}}
-{{-     $aiLmstudio       = get $aiClients "lmstudio"    | default false -}}
-{{-     $aiClaude     = get $aiClients "claude" | default false -}}
-{{-     $reflector            := get $cfg "reflector" | default dict -}}
-{{-     $reflectorCountries    = get $reflector "countries" | default "" -}}
-{{-     $reflectorSort         = get $reflector "sort"      | default "age" -}}
-{{-     $reflectorServers      = get $reflector "servers"   | default 5 -}}
+{{-     $cfg            := get $allHosts $hostname -}}
+{{-     $paru            = get $cfg "paru"                    -}}
+{{-     $nvidia          = get $cfg "nvidia"                  -}}
+{{-     $zsh             = get $cfg "zsh"             | default false -}}
+{{-     $pacman         := get $cfg "pacman"          | default dict -}}
+{{-     $multilibEnabled = get $pacman "multilib_enabled"     | default false -}}
+{{-     $parallel        = get $pacman "parallel"             | default 1 -}}
+{{-     $baseTools       = get $cfg "base_tools_enabled"      | default false -}}
+{{-     $advancedTools   = get $cfg "advanced_tools_enabled"  | default false -}}
+{{-     $niri            = get $cfg "niri_enabled"            | default false -}}
+{{-     $libvirt         = get $cfg "libvirt_enabled"         | default false -}}
+{{-     $devTools        = get $cfg "dev_tools_enabled"       | default false -}}
+{{-     $rbw             = get $cfg "rbw_enabled"             | default false -}}
+{{-     $ai             := get $cfg "ai"              | default dict -}}
+{{-     $aiClients      := get $ai  "clients"         | default dict -}}
+{{-     $aiLmstudio      = get $aiClients "lmstudio"  | default false -}}
+{{-     $aiClaude        = get $aiClients "claude"    | default false -}}
+{{-     $reflector      := get $cfg "reflector"       | default dict -}}
+{{-     $reflectorCountries = get $reflector "countries" | default "" -}}
+{{-     $reflectorSort      = get $reflector "sort"      | default "age" -}}
+{{-     $reflectorServers   = get $reflector "servers"   | default 5 -}}
 {{-   end -}}
 {{- else -}}
-{{-   $paru            = promptBoolOnce . "paru_enabled"            "Enable paru AUR helper installation" -}}
-{{-   $nvidia          = promptBoolOnce . "nvidia_enabled"          "Enable NVIDIA driver installation" -}}
-{{-   $zsh             = promptBoolOnce . "zsh_enabled"             "Enable zsh + oh-my-zsh + powerlevel10k installation" -}}
-{{-   $multilibEnabled = promptBoolOnce . "pacman_multilib_enabled" "Enable pacman multilib repository" -}}
-{{-   $parallel        = promptIntOnce  . "pacman_parallel"         "Pacman parallel downloads count" -}}
-{{-   $baseTools       = promptBoolOnce . "base_tools_enabled"      "Install base CLI tools (eza, fzf, htop, tmux…)" -}}
-{{-   $advancedTools   = promptBoolOnce . "advanced_tools_enabled"  "Install advanced tools (neovim, zellij, ripgrep…)" -}}
-{{-   $niri            = promptBoolOnce . "niri_enabled"     "Install niri Wayland compositor and desktop environment" -}}
-{{-   $libvirt        = promptBoolOnce . "libvirt_enabled"  "Install libvirt/QEMU virtualization stack" -}}
-{{-   $devTools       = promptBoolOnce . "dev_tools_enabled" "Install development tools (gcc, clang, python, node, rust, go…)" -}}
-{{-   $aiLmstudio     = promptBoolOnce . "ai_lmstudio"      "Install LM Studio (AI model runner)" -}}
-{{-   $aiClaude   = promptBoolOnce . "ai_claude"   "Install Claude Code CLI" -}}
-{{-   $reflectorCountries   = promptStringOnce . "reflector_countries"    "Reflector mirror countries (comma-separated, empty for no filter)" -}}
-{{-   $reflectorSort        = promptStringOnce . "reflector_sort"         "Reflector sort method (age, rate, country, score, delay)" -}}
-{{-   $reflectorServers     = promptIntOnce    . "reflector_servers"      "Number of reflector mirrors to select" -}}
+{{-   $paru            = promptBoolOnce   . "paru_enabled"            "Enable paru AUR helper installation" -}}
+{{-   $nvidia          = promptBoolOnce   . "nvidia_enabled"          "Enable NVIDIA driver installation" -}}
+{{-   $zsh             = promptBoolOnce   . "zsh_enabled"             "Enable zsh + oh-my-zsh + powerlevel10k installation" -}}
+{{-   $multilibEnabled = promptBoolOnce   . "pacman_multilib_enabled" "Enable pacman multilib repository" -}}
+{{-   $parallel        = promptIntOnce    . "pacman_parallel"         "Pacman parallel downloads count" -}}
+{{-   $baseTools       = promptBoolOnce   . "base_tools_enabled"      "Install base CLI tools (eza, fzf, htop, tmux…)" -}}
+{{-   $advancedTools   = promptBoolOnce   . "advanced_tools_enabled"  "Install advanced tools (neovim, zellij, ripgrep…)" -}}
+{{-   $niri            = promptBoolOnce   . "niri_enabled"            "Install niri Wayland compositor and desktop environment" -}}
+{{-   $libvirt         = promptBoolOnce   . "libvirt_enabled"         "Install libvirt/QEMU virtualization stack" -}}
+{{-   $devTools        = promptBoolOnce   . "dev_tools_enabled"       "Install development tools (gcc, clang, python, node, rust, go…)" -}}
+{{-   $rbw             = promptBoolOnce   . "rbw_enabled"             "Install rbw (Bitwarden CLI)" -}}
+{{-   $aiLmstudio      = promptBoolOnce   . "ai_lmstudio"             "Install LM Studio (AI model runner)" -}}
+{{-   $aiClaude        = promptBoolOnce   . "ai_claude"               "Install Claude desktop client" -}}
+{{-   $reflectorCountries = promptStringOnce . "reflector_countries"  "Reflector mirror countries (comma-separated, empty for no filter)" -}}
+{{-   $reflectorSort      = promptStringOnce . "reflector_sort"       "Reflector sort method (age, rate, country, score, delay)" -}}
+{{-   $reflectorServers   = promptIntOnce    . "reflector_servers"    "Number of reflector mirrors to select" -}}
 {{- end -}}
 
 encryption = "age"
@@ -75,14 +78,15 @@ encryption = "age"
     niri_enabled           = {{ $niri }}
     libvirt_enabled        = {{ $libvirt }}
     dev_tools_enabled      = {{ $devTools }}
+    rbw_enabled            = {{ $rbw }}
 
 [data.pacman]
     multilib_enabled = {{ $multilibEnabled }}
     parallel         = {{ $parallel }}
 
 [data.ai.clients]
-    lmstudio    = {{ $aiLmstudio }}
-    claude = {{ $aiClaude }}
+    lmstudio = {{ $aiLmstudio }}
+    claude   = {{ $aiClaude }}
 
 [data.reflector]
     countries = "{{ $reflectorCountries }}"

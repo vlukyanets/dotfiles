@@ -50,7 +50,7 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `09-install-noctalia-shell` | `niri_enabled` + `paru` | Installs noctalia-shell, pipewire-jack, qt6-multimedia-ffmpeg from AUR |
 | `10-configure-pipewire` | always | Installs PipeWire stack; enables pipewire, pipewire-pulse, wireplumber user services |
 | `11-install-desktop-programs` | `niri_enabled` | GUI apps via pacman + AUR (see below) |
-| `12-install-rbw` | always | Installs `rbw` + `pinentry` (Bitwarden CLI) |
+| `12-install-rbw` | `rbw_enabled` | Installs `rbw` + `pinentry` (Bitwarden CLI) |
 | `13-install-libvirt` | `libvirt_enabled` | QEMU/KVM stack; enables libvirtd; adds user to `libvirt` and `kvm` groups |
 | `14-install-dev-tools` | `dev_tools_enabled` | Full dev toolchain; `visual-studio-code-bin` via paru if enabled |
 | `15-configure-dark-theme` | `niri_enabled` | Installs Adwaita-dark; applies via `gsettings` |
@@ -92,6 +92,7 @@ Flags are set per-host in `.chezmoidata.toml`. Unknown hosts are prompted intera
 | `niri_enabled` | bool | `false` | Install niri desktop environment and all desktop scripts |
 | `libvirt_enabled` | bool | `false` | Install QEMU/KVM virtualisation stack |
 | `dev_tools_enabled` | bool | `false` | Install development toolchain |
+| `rbw_enabled` | bool | `false` | Install rbw Bitwarden CLI + pinentry |
 
 ### `[hostname.pacman]`
 

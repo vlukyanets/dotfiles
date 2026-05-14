@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+{{ if not .rbw_enabled -}}
+echo "==> rbw installation skipped (disabled in config)."
+exit 0
+{{- end }}
 
 set -euo pipefail
 
