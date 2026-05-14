@@ -38,6 +38,7 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | Script | Condition | What it does |
 |---|---|---|
 | `before_00-configure-git-hooks` | always | Configures `.githooks` path in the source repo |
+| `before_01-deploy-ssh-keys` | always | Decrypts host-specific SSH keys from `keys/<hostname>/` and places them in `~/.ssh/` |
 | `00-configure-pacman` | always | Sets `ParallelDownloads`; enables `[multilib]` if configured |
 | `01-install-base-packages` | always | Installs essential system packages via pacman |
 | `02-install-reflector` | always | Installs reflector; writes `/etc/xdg/reflector/reflector.conf` from host data; enables daily timer |
@@ -137,6 +138,32 @@ Detection uses `lspci` model name matching. Kernel headers are auto-detected fro
 | Tesla / Curie (GeForce 8/9/100–300) | 9800 GT, 8600 GT | `nvidia-340xx-dkms` | — |
 
 Legacy drivers (anything except `nvidia-dkms`) are AUR packages and require `paru = true`.
+
+## SSH keys
+
+Per-host SSH keys are stored encrypted in `keys/<hostname>/`. On apply, `before_01-deploy-ssh-keys` decrypts all `.age` files and copies all `.pub` files into `~/.ssh/` automatically.
+
+**Directory layout:**
+```
+keys/
+  hyper-lin/
+    id_ed25519.age      # encrypted private key
+    id_ed25519.pub      # public key (plaintext)
+  echo-server/
+    id_ed25519.age
+    id_ed25519.pub
+```
+
+**Adding a key for a host:**
+```sh
+# Encrypt the private key to all recipients
+age -R .age-recipients -o keys/<hostname>/id_ed25519.age ~/.ssh/id_ed25519
+# Copy the public key as-is
+cp ~/.ssh/id_ed25519.pub keys/<hostname>/id_ed25519.pub
+git add keys/<hostname>/ && git commit
+```
+
+The decryption identity is controlled by the `AGE_IDENTITY` environment variable (default: `~/.ssh/id_ed25519`). Multiple key files per host are supported — every `.age` file in the directory is decrypted.
 
 ## Managing encryption recipients
 

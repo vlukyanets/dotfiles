@@ -5,6 +5,7 @@
 README.md
 bootstrap.sh
 system
+keys
 
 # ZSH files
 {{- if not .zsh_enabled }}

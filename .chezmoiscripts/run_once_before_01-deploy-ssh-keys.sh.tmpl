@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+KEYS_DIR="{{ .chezmoi.sourceDir }}/keys/{{ .chezmoi.hostname }}"
+
+if [[ ! -d "${KEYS_DIR}" ]]; then
+    echo "==> No SSH keys directory found for host {{ .chezmoi.hostname }}, skipping."
+    exit 0
+fi
+
+# Count deployable files
+shopt -s nullglob
+age_files=("${KEYS_DIR}"/*.age)
+pub_files=("${KEYS_DIR}"/*.pub)
+shopt -u nullglob
+
+if [[ ${#age_files[@]} -eq 0 && ${#pub_files[@]} -eq 0 ]]; then
+    echo "==> No SSH key files found for host {{ .chezmoi.hostname }}, skipping."
+    exit 0
+fi
+
+echo "==> Deploying SSH keys for {{ .chezmoi.hostname }}..."
+
+mkdir -p "${HOME}/.ssh"
+chmod 700 "${HOME}/.ssh"
+
+AGE_CMD="{{ env "AGE_CMD" | default "age" }}"
+AGE_ID="{{ env "AGE_IDENTITY" | default (joinPath .chezmoi.homeDir ".ssh/id_ed25519") }}"
+
+for encrypted_key in "${age_files[@]}"; do
+    key_name="$(basename "${encrypted_key%.age}")"
+    echo "--> Decrypting ${key_name}..."
+    "${AGE_CMD}" -d -i "${AGE_ID}" -o "${HOME}/.ssh/${key_name}" "${encrypted_key}"
+    chmod 600 "${HOME}/.ssh/${key_name}"
+done
+
+for pub_key in "${pub_files[@]}"; do
+    key_name="$(basename "${pub_key}")"
+    echo "--> Copying ${key_name}..."
+    cp "${pub_key}" "${HOME}/.ssh/${key_name}"
+    chmod 644 "${HOME}/.ssh/${key_name}"
+done
+
+echo "==> SSH keys deployed."
