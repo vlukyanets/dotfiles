@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+{{ if not .libvirt_enabled -}}
+echo "==> libvirt/QEMU installation skipped (disabled in config)."
+exit 0
+{{- end }}
 
 set -euo pipefail
 

@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+{{ if not .dev_tools_enabled -}}
+echo "==> Development tools installation skipped (disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> Installing development tools..."
+
+sudo pacman -S --needed --noconfirm \
+    base-devel \
+    gcc \
+    clang \
+    gdb \
+    lldb \
+    llvm \
+    python \
+    python-pip \
+    nodejs \
+    npm \
+    rustup \
+    dotnet-sdk \
+    go \
+    ninja \
+    meson \
+    cmake \
+    just
+
+echo "==> Setting up Rust stable toolchain..."
+
+rustup default stable
+
+echo "==> Development tools installed."
