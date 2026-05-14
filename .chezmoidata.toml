@@ -2,6 +2,7 @@
 paru                   = true
 nvidia                 = true
 zsh                    = true
+base_tools_enabled     = true
 advanced_tools_enabled = true
 niri_enabled           = true
 libvirt_enabled        = true
