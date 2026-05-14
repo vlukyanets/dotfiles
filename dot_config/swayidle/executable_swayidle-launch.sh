@@ -27,6 +27,7 @@ case "$PROFILE" in
             timeout 180  'niri msg action power-off-monitors' \
             resume       'niri msg action' \
             timeout 200  "${LOCK_CMD}" \
+            timeout 600  'systemctl suspend' \
             before-sleep "${LOCK_CMD}"
         ;;
 
