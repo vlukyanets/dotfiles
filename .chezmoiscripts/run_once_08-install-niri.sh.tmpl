@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+{{ if not .niri_enabled -}}
+echo "==> Niri installation skipped (disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> Installing niri Wayland compositor and desktop environment..."
+
+sudo pacman -S --needed --noconfirm \
+    niri \
+    xwayland-satellite \
+    xdg-desktop-portal-gtk \
+    brightnessctl \
+    swayidle \
+    swaylock \
+    acpid \
+    greetd \
+    greetd-tuigreet \
+    xdg-utils \
+    ttf-firacode-nerd \
+    noto-fonts-emoji \
+    power-profiles-daemon
+
+echo "==> Enabling system services..."
+
+sudo systemctl enable --now acpid.service
+sudo systemctl enable --now power-profiles-daemon.service
+sudo systemctl enable greetd.service
+
+echo "==> Installing system configs..."
+
+# /etc/greetd/config.toml  (root:greeter 644)
+sudo mkdir -p /etc/greetd
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/greetd/config.toml" /etc/greetd/config.toml
+sudo chown root:greeter /etc/greetd/config.toml
+sudo chmod 644 /etc/greetd/config.toml
+
+# /etc/acpi events and actions  (root:root 644 / 755)
+sudo mkdir -p /etc/acpi/events /etc/acpi/actions
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/events/ac-adapter"    /etc/acpi/events/ac-adapter
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/events/power-button"  /etc/acpi/events/power-button
+sudo chmod 644 /etc/acpi/events/ac-adapter /etc/acpi/events/power-button
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/actions/ac-adapter.sh"   /etc/acpi/actions/ac-adapter.sh
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/actions/power-button.sh" /etc/acpi/actions/power-button.sh
+sudo chmod 755 /etc/acpi/actions/ac-adapter.sh /etc/acpi/actions/power-button.sh
+sudo chown -R root:root /etc/acpi/events /etc/acpi/actions
+
+# /etc/udev/rules.d/60-backlight.rules  (root:root 644)
+sudo mkdir -p /etc/udev/rules.d
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/udev/rules.d/60-backlight.rules" /etc/udev/rules.d/60-backlight.rules
+sudo chown root:root /etc/udev/rules.d/60-backlight.rules
+sudo chmod 644 /etc/udev/rules.d/60-backlight.rules
+sudo udevadm control --reload-rules
+
+# /usr/local/bin/power-profile-switch.sh  (root:root 755)
+sudo cp "{{ .chezmoi.sourceDir }}/system/usr/local/bin/power-profile-switch.sh" /usr/local/bin/power-profile-switch.sh
+sudo chown root:root /usr/local/bin/power-profile-switch.sh
+sudo chmod 755 /usr/local/bin/power-profile-switch.sh
+
+echo "==> Niri and desktop environment installed (pacman packages + system config)."

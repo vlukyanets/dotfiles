@@ -4,9 +4,19 @@
 # Repo-only files — not deployed to ~
 README.md
 bootstrap.sh
+system
 
 # ZSH files
 {{- if not .zsh_enabled }}
 .zshrc
 .p10k.zsh
+{{- end }}
+
+# Niri desktop environment configs
+{{- if not .niri_enabled }}
+.config/kitty
+.config/niri
+.config/noctalia
+.config/swayidle
+.config/swaylock
 {{- end }}

@@ -8,6 +8,7 @@
 {{- $parallel        := 1 -}}
 {{- $baseTools       := false -}}
 {{- $advancedTools   := false -}}
+{{- $niri            := false -}}
 
 {{- if stat (joinPath .chezmoi.sourceDir ".chezmoidata.toml") -}}
 {{-   $allHosts := fromToml (include ".chezmoidata.toml") -}}
@@ -21,6 +22,7 @@
 {{-     $parallel         = get $pacman "parallel" | default 1 -}}
 {{-     $baseTools        = get $cfg "base_tools_enabled"    | default false -}}
 {{-     $advancedTools    = get $cfg "advanced_tools_enabled" | default false -}}
+{{-     $niri             = get $cfg "niri_enabled" | default false -}}
 {{-   end -}}
 {{- else -}}
 {{-   $paru            = promptBoolOnce . "paru_enabled"            "Enable paru AUR helper installation" -}}
@@ -30,6 +32,7 @@
 {{-   $parallel        = promptIntOnce  . "pacman_parallel"         "Pacman parallel downloads count" -}}
 {{-   $baseTools       = promptBoolOnce . "base_tools_enabled"      "Install base CLI tools (eza, fzf, htop, tmux…)" -}}
 {{-   $advancedTools   = promptBoolOnce . "advanced_tools_enabled"  "Install advanced tools (neovim, zellij, ripgrep…)" -}}
+{{-   $niri            = promptBoolOnce . "niri_enabled"            "Install niri Wayland compositor and desktop environment" -}}
 {{- end -}}
 
 encryption = "age"
@@ -45,6 +48,7 @@ encryption = "age"
     zsh_enabled            = {{ $zsh }}
     base_tools_enabled     = {{ $baseTools }}
     advanced_tools_enabled = {{ $advancedTools }}
+    niri_enabled           = {{ $niri }}
 
 [data.pacman]
     multilib_enabled = {{ $multilibEnabled }}

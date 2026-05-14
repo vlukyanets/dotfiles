@@ -3,11 +3,17 @@ paru                   = true
 nvidia                 = true
 zsh                    = true
 advanced_tools_enabled = true
-identity = "~/.ssh/id_ed25519"
+niri_enabled           = true
+identity               = "~/.ssh/id_ed25519"
 
 [hyper-lin.pacman]
 multilib_enabled = true
 parallel         = 4
+
+[hyper-lin.reflector]
+countries = "Ukraine,Poland,Slovakia"
+sort      = "rate"
+servers   = 20
 
 [echo-server]
 paru               = true
@@ -19,3 +25,8 @@ identity           = "~/.ssh/id_ed25519"
 [echo-server.pacman]
 multilib_enabled = true
 parallel         = 2
+
+[echo-server.reflector]
+countries = "Ukraine,Poland"
+sort      = "rate"
+servers   = 10

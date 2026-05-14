@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "==> Installing reflector..."
+
+pacman -Qi reflector &>/dev/null && _reflector_was_present=1 || _reflector_was_present=0
+
+sudo pacman -S --needed --noconfirm reflector
+
+echo "==> Installing reflector config..."
+
+# /etc/xdg/reflector/reflector.conf  (root:root 644)
+sudo mkdir -p /etc/xdg/reflector
+chezmoi execute-template \
+    < "{{ .chezmoi.sourceDir }}/system/etc/xdg/reflector/reflector.conf.tmpl" \
+    | sudo tee /etc/xdg/reflector/reflector.conf > /dev/null
+sudo chown root:root /etc/xdg/reflector/reflector.conf
+sudo chmod 644 /etc/xdg/reflector/reflector.conf
+
+echo "==> Configuring reflector timer (daily schedule)..."
+
+TIMER=/usr/lib/systemd/system/reflector.timer
+
+sudo sed -i 's/^OnCalendar=.*/OnCalendar=daily/' "$TIMER"
+
+if sudo grep -q '^RandomizedDelaySec=' "$TIMER"; then
+    sudo sed -i 's/^RandomizedDelaySec=.*/RandomizedDelaySec=1h/' "$TIMER"
+else
+    sudo sed -i '/^\[Timer\]/a RandomizedDelaySec=1h' "$TIMER"
+fi
+
+sudo systemctl daemon-reload
+
+echo "==> Enabling reflector timer..."
+
+sudo systemctl enable --now reflector.timer
+
+if [[ $_reflector_was_present -eq 0 ]]; then
+    echo "==> Running reflector for the first time (take a time depending on config)..."
+    sudo systemctl start reflector.service
+fi
+
+echo "==> Reflector installed and timer enabled."

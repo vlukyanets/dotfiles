@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+{{ if not .niri_enabled -}}
+echo "==> Noctalia-shell installation skipped (niri disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> Installing noctalia-shell (AUR)..."
+
+# noctalia-shell: stable AUR release instead of noctalia-shell-git
+{{ if .paru_enabled -}}
+if ! command -v paru &>/dev/null; then
+    echo "ERROR: paru is required for noctalia-shell (AUR) but not found."
+    exit 1
+fi
+
+# pipewire-jack: PipeWire-native JACK, no separate jack2 daemon needed
+# qt6-multimedia-ffmpeg: lighter FFmpeg backend instead of qt6-multimedia-gstreamer
+paru -S --needed --noconfirm \
+    noctalia-shell \
+    pipewire-jack \
+    qt6-multimedia-ffmpeg
+
+{{- else -}}
+echo "ERROR: noctalia-shell is an AUR package. Enable paru in .chezmoidata.toml or install manually."
+exit 1
+{{- end }}
+
+echo "==> noctalia-shell installed."

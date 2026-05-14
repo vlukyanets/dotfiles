@@ -1,0 +1,6 @@
+[default_session]
+command = "tuigreet --time --remember --remember-session --sessions /usr/share/xsessions:/usr/share/wayland-sessions"
+user = "greeter"
+
+[terminal]
+vt = 1

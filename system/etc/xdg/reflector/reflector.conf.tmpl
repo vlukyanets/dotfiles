@@ -1,0 +1,13 @@
+{{- $host := index . .chezmoi.hostname -}}
+{{- $r := index $host "reflector" -}}
+{{- $servers := 5 -}}
+{{- $sort := "age" -}}
+{{- if and $r (index $r "servers") }}{{- $servers = index $r "servers" -}}{{- end -}}
+{{- if and $r (index $r "sort") }}{{- $sort = index $r "sort" -}}{{- end -}}
+--save /etc/pacman.d/mirrorlist
+--protocol https
+--latest {{ $servers }}
+--sort {{ $sort }}
+{{- if and $r (index $r "countries") }}
+--country {{ index $r "countries" }}
+{{- end }}
