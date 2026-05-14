@@ -1,0 +1,31 @@
+[user]
+	name  = Valentin Lukyanets
+	email = valikluks95@gmail.com
+
+[core]
+	editor   = {{ env "EDITOR" | default "nano" }}
+	autocrlf = input
+	pager    = less -FRX
+
+[init]
+	defaultBranch = main
+
+[diff]
+	algorithm  = histogram
+	colorMoved = default
+
+[push]
+	default         = simple
+	autoSetupRemote = true
+
+[pull]
+	rebase = true
+
+[fetch]
+	prune = true
+
+[alias]
+	lg      = log --oneline --graph --decorate --all
+	st      = status -sb
+	undo    = reset --soft HEAD~1
+	aliases = config --get-regexp alias
