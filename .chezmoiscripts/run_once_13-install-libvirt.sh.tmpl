@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "==> Installing libvirt/QEMU virtualization stack..."
+
+sudo pacman -S --needed --noconfirm \
+    qemu-desktop \
+    libvirt \
+    virt-manager \
+    virt-viewer \
+    dnsmasq \
+    edk2-ovmf \
+    swtpm
+
+echo "==> Enabling libvirt services..."
+
+sudo systemctl enable --now libvirtd.service
+sudo systemctl enable --now virtlogd.socket
+
+echo "==> Adding user to virtualization groups..."
+
+sudo usermod -aG libvirt "${USER}"
+sudo usermod -aG kvm     "${USER}"
+
+echo "==> libvirt/QEMU installed. Re-login required for group membership to take effect."
