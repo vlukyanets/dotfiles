@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+{{ if not .niri_enabled -}}
+echo "==> Desktop programs installation skipped (niri disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> Installing desktop programs..."
+
+sudo pacman -S --needed --noconfirm \
+    kitty \
+    firefox \
+    discord \
+    telegram-desktop \
+    evince \
+    qbittorrent \
+    tailscale \
+    cava \
+    cmatrix \
+    obsidian \
+    termusic \
+    doublecmd-qt6
+
+echo "==> Enabling tailscale service..."
+
+sudo systemctl enable --now tailscaled.service
+
+{{ if .paru_enabled -}}
+echo "==> Installing AUR desktop programs..."
+
+if ! command -v paru &>/dev/null; then
+    echo "ERROR: paru is required for AUR packages but not found."
+    exit 1
+fi
+
+paru -S --needed --noconfirm \
+    onlyoffice-bin \
+    zoom
+
+{{- else -}}
+echo "==> Skipping AUR desktop programs (paru disabled): onlyoffice-bin, zoom"
+{{- end }}
+
+echo "==> Desktop programs installed."
