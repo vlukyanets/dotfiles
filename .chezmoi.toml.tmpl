@@ -9,6 +9,9 @@
 {{- $baseTools       := false -}}
 {{- $advancedTools   := false -}}
 {{- $niri            := false -}}
+{{- $reflectorCountries   := "" -}}
+{{- $reflectorSort        := "age" -}}
+{{- $reflectorServers     := 5 -}}
 
 {{- if stat (joinPath .chezmoi.sourceDir ".chezmoidata.toml") -}}
 {{-   $allHosts := fromToml (include ".chezmoidata.toml") -}}
@@ -23,6 +26,10 @@
 {{-     $baseTools        = get $cfg "base_tools_enabled"    | default false -}}
 {{-     $advancedTools    = get $cfg "advanced_tools_enabled" | default false -}}
 {{-     $niri             = get $cfg "niri_enabled" | default false -}}
+{{-     $reflector            := get $cfg "reflector" | default dict -}}
+{{-     $reflectorCountries    = get $reflector "countries" | default "" -}}
+{{-     $reflectorSort         = get $reflector "sort"      | default "age" -}}
+{{-     $reflectorServers      = get $reflector "servers"   | default 5 -}}
 {{-   end -}}
 {{- else -}}
 {{-   $paru            = promptBoolOnce . "paru_enabled"            "Enable paru AUR helper installation" -}}
@@ -32,7 +39,10 @@
 {{-   $parallel        = promptIntOnce  . "pacman_parallel"         "Pacman parallel downloads count" -}}
 {{-   $baseTools       = promptBoolOnce . "base_tools_enabled"      "Install base CLI tools (eza, fzf, htop, tmux…)" -}}
 {{-   $advancedTools   = promptBoolOnce . "advanced_tools_enabled"  "Install advanced tools (neovim, zellij, ripgrep…)" -}}
-{{-   $niri            = promptBoolOnce . "niri_enabled"            "Install niri Wayland compositor and desktop environment" -}}
+{{-   $niri            = promptBoolOnce   . "niri_enabled"            "Install niri Wayland compositor and desktop environment" -}}
+{{-   $reflectorCountries   = promptStringOnce . "reflector_countries"    "Reflector mirror countries (comma-separated, empty for no filter)" -}}
+{{-   $reflectorSort        = promptStringOnce . "reflector_sort"         "Reflector sort method (age, rate, country, score, delay)" -}}
+{{-   $reflectorServers     = promptIntOnce    . "reflector_servers"      "Number of reflector mirrors to select" -}}
 {{- end -}}
 
 encryption = "age"
@@ -53,3 +63,8 @@ encryption = "age"
 [data.pacman]
     multilib_enabled = {{ $multilibEnabled }}
     parallel         = {{ $parallel }}
+
+[data.reflector]
+    countries = "{{ $reflectorCountries }}"
+    sort      = "{{ $reflectorSort }}"
+    servers   = {{ $reflectorServers }}

@@ -60,3 +60,11 @@ sudo chown root:root /usr/local/bin/power-profile-switch.sh
 sudo chmod 755 /usr/local/bin/power-profile-switch.sh
 
 echo "==> Niri and desktop environment installed (pacman packages + system config)."
+
+# chezmoi:tracking greetd/config.toml={{ include "system/etc/greetd/config.toml" | sha256sum }}
+# chezmoi:tracking acpi/events/ac-adapter={{ include "system/etc/acpi/events/ac-adapter" | sha256sum }}
+# chezmoi:tracking acpi/events/power-button={{ include "system/etc/acpi/events/power-button" | sha256sum }}
+# chezmoi:tracking acpi/actions/ac-adapter.sh={{ include "system/etc/acpi/actions/ac-adapter.sh" | sha256sum }}
+# chezmoi:tracking acpi/actions/power-button.sh={{ include "system/etc/acpi/actions/power-button.sh" | sha256sum }}
+# chezmoi:tracking udev/60-backlight.rules={{ include "system/etc/udev/rules.d/60-backlight.rules" | sha256sum }}
+# chezmoi:tracking power-profile-switch.sh={{ include "system/usr/local/bin/power-profile-switch.sh" | sha256sum }}

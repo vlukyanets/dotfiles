@@ -12,9 +12,15 @@ echo "==> Installing reflector config..."
 
 # /etc/xdg/reflector/reflector.conf  (root:root 644)
 sudo mkdir -p /etc/xdg/reflector
-chezmoi execute-template \
-    < "{{ .chezmoi.sourceDir }}/system/etc/xdg/reflector/reflector.conf.tmpl" \
-    | sudo tee /etc/xdg/reflector/reflector.conf > /dev/null
+sudo tee /etc/xdg/reflector/reflector.conf > /dev/null <<'EOF'
+--save /etc/pacman.d/mirrorlist
+--protocol https
+--latest {{ .reflector.servers }}
+--sort {{ .reflector.sort }}
+{{- if .reflector.countries }}
+--country {{ .reflector.countries }}
+{{- end }}
+EOF
 sudo chown root:root /etc/xdg/reflector/reflector.conf
 sudo chmod 644 /etc/xdg/reflector/reflector.conf
 
