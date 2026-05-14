@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "==> Installing Docker..."
+
+sudo pacman -S --needed --noconfirm \
+    docker \
+    docker-buildx \
+    docker-compose
+
+echo "==> Enabling Docker service..."
+
+sudo systemctl enable --now docker.service
+
+echo "==> Adding user to docker group..."
+
+sudo usermod -aG docker "${USER}"
+
+echo "==> Docker installed. Re-login required for group membership to take effect."

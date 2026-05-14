@@ -55,8 +55,9 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `13-install-rbw` | `rbw_enabled` | Installs `rbw` + `pinentry` (Bitwarden CLI) |
 | `14-install-libvirt` | `libvirt_enabled` | QEMU/KVM stack; enables libvirtd; adds user to `libvirt` and `kvm` groups |
 | `15-install-dev-tools` | `dev_tools_enabled` | Full dev toolchain; `visual-studio-code-bin` via paru if enabled |
-| `16-configure-dark-theme` | `niri_enabled` | Installs Adwaita-dark; applies via `gsettings` |
-| `17-install-ai-clients` | `ai.clients.*` | Installs enabled AI clients from AUR via paru |
+| `16-install-docker` | always | Installs `docker`, `docker-buildx`, `docker-compose`; enables docker service; adds user to `docker` group |
+| `17-configure-dark-theme` | `niri_enabled` | Installs Adwaita-dark; applies via `gsettings` |
+| `18-install-ai-clients` | `ai.clients.*` | Installs enabled AI clients from AUR via paru |
 
 ### Desktop programs (script 11)
 
