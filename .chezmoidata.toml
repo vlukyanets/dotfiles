@@ -17,6 +17,10 @@ countries = "Ukraine,Poland,Slovakia"
 sort      = "rate"
 servers   = 20
 
+[hyper-lin.ai.clients]
+lmstudio    = true
+claude = true
+
 [echo-server]
 paru               = true
 nvidia             = true
@@ -34,3 +38,7 @@ parallel         = 2
 countries = "Ukraine,Poland"
 sort      = "rate"
 servers   = 10
+
+[echo-server.ai.clients]
+lmstudio    = false
+claude = false

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+{{ if and (not .ai.clients.lmstudio) (not .ai.clients.claude) -}}
+echo "==> AI clients installation skipped (all disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+if ! command -v paru &>/dev/null; then
+    echo "ERROR: paru is required for AI clients (AUR packages) but not found."
+    exit 1
+fi
+
+echo "==> Installing AI clients..."
+
+packages=(
+{{- if .ai.clients.lmstudio }}
+    lmstudio
+{{- end }}
+{{- if .ai.clients.claude }}
+    claude-desktop-bin
+{{- end }}
+)
+
+paru -S --needed --noconfirm "${packages[@]}"
+
+echo "==> AI clients installed."

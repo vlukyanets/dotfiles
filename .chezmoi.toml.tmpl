@@ -11,6 +11,8 @@
 {{- $niri            := false -}}
 {{- $libvirt         := false -}}
 {{- $devTools        := false -}}
+{{- $aiLmstudio      := false -}}
+{{- $aiClaude    := false -}}
 {{- $reflectorCountries   := "" -}}
 {{- $reflectorSort        := "age" -}}
 {{- $reflectorServers     := 5 -}}
@@ -30,6 +32,10 @@
 {{-     $niri             = get $cfg "niri_enabled"    | default false -}}
 {{-     $libvirt          = get $cfg "libvirt_enabled" | default false -}}
 {{-     $devTools         = get $cfg "dev_tools_enabled" | default false -}}
+{{-     $ai              := get $cfg "ai" | default dict -}}
+{{-     $aiClients       := get $ai "clients" | default dict -}}
+{{-     $aiLmstudio       = get $aiClients "lmstudio"    | default false -}}
+{{-     $aiClaude     = get $aiClients "claude" | default false -}}
 {{-     $reflector            := get $cfg "reflector" | default dict -}}
 {{-     $reflectorCountries    = get $reflector "countries" | default "" -}}
 {{-     $reflectorSort         = get $reflector "sort"      | default "age" -}}
@@ -46,6 +52,8 @@
 {{-   $niri            = promptBoolOnce . "niri_enabled"     "Install niri Wayland compositor and desktop environment" -}}
 {{-   $libvirt        = promptBoolOnce . "libvirt_enabled"  "Install libvirt/QEMU virtualization stack" -}}
 {{-   $devTools       = promptBoolOnce . "dev_tools_enabled" "Install development tools (gcc, clang, python, node, rust, go…)" -}}
+{{-   $aiLmstudio     = promptBoolOnce . "ai_lmstudio"      "Install LM Studio (AI model runner)" -}}
+{{-   $aiClaude   = promptBoolOnce . "ai_claude"   "Install Claude Code CLI" -}}
 {{-   $reflectorCountries   = promptStringOnce . "reflector_countries"    "Reflector mirror countries (comma-separated, empty for no filter)" -}}
 {{-   $reflectorSort        = promptStringOnce . "reflector_sort"         "Reflector sort method (age, rate, country, score, delay)" -}}
 {{-   $reflectorServers     = promptIntOnce    . "reflector_servers"      "Number of reflector mirrors to select" -}}
@@ -71,6 +79,10 @@ encryption = "age"
 [data.pacman]
     multilib_enabled = {{ $multilibEnabled }}
     parallel         = {{ $parallel }}
+
+[data.ai.clients]
+    lmstudio    = {{ $aiLmstudio }}
+    claude = {{ $aiClaude }}
 
 [data.reflector]
     countries = "{{ $reflectorCountries }}"
