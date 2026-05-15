@@ -26,8 +26,8 @@ case "$PROFILE" in
             resume       'brightnessctl -r' \
             timeout 180  'niri msg action power-off-monitors' \
             resume       'niri msg action' \
-            timeout 200  "${LOCK_CMD}" \
-            timeout 600  'systemctl suspend' \
+            timeout 300  "${LOCK_CMD}" \
+            timeout 600  'systemctl sleep' \
             before-sleep "${LOCK_CMD}"
         ;;
 
