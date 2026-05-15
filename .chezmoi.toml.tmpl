@@ -23,9 +23,9 @@
 {{-   $allHosts := fromToml (include ".chezmoidata.toml") -}}
 {{-   if hasKey $allHosts $hostname -}}
 {{-     $cfg            := get $allHosts $hostname -}}
-{{-     $paru            = get $cfg "paru"                    -}}
-{{-     $nvidia          = get $cfg "nvidia"                  -}}
-{{-     $zsh             = get $cfg "zsh"             | default false -}}
+{{-     $paru            = get $cfg "paru_enabled"            | default false -}}
+{{-     $nvidia          = get $cfg "nvidia_enabled"          | default false -}}
+{{-     $zsh             = get $cfg "zsh_enabled"             | default false -}}
 {{-     $pacman         := get $cfg "pacman"          | default dict -}}
 {{-     $multilibEnabled = get $pacman "multilib_enabled"     | default false -}}
 {{-     $parallel        = get $pacman "parallel"             | default 1 -}}

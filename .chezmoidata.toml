@@ -1,7 +1,7 @@
 [hyper-lin]
-paru                   = true
-nvidia                 = true
-zsh                    = true
+paru_enabled           = true
+nvidia_enabled         = true
+zsh_enabled            = true
 base_tools_enabled     = true
 advanced_tools_enabled = true
 niri_enabled           = true
@@ -25,9 +25,9 @@ lmstudio = true
 claude   = true
 
 [echo-server]
-paru                   = true
-nvidia                 = true
-zsh                    = true
+paru_enabled           = true
+nvidia_enabled         = true
+zsh_enabled            = true
 base_tools_enabled     = true
 advanced_tools_enabled = false
 niri_enabled           = false
