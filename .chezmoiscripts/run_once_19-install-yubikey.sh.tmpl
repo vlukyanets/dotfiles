@@ -23,9 +23,16 @@ sudo mkdir -p /etc/udev/rules.d
 sudo cp "{{ .chezmoi.sourceDir }}/system/etc/udev/rules.d/70-u2f.rules" /etc/udev/rules.d/70-u2f.rules
 sudo chown root:root /etc/udev/rules.d/70-u2f.rules
 sudo chmod 644 /etc/udev/rules.d/70-u2f.rules
+
+# /usr/local/bin/yubikey-next-id  (root:root 755)
+sudo cp "{{ .chezmoi.sourceDir }}/system/usr/local/bin/yubikey-next-id" /usr/local/bin/yubikey-next-id
+sudo chown root:root /usr/local/bin/yubikey-next-id
+sudo chmod 755 /usr/local/bin/yubikey-next-id
+
 sudo udevadm control --reload-rules
 sudo udevadm trigger
 
 echo "==> YubiKey setup complete."
 
 # chezmoi:tracking udev/70-u2f.rules={{ include "system/etc/udev/rules.d/70-u2f.rules" | sha256sum }}
+# chezmoi:tracking yubikey-next-id={{ include "system/usr/local/bin/yubikey-next-id" | sha256sum }}

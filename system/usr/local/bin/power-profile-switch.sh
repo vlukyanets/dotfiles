@@ -93,8 +93,8 @@ case "$PROFILE" in
 
         set_cpu_governor performance
 
-        brightnessctl set 100% 2>/dev/null \
-            && logger -t "$LOG_TAG" "Brightness -> 100%"
+        brightnessctl -r 2>/dev/null \
+            && logger -t "$LOG_TAG" "Brightness restored"
 
         set_user_env POWER_PROFILE ac
         run_as_user systemctl --user restart swayidle.service \
@@ -108,8 +108,9 @@ case "$PROFILE" in
 
         set_cpu_governor powersave
 
-        brightnessctl set 50% 2>/dev/null \
-            && logger -t "$LOG_TAG" "Brightness -> 50%"
+        _bright_half=$(( $(brightnessctl get 2>/dev/null || echo 0) / 2 ))
+        brightnessctl -s set "$_bright_half" 2>/dev/null \
+            && logger -t "$LOG_TAG" "Brightness saved -> half ($_bright_half)"
 
         set_user_env POWER_PROFILE battery
         run_as_user systemctl --user restart swayidle.service \
