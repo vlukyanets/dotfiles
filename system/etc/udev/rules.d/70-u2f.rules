@@ -1,0 +1,7 @@
+# YubiKey udev rules — grant logged-in user access via uaccess
+
+# YubiKey USB (all product variants)
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1050", TAG+="uaccess"
+
+# YubiKey HID (FIDO2/U2F hidraw interface)
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1050", TAG+="uaccess"

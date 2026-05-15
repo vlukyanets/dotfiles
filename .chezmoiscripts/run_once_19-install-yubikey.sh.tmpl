@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+{{ if not .yubikey_enabled -}}
+echo "==> YubiKey setup skipped (disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> Installing YubiKey packages..."
+
+sudo pacman -S --needed --noconfirm \
+    yubikey-manager \
+    libfido2 \
+    ccid \
+    pcsclite \
+    usbutils
+
+sudo systemctl enable --now pcscd.socket
+
+echo "==> Deploying YubiKey udev rules..."
+
+sudo mkdir -p /etc/udev/rules.d
+sudo cp "{{ .chezmoi.sourceDir }}/system/etc/udev/rules.d/70-u2f.rules" /etc/udev/rules.d/70-u2f.rules
+sudo chown root:root /etc/udev/rules.d/70-u2f.rules
+sudo chmod 644 /etc/udev/rules.d/70-u2f.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+echo "==> YubiKey setup complete."
+
+# chezmoi:tracking udev/70-u2f.rules={{ include "system/etc/udev/rules.d/70-u2f.rules" | sha256sum }}

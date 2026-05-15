@@ -8,6 +8,7 @@ niri_enabled           = true
 libvirt_enabled        = true
 dev_tools_enabled      = true
 rbw_enabled            = true
+yubikey_enabled        = true
 identity               = "~/.ssh/id_ed25519"
 
 [hyper-lin.pacman]
@@ -33,6 +34,7 @@ niri_enabled           = false
 libvirt_enabled        = true
 dev_tools_enabled      = false
 rbw_enabled            = false
+yubikey_enabled        = false
 identity               = "~/.ssh/id_ed25519"
 
 [echo-server.pacman]

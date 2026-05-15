@@ -12,6 +12,7 @@
 {{- $libvirt            := false -}}
 {{- $devTools           := false -}}
 {{- $rbw                := false -}}
+{{- $yubikey            := false -}}
 {{- $aiLmstudio         := false -}}
 {{- $aiClaude           := false -}}
 {{- $reflectorCountries := "" -}}
@@ -34,6 +35,7 @@
 {{-     $libvirt         = get $cfg "libvirt_enabled"         | default false -}}
 {{-     $devTools        = get $cfg "dev_tools_enabled"       | default false -}}
 {{-     $rbw             = get $cfg "rbw_enabled"             | default false -}}
+{{-     $yubikey         = get $cfg "yubikey_enabled"         | default false -}}
 {{-     $ai             := get $cfg "ai"              | default dict -}}
 {{-     $aiClients      := get $ai  "clients"         | default dict -}}
 {{-     $aiLmstudio      = get $aiClients "lmstudio"  | default false -}}
@@ -55,6 +57,7 @@
 {{-   $libvirt         = promptBoolOnce   . "libvirt_enabled"         "Install libvirt/QEMU virtualization stack" -}}
 {{-   $devTools        = promptBoolOnce   . "dev_tools_enabled"       "Install development tools (gcc, clang, python, node, rust, go…)" -}}
 {{-   $rbw             = promptBoolOnce   . "rbw_enabled"             "Install rbw (Bitwarden CLI)" -}}
+{{-   $yubikey         = promptBoolOnce   . "yubikey_enabled"         "Install YubiKey tools and udev rules" -}}
 {{-   $aiLmstudio      = promptBoolOnce   . "ai_lmstudio"             "Install LM Studio (AI model runner)" -}}
 {{-   $aiClaude        = promptBoolOnce   . "ai_claude"               "Install Claude desktop client" -}}
 {{-   $reflectorCountries = promptStringOnce . "reflector_countries"  "Reflector mirror countries (comma-separated, empty for no filter)" -}}
@@ -79,6 +82,7 @@ encryption = "age"
     libvirt_enabled        = {{ $libvirt }}
     dev_tools_enabled      = {{ $devTools }}
     rbw_enabled            = {{ $rbw }}
+    yubikey_enabled        = {{ $yubikey }}
 
 [data.pacman]
     multilib_enabled = {{ $multilibEnabled }}
