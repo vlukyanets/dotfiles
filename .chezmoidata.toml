@@ -24,14 +24,16 @@ lmstudio = true
 claude   = true
 
 [echo-server]
-paru               = true
-nvidia             = true
-zsh                = true
-base_tools_enabled = true
-libvirt_enabled    = true
-dev_tools_enabled  = false
-rbw_enabled        = false
-identity           = "~/.ssh/id_ed25519"
+paru                   = true
+nvidia                 = true
+zsh                    = true
+base_tools_enabled     = true
+advanced_tools_enabled = false
+niri_enabled           = false
+libvirt_enabled        = true
+dev_tools_enabled      = false
+rbw_enabled            = false
+identity               = "~/.ssh/id_ed25519"
 
 [echo-server.pacman]
 multilib_enabled = true
