@@ -29,3 +29,11 @@ fi
 if command -v zoxide &>/dev/null; then
     eval "$(zoxide init zsh)"
 fi
+
+if command -v eza &>/dev/null; then
+    alias lf='eza --icons --group-directories-first'
+    alias ll='eza -lh --icons --group-directories-first'
+    alias la='eza -lha --icons --group-directories-first'
+    alias lt='eza --tree --icons --group-directories-first'
+    alias lf1='eza -1 --icons --group-directories-first'
+fi
