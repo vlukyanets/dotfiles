@@ -46,6 +46,11 @@ sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/lid.sh" /etc/acpi/lid.sh
 sudo chmod 755 /etc/acpi/lid.sh
 sudo chown -R root:root /etc/acpi/events /etc/acpi/lid.sh
 
+# /etc/systemd/logind.conf — disable lid-switch suspend (acpid lid.sh manages display instead)
+sudo sed -i 's/^#\?HandleLidSwitch=.*/HandleLidSwitch=ignore/' /etc/systemd/logind.conf
+sudo sed -i 's/^#\?HandleLidSwitchExternalPower=.*/HandleLidSwitchExternalPower=ignore/' /etc/systemd/logind.conf
+sudo systemctl restart systemd-logind
+
 # /etc/udev/rules.d/99-power-profile.rules  (root:root 644)
 sudo mkdir -p /etc/udev/rules.d
 sudo cp "{{ .chezmoi.sourceDir }}/system/etc/udev/rules.d/99-power-profile.rules" /etc/udev/rules.d/99-power-profile.rules
