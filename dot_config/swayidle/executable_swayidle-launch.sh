@@ -4,8 +4,6 @@ get_systemd_user_env() { local v=$(systemctl --user show-environment | grep "^${
 
 PROFILE=$(get_systemd_user_env "POWER_PROFILE" "battery")
 LOCK_CMD="${HOME}/.config/swaylock/lock.sh"
-NIRI_DPMS_OFF="niri msg action power-off-monitors"
-NIRI_DPMS_ON="niri msg action"
 
 log() { logger -t "swayidle-launch" "$*"; }
 
@@ -18,7 +16,7 @@ case "$PROFILE" in
             resume       'brightnessctl -r' \
             timeout 1200 'niri msg action power-off-monitors' \
             resume       'niri msg action' \
-            before-sleep "${LOCK_CMD}"
+            timeout 1500 "${LOCK_CMD}"
         ;;
     battery)
         exec swayidle -w \
