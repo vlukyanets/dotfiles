@@ -24,7 +24,7 @@
         "showCategories": true,
         "showIconBackground": false,
         "sortByMostUsed": true,
-        "terminalCommand": "ghostty -e",
+        "terminalCommand": "kitty -e",
         "viewMode": "list"
     },
     "audio": {
@@ -666,9 +666,9 @@
     },
     "ui": {
         "boxBorderEnabled": false,
-        "fontDefault": "Sans Serif",
+        "fontDefault": "FiraCode Nerd Font",
         "fontDefaultScale": 1,
-        "fontFixed": "monospace",
+        "fontFixed": "FiraCode Nerd Font Mono",
         "fontFixedScale": 1,
         "panelBackgroundOpacity": 1,
         "panelsAttachedToBar": true,
