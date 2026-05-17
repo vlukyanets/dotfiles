@@ -59,15 +59,7 @@ else
     NVIDIA_LIB32="lib32-nvidia-utils"
 fi
 
-echo "Driver: ${DRIVER_PACKAGE} ${NVIDIA_LIB32}"
-
-# ── Guard: already installed? ────────────────────────────────────────────────
-if pacman -Qq "${DRIVER_PACKAGE}" &>/dev/null; then
-    echo "${DRIVER_PACKAGE} already installed. Skipping."
-    exit 0
-fi
-
-# ── Auto-detect and install matching kernel headers (required for DKMS) ──────
+# ── Auto-detect matching kernel headers (required for DKMS) ──────────────────
 KERNEL_RELEASE=$(uname -r)
 if   [[ "${KERNEL_RELEASE}" == *"-zen"*      ]]; then HEADERS_PKG="linux-zen-headers"
 elif [[ "${KERNEL_RELEASE}" == *"-lts"*      ]]; then HEADERS_PKG="linux-lts-headers"
@@ -75,14 +67,11 @@ elif [[ "${KERNEL_RELEASE}" == *"-hardened"* ]]; then HEADERS_PKG="linux-hardene
 else                                                  HEADERS_PKG="linux-headers"
 fi
 
-if ! pacman -Qq "${HEADERS_PKG}" &>/dev/null; then
-    echo "--> Installing ${HEADERS_PKG}..."
-    sudo pacman -S --needed --noconfirm "${HEADERS_PKG}"
-fi
+echo "Driver: ${DRIVER_PACKAGE} ${NVIDIA_LIB32} ${HEADERS_PKG}"
 
-# ── Install driver (and optional lib32) ──────────────────────────────────────
+# ── Install driver, headers, and optional lib32 ───────────────────────────────
 install_packages() {
-    local pkgs=("${DRIVER_PACKAGE}")
+    local pkgs=("${DRIVER_PACKAGE}" "${HEADERS_PKG}")
     [[ -n "${NVIDIA_LIB32}" ]] && pkgs+=("${NVIDIA_LIB32}")
 
     if [[ "${DRIVER_PACKAGE}" == "nvidia-dkms" ]]; then
@@ -96,7 +85,7 @@ install_packages() {
         fi
         paru -S --needed --noconfirm "${pkgs[@]}"
         {{- else -}}
-        echo "ERROR: ${DRIVER_PACKAGE} is an AUR package. Enable paru in .chezmoidata.toml or install manually."
+        echo "ERROR: ${DRIVER_PACKAGE} is an AUR package. Enable paru in config or install manually."
         exit 1
         {{- end }}
     fi
