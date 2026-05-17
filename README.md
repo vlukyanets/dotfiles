@@ -8,18 +8,7 @@ Modular chezmoi dotfiles targeting Arch Linux. Supports multiple hosts with per-
 |---|---|---|
 | `curl` | Download bootstrap script | `sudo pacman -S curl` |
 | `git` | Clone repo, run hooks | `sudo pacman -S git` |
-| `openssh` | SSH key pair used as age identity | `sudo pacman -S openssh` |
-| `age` / `rage` | Encrypt / decrypt `.age` files | `sudo pacman -S age` or `sudo pacman -S rage-encryption` |
 | `chezmoi` | Apply dotfiles | see Bootstrap below |
-
-An SSH key pair must exist before running bootstrap (`ssh-keygen -t ed25519` if not).
-
-Two environment variables control encryption behaviour:
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `AGE_CMD` | `age` | age-compatible binary to use (`rage`, etc.) |
-| `AGE_IDENTITY` | `~/.ssh/id_ed25519` | SSH private key used for decryption |
 
 ## Bootstrap
 
@@ -27,7 +16,7 @@ Two environment variables control encryption behaviour:
 bash <(curl -fsLS https://raw.githubusercontent.com/vlukyanets/dotfiles/main/bootstrap.sh)
 ```
 
-The script installs missing prerequisites (`age`, `chezmoi`), clones the repo, and runs `chezmoi apply`. Known hostnames are configured automatically from `.chezmoidata.toml`; unknown machines are prompted interactively for each feature flag.
+The script installs missing prerequisites, clones the repo, and runs `chezmoi apply`. Known hostnames are configured automatically from `.chezmoidata.toml`; unknown machines are prompted interactively for each feature flag.
 
 After the first apply, git hooks are active — encrypted files decrypt on checkout and re-encrypt before commit automatically.
 
@@ -143,44 +132,3 @@ Detection uses `lspci` model name matching. Kernel headers are auto-detected fro
 
 Legacy drivers (anything except `nvidia-dkms`) are AUR packages and require `paru = true`.
 
-## SSH keys
-
-Per-host SSH keys are stored encrypted in `keys/<hostname>/`. On apply, `before_01-deploy-ssh-keys` decrypts all `.age` files and copies all `.pub` files into `~/.ssh/` automatically.
-
-**Directory layout:**
-```
-keys/
-  hyper-lin/
-    id_ed25519.age      # encrypted private key
-    id_ed25519.pub      # public key (plaintext)
-  echo-server/
-    id_ed25519.age
-    id_ed25519.pub
-```
-
-**Adding a key for a host:**
-```sh
-# Encrypt the private key to all recipients
-age -R .age-recipients -o keys/<hostname>/id_ed25519.age ~/.ssh/id_ed25519
-# Copy the public key as-is
-cp ~/.ssh/id_ed25519.pub keys/<hostname>/id_ed25519.pub
-git add keys/<hostname>/ && git commit
-```
-
-The decryption identity is controlled by the `AGE_IDENTITY` environment variable (default: `~/.ssh/id_ed25519`). Multiple key files per host are supported — every `.age` file in the directory is decrypted.
-
-## Managing encryption recipients
-
-All SSH public keys authorised to decrypt files are listed in `.age-recipients`. To add a new key:
-
-```sh
-echo "ssh-ed25519 AAAA... # new-machine" >> .age-recipients
-# re-encrypt all age files with the updated recipients list
-for f in *.age; do
-    plain="${f%.age}"
-    rage -d -i ~/.ssh/id_ed25519 -o "$plain" "$f"
-    rage -R .age-recipients -o "$f" "$plain"
-    rm "$plain"
-done
-git add .age-recipients *.age && git commit
-```

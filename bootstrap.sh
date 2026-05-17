@@ -14,16 +14,6 @@ if ! command -v git &>/dev/null; then
     fi
 fi
 
-# ── openssh ───────────────────────────────────────────────────────────────────
-if ! command -v ssh &>/dev/null; then
-    if command -v pacman &>/dev/null; then
-        sudo pacman -S --needed --noconfirm openssh
-    else
-        echo "error: install openssh then re-run this script" >&2
-        exit 1
-    fi
-fi
-
 # ── chezmoi ───────────────────────────────────────────────────────────────────
 if ! command -v chezmoi &>/dev/null; then
     if command -v pacman &>/dev/null; then
