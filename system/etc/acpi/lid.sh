@@ -30,3 +30,11 @@ runuser -u "$REAL_USER" -- \
         niri msg output eDP-1 "$ACTION"
 
 logger "lid.sh: set eDP-1 $ACTION for user $REAL_USER"
+
+if [ "$LID_STATE" = "closed" ]; then
+    CURRENT_PROFILE=$(cat /tmp/current-power-profile 2>/dev/null || echo "ac")
+    if [ "$CURRENT_PROFILE" = "battery" ]; then
+        logger "lid.sh: on battery, triggering sleep"
+        systemctl sleep
+    fi
+fi
