@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-
-set -euo pipefail
-
-git -C "{{ .chezmoi.sourceDir }}" config core.hooksPath .githooks
-echo "==> git: core.hooksPath set to .githooks"

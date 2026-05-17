@@ -10,24 +10,12 @@ Modular chezmoi dotfiles targeting Arch Linux. Supports multiple hosts with per-
 | `git` | Clone repo, run hooks | `sudo pacman -S git` |
 | `chezmoi` | Apply dotfiles | see Bootstrap below |
 
-## Bootstrap
-
-```sh
-bash <(curl -fsLS https://raw.githubusercontent.com/vlukyanets/dotfiles/main/bootstrap.sh)
-```
-
-The script installs missing prerequisites, clones the repo, and runs `chezmoi apply`. Known hostnames are configured automatically from `.chezmoidata.toml`; unknown machines are prompted interactively for each feature flag.
-
-After the first apply, git hooks are active — encrypted files decrypt on checkout and re-encrypt before commit automatically.
-
 ## Install scripts
 
 Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-run only if their content changes (which happens automatically when the package list or any rendered template value changes).
 
 | Script | Condition | What it does |
 |---|---|---|
-| `before_00-configure-git-hooks` | always | Configures `.githooks` path in the source repo |
-| `before_01-deploy-ssh-keys` | always | Decrypts host-specific SSH keys from `keys/<hostname>/` and places them in `~/.ssh/` |
 | `00-configure-pacman` | always | Sets `ParallelDownloads`; enables `[multilib]` if configured |
 | `01-install-base-packages` | always | Installs essential system packages via pacman |
 | `02-install-reflector` | always | Installs reflector; writes `/etc/xdg/reflector/reflector.conf` from host data; enables daily timer |
@@ -35,7 +23,7 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `04-install-paru` | `paru` | Installs rustup (pacman) then builds paru from AUR; sets `MAKEFLAGS=-j$(nproc)` |
 | `05-install-nvidia` | `nvidia` | Detects GPU generation via `lspci`; installs matching DKMS driver + kernel headers + lib32 |
 | `06-install-zsh` | `zsh` | Installs zsh, oh-my-zsh, powerlevel10k, autosuggestions, syntax-highlighting; sets default shell |
-| `07-install-base-tools` | `base_tools_enabled` | `eza fd fzf htop jq yq rsync tree tmux` |
+| `07-install-base-tools` | `base_tools_enabled` | `eza fd fzf htop jq yq rsync tree tmux` and more |
 | `08-install-advanced-tools` | `advanced_tools_enabled` | `ncdu duf btop zellij neovim just fastfetch ripgrep` and more |
 | `09-install-niri` | `niri_enabled` | Niri compositor, swaylock, greetd/tuigreet, fonts, `wl-clipboard`; deploys ACPI/udev/greetd system configs |
 | `10-install-noctalia-shell` | `niri_enabled` + `paru` | Installs noctalia-shell, pipewire-jack, qt6-multimedia-ffmpeg from AUR |
@@ -47,7 +35,7 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `16-install-docker` | always | Installs `docker`, `docker-buildx`, `docker-compose`; enables docker service; adds user to `docker` group |
 | `17-configure-dark-theme` | `niri_enabled` | Installs Adwaita-dark; applies via `gsettings` |
 | `18-install-ai-clients` | `ai.clients.*` | Installs enabled AI clients from AUR via paru |
-| `19-install-yubikey` | `yubikey_enabled` | Installs `yubikey-manager`, `libfido2`, `ccid`, `pcsclite`, `usbutils`; enables `pcscd.socket`; deploys `70-u2f.rules` and `yubikey-next-id` script to `/usr/local/bin/` |
+| `19-install-yubikey` | `yubikey_enabled` | Installs `yubikey-manager`, `libfido2`, `ccid`, `pcsclite`, `usbutils`; enables `pcscd.socket`; deploys `70-u2f.rules`; deploys `yubikey-next-id` script to `/usr/local/bin/` |
 | `20-install-plymouth` | always | Installs Plymouth; uses `plymouth-theme-arch-logo-new` (AUR, requires paru) or `bgrt` fallback; inserts `plymouth` hook into `/etc/mkinitcpio.conf`; rebuilds initramfs |
 
 ### Desktop programs (script 12)
