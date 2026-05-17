@@ -58,22 +58,24 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `16-install-docker` | always | Installs `docker`, `docker-buildx`, `docker-compose`; enables docker service; adds user to `docker` group |
 | `17-configure-dark-theme` | `niri_enabled` | Installs Adwaita-dark; applies via `gsettings` |
 | `18-install-ai-clients` | `ai.clients.*` | Installs enabled AI clients from AUR via paru |
+| `19-install-yubikey` | `yubikey_enabled` | Installs `yubikey-manager`, `libfido2`, `ccid`, `pcsclite`, `usbutils`; enables `pcscd.socket`; deploys `70-u2f.rules` and `yubikey-next-id` script to `/usr/local/bin/` |
+| `20-install-plymouth` | always | Installs Plymouth; uses `plymouth-theme-arch-logo-new` (AUR, requires paru) or `bgrt` fallback; inserts `plymouth` hook into `/etc/mkinitcpio.conf`; rebuilds initramfs |
 
-### Desktop programs (script 11)
+### Desktop programs (script 12)
 
 | Source | Packages |
 |---|---|
-| pacman | `kitty` `firefox` `discord` `telegram-desktop` `evince` `qbittorrent` `tailscale` `cava` `cmatrix` `obsidian` `termusic` `doublecmd-qt6` |
+| pacman | `kitty` `firefox` `discord` `telegram-desktop` `evince` `qbittorrent` `tailscale` `cava` `cmatrix` `obsidian` `termusic` `doublecmd-qt6` `vlc` |
 | AUR (paru) | `onlyoffice-bin` `zoom` |
 
-### Development tools (script 14)
+### Development tools (script 15)
 
 | Source | Packages |
 |---|---|
 | pacman | `base-devel` `gcc` `clang` `gdb` `lldb` `llvm` `python` `python-pip` `nodejs` `npm` `rustup` `dotnet-sdk` `go` `ninja` `meson` `cmake` `just` |
 | AUR (paru) | `visual-studio-code-bin` |
 
-### AI clients (script 16)
+### AI clients (script 18)
 
 | Source | Packages |
 |---|---|
@@ -87,15 +89,16 @@ Flags are set per-host in `.chezmoidata.toml`. Unknown hosts are prompted intera
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
-| `paru` | bool | `false` | Build and install paru AUR helper |
-| `nvidia` | bool | `false` | Auto-detect and install NVIDIA DKMS driver |
-| `zsh` | bool | `false` | Install zsh + oh-my-zsh + powerlevel10k |
+| `paru_enabled` | bool | `false` | Build and install paru AUR helper |
+| `nvidia_enabled` | bool | `false` | Auto-detect and install NVIDIA DKMS driver |
+| `zsh_enabled` | bool | `false` | Install zsh + oh-my-zsh + powerlevel10k |
 | `base_tools_enabled` | bool | `false` | Install base CLI toolkit |
 | `advanced_tools_enabled` | bool | `false` | Install advanced CLI toolkit |
 | `niri_enabled` | bool | `false` | Install niri desktop environment and all desktop scripts |
 | `libvirt_enabled` | bool | `false` | Install QEMU/KVM virtualisation stack |
 | `dev_tools_enabled` | bool | `false` | Install development toolchain |
 | `rbw_enabled` | bool | `false` | Install rbw Bitwarden CLI + pinentry |
+| `yubikey_enabled` | bool | `false` | Install YubiKey tools, enable `pcscd.socket`, deploy U2F udev rules |
 
 ### `[hostname.pacman]`
 
