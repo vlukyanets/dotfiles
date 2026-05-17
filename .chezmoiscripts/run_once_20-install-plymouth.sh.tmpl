@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "==> Installing Plymouth..."
+
+# ── Install Plymouth ─────────────────────────────────────────────────────────
+sudo pacman -S --needed --noconfirm plymouth
+
+# ── Theme selection ───────────────────────────────────────────────────────────
+if command -v paru &>/dev/null; then
+    echo "--> paru detected, installing plymouth-theme-arch-logo-new..."
+    paru -S --needed --noconfirm plymouth-theme-arch-logo-new
+    PLYMOUTH_THEME="arch-logo-new"
+else
+    echo "--> paru not found, using built-in bgrt theme."
+    PLYMOUTH_THEME="bgrt"
+fi
+
+# ── Configure mkinitcpio ──────────────────────────────────────────────────────
+MKINITCPIO_CONF="/etc/mkinitcpio.conf"
+
+if ! grep -qE '^HOOKS=.*\bplymouth\b' "${MKINITCPIO_CONF}"; then
+    echo "--> Adding plymouth hook to mkinitcpio..."
+    if grep -qE '^HOOKS=.*\bsystemd\b' "${MKINITCPIO_CONF}"; then
+        sudo sed -i '/^HOOKS=/ s/\bsystemd\b/systemd plymouth/' "${MKINITCPIO_CONF}"
+    elif grep -qE '^HOOKS=.*\budev\b' "${MKINITCPIO_CONF}"; then
+        sudo sed -i '/^HOOKS=/ s/\budev\b/udev plymouth/' "${MKINITCPIO_CONF}"
+    else
+        sudo sed -i '/^HOOKS=/ s/\bbase\b/base plymouth/' "${MKINITCPIO_CONF}"
+    fi
+else
+    echo "--> plymouth hook already present in mkinitcpio, skipping."
+fi
+
+# ── Set theme and rebuild initramfs ──────────────────────────────────────────
+echo "--> Setting theme '${PLYMOUTH_THEME}' and rebuilding initramfs..."
+sudo plymouth-set-default-theme -R "${PLYMOUTH_THEME}"
+
+echo "==> Plymouth installed and configured."
+echo "    NOTE: Add 'quiet splash' to your kernel command line for the splash screen to appear."
