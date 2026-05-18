@@ -42,38 +42,10 @@ sudo chmod 755 /usr/local/bin/power-profile-switch.sh
 # acpi=force     — forces ACPI even when the BIOS doesn't fully advertise it
 # acpi_osi=Linux — tells the BIOS firmware it's running Linux (some boards
 #                  behave differently and expose S5 power-off only with this)
-PARAMS="acpi=force acpi_osi=Linux"
 
-if bootctl is-installed 2>/dev/null; then
-    ESP="$(bootctl --print-esp-path 2>/dev/null)"
-    ENTRIES="${ESP}/loader/entries"
-    echo "==> Detected systemd-boot (ESP: ${ESP}). Patching kernel entries..."
-    for entry in "${ENTRIES}"/*.conf; do
-        [ -f "$entry" ] || continue
-        if grep -q "^options" "$entry"; then
-            if ! grep -q "acpi=force" "$entry"; then
-                sudo sed -i "s|^options .*|& ${PARAMS}|" "$entry"
-                echo "    Updated: $entry"
-            else
-                echo "    Already has acpi=force: $entry (skipped)"
-            fi
-        fi
-    done
-elif [ -f "/etc/default/grub" ]; then
-    echo "==> Detected GRUB. Patching /etc/default/grub..."
-    if ! grep -q "acpi=force" /etc/default/grub; then
-        sudo sed -i "s|GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"|GRUB_CMDLINE_LINUX_DEFAULT=\"\1 ${PARAMS}\"|" /etc/default/grub
-        sudo grub-mkconfig -o /boot/grub/grub.cfg
-        echo "==> GRUB config regenerated."
-    else
-        echo "==> acpi=force already present in GRUB config, skipping."
-    fi
-else
-    echo "==> WARNING: No bootloader config detected (neither systemd-boot nor GRUB)."
-    echo "    Add the following parameters to your kernel command line manually:"
-    echo "    ${PARAMS}"
-    exit 1
-fi
+PARAMS="acpi=force acpi_osi=Linux"
+echo "==> WARNING: Add the following parameters to your kernel command line manually:"
+echo "    ${PARAMS}"
 
 echo "==> ACPI configuration complete."
 
