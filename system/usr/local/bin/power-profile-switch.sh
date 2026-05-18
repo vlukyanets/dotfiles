@@ -14,6 +14,12 @@ if [[ -z "$USER_NAME" ]]; then
 fi
 RUNTIME_DIR="/run/user/${USER_ID}"
 
+CURRENT_PROFILE_FILE="/tmp/current-power-profile"
+if [[ -f "$CURRENT_PROFILE_FILE" ]] && [[ "$(cat "$CURRENT_PROFILE_FILE")" == "$PROFILE" ]]; then
+    logger -t "$LOG_TAG" "Already on profile=${PROFILE}, no-op"
+    exit 0
+fi
+
 logger -t "$LOG_TAG" "profile=${PROFILE} user=${USER_NAME} uid=${USER_ID}"
 
 run_as_user() {
