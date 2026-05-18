@@ -37,7 +37,7 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `18-install-ai-clients` | `ai.clients.*` | Installs enabled AI clients from AUR via paru |
 | `19-install-yubikey` | `yubikey_enabled` | Installs `yubikey-manager`, `libfido2`, `ccid`, `pcsclite`, `usbutils`; enables `pcscd.socket`; deploys `70-u2f.rules`; deploys `yubikey-next-id.sh` script to `/usr/local/bin/` |
 | `20-install-plymouth` | always | Installs Plymouth; uses `plymouth-theme-arch-logo-new` (AUR, requires paru) or `bgrt` fallback; inserts `plymouth` hook into `/etc/mkinitcpio.conf`; rebuilds initramfs |
-| `21-configure-acpi` | always | Installs `acpid`, `swayidle`, `power-profiles-daemon`; deploys lid-switch handler, logind.conf patch, udev power-profile rules, `power-profile-switch.sh`; adds `acpi=force acpi_osi=Linux` to bootloader (systemd-boot via `bootctl` or GRUB) |
+| `21-configure-acpi` | always | Installs `acpid`, `swayidle`, `power-profiles-daemon`; deploys lid-switch handler, logind.conf patch, udev power-profile rules, `power-profile-switch.sh`; strictly recommends to add ACPI-related kernel parameters to kernel command line |
 
 ### Desktop programs (script 12)
 
