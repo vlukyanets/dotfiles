@@ -15,19 +15,15 @@ sudo pacman -S --needed --noconfirm \
     brightnessctl \
     swayidle \
     swaylock \
-    acpid \
     greetd \
     greetd-tuigreet \
     xdg-utils \
     ttf-firacode-nerd \
     noto-fonts-emoji \
-    power-profiles-daemon \
     wl-clipboard
 
 echo "==> Enabling system services..."
 
-sudo systemctl enable --now acpid.service
-sudo systemctl enable --now power-profiles-daemon.service
 sudo systemctl enable greetd.service
 
 echo "==> Installing system configs..."
@@ -38,35 +34,6 @@ sudo cp "{{ .chezmoi.sourceDir }}/system/etc/greetd/config.toml" /etc/greetd/con
 sudo chown root:greeter /etc/greetd/config.toml
 sudo chmod 644 /etc/greetd/config.toml
 
-# /etc/acpi  (root:root)
-sudo mkdir -p /etc/acpi/events
-sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/events/lid" /etc/acpi/events/lid
-sudo chmod 644 /etc/acpi/events/lid
-sudo cp "{{ .chezmoi.sourceDir }}/system/etc/acpi/lid.sh" /etc/acpi/lid.sh
-sudo chmod 755 /etc/acpi/lid.sh
-sudo chown -R root:root /etc/acpi/events /etc/acpi/lid.sh
-
-# /etc/systemd/logind.conf — disable lid-switch suspend (acpid lid.sh manages display instead)
-sudo sed -i 's/^#\?HandleLidSwitch=.*/HandleLidSwitch=ignore/' /etc/systemd/logind.conf
-sudo sed -i 's/^#\?HandleLidSwitchExternalPower=.*/HandleLidSwitchExternalPower=ignore/' /etc/systemd/logind.conf
-echo "logind config changed — a reboot is required for it to take effect"
-
-# /etc/udev/rules.d/99-power-profile.rules  (root:root 644)
-sudo mkdir -p /etc/udev/rules.d
-sudo cp "{{ .chezmoi.sourceDir }}/system/etc/udev/rules.d/99-power-profile.rules" /etc/udev/rules.d/99-power-profile.rules
-sudo chown root:root /etc/udev/rules.d/99-power-profile.rules
-sudo chmod 644 /etc/udev/rules.d/99-power-profile.rules
-sudo udevadm control --reload-rules
-
-# /usr/local/bin/power-profile-switch.sh  (root:root 755)
-sudo cp "{{ .chezmoi.sourceDir }}/system/usr/local/bin/power-profile-switch.sh" /usr/local/bin/power-profile-switch.sh
-sudo chown root:root /usr/local/bin/power-profile-switch.sh
-sudo chmod 755 /usr/local/bin/power-profile-switch.sh
-
 echo "==> Niri and desktop environment installed (pacman packages + system config)."
 
 # chezmoi:tracking greetd/config.toml={{ include "system/etc/greetd/config.toml" | sha256sum }}
-# chezmoi:tracking acpi/events/lid={{ include "system/etc/acpi/events/lid" | sha256sum }}
-# chezmoi:tracking acpi/lid.sh={{ include "system/etc/acpi/lid.sh" | sha256sum }}
-# chezmoi:tracking udev/99-power-profile.rules={{ include "system/etc/udev/rules.d/99-power-profile.rules" | sha256sum }}
-# chezmoi:tracking power-profile-switch.sh={{ include "system/usr/local/bin/power-profile-switch.sh" | sha256sum }}

@@ -19,6 +19,8 @@ Type=simple
 ExecStart=%h/.config/swayidle/swayidle-launch.sh
 Restart=on-failure
 RestartSec=3s
+RestartPreventExitStatus=SIGTERM
+TimeoutStopSec=5
 
 # Pass the user environment so POWER_PROFILE is visible
 PassEnvironment=POWER_PROFILE WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS

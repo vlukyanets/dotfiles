@@ -20,4 +20,5 @@ keys
 .config/noctalia
 .config/swayidle
 .config/swaylock
+.config/systemd
 {{- end }}

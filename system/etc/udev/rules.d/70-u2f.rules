@@ -4,7 +4,7 @@
 SUBSYSTEM=="usb", ATTRS{idVendor}=="1050", TAG+="uaccess"
 
 # YubiKey HID — FIDO2/U2F interface (protocol 00), symlinked as /dev/yubikey0, /dev/yubikey1, …
-KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ENV{ID_VENDOR_ID}=="1050", ATTRS{bInterfaceProtocol}=="00", TAG+="uaccess", PROGRAM+="/usr/local/bin/yubikey-next-id yubikey", SYMLINK+="yubikey%c"
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ENV{ID_VENDOR_ID}=="1050", ATTRS{bInterfaceProtocol}=="00", TAG+="uaccess", PROGRAM+="/usr/local/bin/yubikey-next-id.sh yubikey", SYMLINK+="yubikey%c"
 
 # YubiKey HID — OTP keyboard interface (protocol 01), symlinked as /dev/yubikey-otp0, /dev/yubikey-otp1, …
-KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ENV{ID_VENDOR_ID}=="1050", ATTRS{bInterfaceProtocol}=="01", TAG+="uaccess", PROGRAM+="/usr/local/bin/yubikey-next-id yubikey-otp", SYMLINK+="yubikey-otp%c"
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ENV{ID_VENDOR_ID}=="1050", ATTRS{bInterfaceProtocol}=="01", TAG+="uaccess", PROGRAM+="/usr/local/bin/yubikey-next-id.sh yubikey-otp", SYMLINK+="yubikey-otp%c"
