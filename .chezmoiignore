@@ -19,6 +19,5 @@ keys
 .config/niri
 .config/noctalia
 .config/swayidle
-.config/swaylock
 .config/systemd
 {{- end }}

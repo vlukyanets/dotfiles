@@ -25,7 +25,7 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `06-install-zsh` | `zsh` | Installs zsh, oh-my-zsh, powerlevel10k, autosuggestions, syntax-highlighting; sets default shell |
 | `07-install-base-tools` | `base_tools_enabled` | `eza fd fzf htop jq yq rsync tree tmux` and more |
 | `08-install-advanced-tools` | `advanced_tools_enabled` | `ncdu duf btop zellij neovim just fastfetch ripgrep` and more |
-| `09-install-niri` | `niri_enabled` | Niri compositor, swaylock, greetd/tuigreet, fonts, `wl-clipboard`; deploys greetd system config |
+| `09-install-niri` | `niri_enabled` | Niri compositor, greetd/tuigreet, fonts, `wl-clipboard`; deploys greetd system config |
 | `10-install-noctalia-shell` | `niri_enabled` + `paru` | Installs noctalia-shell, pipewire-jack, qt6-multimedia-ffmpeg from AUR |
 | `11-install-pipewire` | always | Installs PipeWire stack; enables pipewire, pipewire-pulse, wireplumber user services |
 | `12-install-desktop-programs` | `niri_enabled` | GUI apps via pacman + AUR (see below) |

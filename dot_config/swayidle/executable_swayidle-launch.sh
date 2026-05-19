@@ -3,7 +3,7 @@
 get_systemd_user_env() { local v=$(systemctl --user show-environment | grep "^${1}=" | cut -d'=' -f2-); echo "${v:-${2:-}}"; }
 
 PROFILE=$(get_systemd_user_env "POWER_PROFILE" "battery")
-LOCK_CMD="${HOME}/.config/swaylock/lock.sh"
+LOCK_CMD="qs -c noctalia-shell ipc call lockScreen lock"
 
 log() { logger -t "swayidle-launch" "$*"; }
 
