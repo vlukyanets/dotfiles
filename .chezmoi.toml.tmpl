@@ -13,6 +13,7 @@
 {{- $devTools           := false -}}
 {{- $rbw                := false -}}
 {{- $yubikey            := false -}}
+{{- $tailscale          := false -}}
 {{- $aiLmstudio         := false -}}
 {{- $aiClaude           := false -}}
 {{- $reflectorCountries := "" -}}
@@ -36,6 +37,7 @@
 {{-     $devTools        = get $cfg "dev_tools_enabled"       | default false -}}
 {{-     $rbw             = get $cfg "rbw_enabled"             | default false -}}
 {{-     $yubikey         = get $cfg "yubikey_enabled"         | default false -}}
+{{-     $tailscale       = get $cfg "tailscale_enabled"       | default false -}}
 {{-     $ai             := get $cfg "ai"              | default dict -}}
 {{-     $aiClients      := get $ai  "clients"         | default dict -}}
 {{-     $aiLmstudio      = get $aiClients "lmstudio"  | default false -}}
@@ -58,6 +60,7 @@
 {{-   $devTools        = promptBoolOnce   . "dev_tools_enabled"       "Install development tools (gcc, clang, python, node, rust, go…)" -}}
 {{-   $rbw             = promptBoolOnce   . "rbw_enabled"             "Install rbw (Bitwarden CLI)" -}}
 {{-   $yubikey         = promptBoolOnce   . "yubikey_enabled"         "Install YubiKey tools and udev rules" -}}
+{{-   $tailscale       = promptBoolOnce   . "tailscale_enabled"       "Install Tailscale and enable tailscaled service" -}}
 {{-   $aiLmstudio      = promptBoolOnce   . "ai_lmstudio"             "Install LM Studio (AI model runner)" -}}
 {{-   $aiClaude        = promptBoolOnce   . "ai_claude"               "Install Claude desktop client" -}}
 {{-   $reflectorCountries = promptStringOnce . "reflector_countries"  "Reflector mirror countries (comma-separated, empty for no filter)" -}}
@@ -82,6 +85,7 @@ encryption = "age"
     dev_tools_enabled      = {{ $devTools }}
     rbw_enabled            = {{ $rbw }}
     yubikey_enabled        = {{ $yubikey }}
+    tailscale_enabled      = {{ $tailscale }}
 
 [data.pacman]
     multilib_enabled = {{ $multilibEnabled }}

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+{{ if not .tailscale_enabled -}}
+echo "==> Tailscale installation skipped (tailscale disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> Installing tailscale..."
+
+sudo pacman -S --needed --noconfirm tailscale
+
+echo "==> Enabling tailscale service..."
+
+sudo systemctl enable --now tailscaled.service
+sudo tailscale set --operator="${USER}"
+
+echo "==> Tailscale installed."

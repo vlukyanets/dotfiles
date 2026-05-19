@@ -38,12 +38,13 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `19-install-yubikey` | `yubikey_enabled` | Installs `yubikey-manager`, `libfido2`, `ccid`, `pcsclite`, `usbutils`; enables `pcscd.socket`; deploys `70-u2f.rules`; deploys `yubikey-next-id.sh` script to `/usr/local/bin/` |
 | `20-install-plymouth` | always | Installs Plymouth; uses `plymouth-theme-arch-logo-new` (AUR, requires paru) or `bgrt` fallback; inserts `plymouth` hook into `/etc/mkinitcpio.conf`; rebuilds initramfs |
 | `21-configure-acpi` | always | Installs `acpid`, `swayidle`, `power-profiles-daemon`; deploys lid-switch handler, logind.conf patch, udev power-profile rules, `power-profile-switch.sh`; strictly recommends to add ACPI-related kernel parameters to kernel command line |
+| `22-install-tailscale` | `tailscale_enabled` | Installs `tailscale`; enables `tailscaled.service`; sets current user as operator |
 
 ### Desktop programs (script 12)
 
 | Source | Packages |
 |---|---|
-| pacman | `kitty` `firefox` `discord` `telegram-desktop` `evince` `qbittorrent` `tailscale` `cava` `cmatrix` `obsidian` `termusic` `doublecmd-qt6` `vlc` |
+| pacman | `kitty` `firefox` `discord` `telegram-desktop` `evince` `qbittorrent` `cava` `cmatrix` `obsidian` `termusic` `doublecmd-qt6` `vlc` |
 | AUR (paru) | `onlyoffice-bin` `zoom` |
 
 ### Development tools (script 15)
@@ -77,6 +78,7 @@ Flags are set per-host in `.chezmoidata.toml`. Unknown hosts are prompted intera
 | `dev_tools_enabled` | bool | `false` | Install development toolchain |
 | `rbw_enabled` | bool | `false` | Install rbw Bitwarden CLI + pinentry |
 | `yubikey_enabled` | bool | `false` | Install YubiKey tools, enable `pcscd.socket`, deploy U2F udev rules |
+| `tailscale_enabled` | bool | `false` | Install Tailscale, enable `tailscaled.service`, set user as operator |
 
 ### `[hostname.pacman]`
 

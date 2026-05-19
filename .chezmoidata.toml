@@ -9,6 +9,7 @@ libvirt_enabled        = true
 dev_tools_enabled      = true
 rbw_enabled            = true
 yubikey_enabled        = true
+tailscale_enabled      = true
 identity               = "~/.ssh/id_ed25519"
 
 [hyper-lin.pacman]
@@ -35,6 +36,7 @@ libvirt_enabled        = true
 dev_tools_enabled      = false
 rbw_enabled            = false
 yubikey_enabled        = false
+tailscale_enabled      = true
 identity               = "~/.ssh/id_ed25519"
 
 [echo-server.pacman]
