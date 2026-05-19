@@ -15,7 +15,7 @@ echo "==> Installing AI clients..."
 
 packages=(
 {{- if .ai.clients.lmstudio }}
-    lmstudio
+    lmstudio-bin
 {{- end }}
 {{- if .ai.clients.claude }}
     claude-desktop-bin
