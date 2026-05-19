@@ -16,7 +16,8 @@ case "$PROFILE" in
             resume       'brightnessctl -r' \
             timeout 1200 'niri msg action power-off-monitors' \
             resume       'niri msg action' \
-            timeout 1500 "${LOCK_CMD}"
+            timeout 1500 "${LOCK_CMD}" \
+            before-sleep "${LOCK_CMD}"
         ;;
     battery)
         exec swayidle -w \
