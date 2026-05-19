@@ -70,7 +70,6 @@ encryption = "age"
 [age]
     command        = "{{ env "AGE_CMD" | default "age" }}"
     identity       = "{{ $identity }}"
-    recipientsFile = "{{ .chezmoi.sourceDir }}/.age-recipients"
 
 [data]
     paru_enabled           = {{ $paru }}
