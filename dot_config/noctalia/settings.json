@@ -24,7 +24,7 @@
         "showCategories": true,
         "showIconBackground": false,
         "sortByMostUsed": true,
-        "terminalCommand": "kitty -e",
+        "terminalCommand": "kitty",
         "viewMode": "list"
     },
     "audio": {
@@ -306,7 +306,7 @@
                 "id": "brightness-card"
             },
             {
-                "enabled": true,
+                "enabled": false,
                 "id": "weather-card"
             },
             {

@@ -6,7 +6,7 @@
   "hideDisconnected": false,
   "hideMullvadExitNodes": true,
   "showSearchBar": false,
-  "terminalCommand": "kitty -e",
+  "terminalCommand": "kitty",
   "sshUsername": "",
   "pingCount": 5,
   "defaultPeerAction": "copy-ip",
