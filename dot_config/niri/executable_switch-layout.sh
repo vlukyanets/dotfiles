@@ -6,7 +6,16 @@ LAYOUT_MAP["Russian"]="keyboard-ru"
 LAYOUT_MAP["Ukrainian"]="keyboard-ua"
 LAYOUT_MAP["Chinese"]="pinyin"
 
-niri msg action switch-layout next
+PARAM="${1:-next}"
+
+if [[ "$PARAM" == "next" ]]; then
+    niri msg action switch-layout next
+elif [[ "$PARAM" =~ ^[0-9]+$ ]]; then
+    niri msg action switch-layout "$PARAM"
+else
+    echo "Usage: switch-layout.sh [next|<index>]" >&2
+    exit 1
+fi
 
 active_name=$(niri msg keyboard-layouts | grep '\*' | cut -d' ' -f4-)
 
@@ -19,4 +28,3 @@ if [ -z "$fcitx5_im" ]; then
 else
     fcitx5-remote -s "$fcitx5_im"
 fi
-

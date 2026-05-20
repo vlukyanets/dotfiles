@@ -130,14 +130,14 @@ window-rule {
 }
 
 binds {
-    Mod+Space hotkey-overlay-title="Switch Language" { spawn "bash" "-c" "~/.config/niri/switch-layout.sh"; }
+    Mod+Space hotkey-overlay-title="Switch Language" { spawn "bash" "-c" "~/.config/niri/switch-layout.sh next"; }
     Mod+Shift+Slash { show-hotkey-overlay; }
 
     Mod+Return hotkey-overlay-title="Open a Terminal: kitty" { spawn "kitty"; }
     Mod+R hotkey-overlay-title="Run Noctalia Launcher" { spawn "qs" "-c" "noctalia-shell" "ipc" "call" "launcher" "toggle"; }
     Mod+B hotkey-overlay-title="Run Firefox Browser" { spawn "firefox"; }
-    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "qs" "-c" "noctalia-shell" "ipc" "call" "lockScreen" "lock"; }
-    Super+Shift+L hotkey-overlay-title="Lock the Screen and toggle displays off" { spawn "bash" "-c" "qs -c noctalia-shell ipc call lockScreen lock & sleep 0.3 && niri msg action power-off-monitors"; }
+    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "bash" "-c" "~/.config/niri/switch-layout.sh 0; qs -c noctalia-shell ipc call lockScreen lock"; }
+    Super+Shift+L hotkey-overlay-title="Lock the Screen and toggle displays off" { spawn "bash" "-c" "~/.config/niri/switch-layout.sh 0; qs -c noctalia-shell ipc call lockScreen lock & sleep 0.3 && niri msg action power-off-monitors"; }
 
     Super+Alt+S allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill orca || exec orca"; }
 
