@@ -19,9 +19,4 @@ sudo pacman -S --needed --noconfirm \
     fcitx5-qt \
     fcitx5-configtool
 
-{{ if .paru_enabled -}}
-echo "==> Installing fcitx5 FluentDark theme from AUR..."
-paru -S --needed --noconfirm fcitx5-skin-fluentdark-git
-{{- end }}
-
 echo "==> fcitx5 installed."

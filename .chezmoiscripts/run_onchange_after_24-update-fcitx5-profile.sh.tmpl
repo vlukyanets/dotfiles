@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+{{- if not .use_fcitx5 }}
+# fcitx5 not enabled — nothing to do
+exit 0
+{{- end }}
+{{- $imMap := dict "english" "keyboard-us" "russian" "keyboard-ru" "ukrainian" "keyboard-ua" "chinese" "pinyin" }}
+{{- $items := list }}
+{{- range .languages }}
+{{-   $im := get $imMap . }}
+{{-   if $im }}{{- $items = append $items $im }}{{- end }}
+{{- end }}
+
+# Profile hash: {{ $items | join "," }}
+# This script re-runs whenever the language list changes.
+
+set -euo pipefail
+
+mkdir -p ~/.config/fcitx5
+
+cat > ~/.config/fcitx5/profile << 'PROFILE'
+[Groups/0]
+# Group Name
+Name=Default
+# Layout
+Default Layout=us
+# Default Input Method
+DefaultIM={{ first $items }}
+
+{{ range $i, $im := $items -}}
+[Groups/0/Items/{{ $i }}]
+# Name
+Name={{ $im }}
+# Layout
+Layout=
+
+{{ end -}}
+[GroupOrder]
+0=Default
+PROFILE
+
+echo "==> fcitx5 profile updated, restarting..."
+pkill -KILL fcitx5 2>/dev/null || true
+sleep 0.3
+fcitx5 -d
