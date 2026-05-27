@@ -1,4 +1,6 @@
 [hyper-lin]
+languages              = ["english", "russian", "ukrainian", "chinese"]
+use_fcitx5             = true
 paru_enabled           = true
 nvidia_enabled         = true
 zsh_enabled            = true

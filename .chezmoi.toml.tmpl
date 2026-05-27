@@ -16,6 +16,8 @@
 {{- $tailscale          := false -}}
 {{- $aiLmstudio         := false -}}
 {{- $aiClaude           := false -}}
+{{- $languages          := list "english" -}}
+{{- $useFcitx5          := false -}}
 {{- $reflectorCountries := "" -}}
 {{- $reflectorSort      := "age" -}}
 {{- $reflectorServers   := 5 -}}
@@ -42,6 +44,8 @@
 {{-     $aiClients      := get $ai  "clients"         | default dict -}}
 {{-     $aiLmstudio      = get $aiClients "lmstudio"  | default false -}}
 {{-     $aiClaude        = get $aiClients "claude"    | default false -}}
+{{-     $languages       = get $cfg "languages"       | default (list "english") -}}
+{{-     $useFcitx5       = get $cfg "use_fcitx5"      | default false -}}
 {{-     $reflector      := get $cfg "reflector"       | default dict -}}
 {{-     $reflectorCountries = get $reflector "countries" | default "" -}}
 {{-     $reflectorSort      = get $reflector "sort"      | default "age" -}}
@@ -63,6 +67,9 @@
 {{-   $tailscale       = promptBoolOnce   . "tailscale_enabled"       "Install Tailscale and enable tailscaled service" -}}
 {{-   $aiLmstudio      = promptBoolOnce   . "ai_lmstudio"             "Install LM Studio (AI model runner)" -}}
 {{-   $aiClaude        = promptBoolOnce   . "ai_claude"               "Install Claude desktop client" -}}
+{{-   $languagesStr   := promptStringOnce . "languages"               "Enabled keyboard layouts (comma-separated: english,russian,ukrainian,chinese)" -}}
+{{-   $languages       = splitList "," $languagesStr -}}
+{{-   $useFcitx5       = promptBoolOnce   . "use_fcitx5"              "Install and enable fcitx5 input method framework" -}}
 {{-   $reflectorCountries = promptStringOnce . "reflector_countries"  "Reflector mirror countries (comma-separated, empty for no filter)" -}}
 {{-   $reflectorSort      = promptStringOnce . "reflector_sort"       "Reflector sort method (age, rate, country, score, delay)" -}}
 {{-   $reflectorServers   = promptIntOnce    . "reflector_servers"    "Number of reflector mirrors to select" -}}
@@ -86,6 +93,8 @@ encryption = "age"
     rbw_enabled            = {{ $rbw }}
     yubikey_enabled        = {{ $yubikey }}
     tailscale_enabled      = {{ $tailscale }}
+    languages              = {{ toJson $languages }}
+    use_fcitx5             = {{ $useFcitx5 }}
 
 [data.pacman]
     multilib_enabled = {{ $multilibEnabled }}

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+{{ if not .niri_enabled -}}
+echo "==> fcitx5 installation skipped (niri disabled)."
+exit 0
+{{- end }}
+{{ if not .use_fcitx5 -}}
+echo "==> fcitx5 installation skipped (use_fcitx5 not enabled)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> Installing fcitx5 input method framework..."
+
+sudo pacman -S --needed --noconfirm \
+    fcitx5 \
+    fcitx5-chinese-addons \
+    fcitx5-gtk \
+    fcitx5-qt \
+    fcitx5-configtool
+
+{{ if .paru_enabled -}}
+echo "==> Installing fcitx5 FluentDark theme from AUR..."
+paru -S --needed --noconfirm fcitx5-skin-fluentdark-git
+{{- end }}
+
+echo "==> fcitx5 installed."

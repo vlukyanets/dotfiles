@@ -1,8 +1,17 @@
+{{- $xkbCode := dict "english" "us" "russian" "ru" "ukrainian" "ua" "chinese" "cn" -}}
+{{- $layouts := list -}}
+{{- range .languages -}}
+{{-   $c := get $xkbCode . -}}
+{{-   if $c -}}{{- $layouts = append $layouts $c -}}{{- end -}}
+{{- end -}}
 environment {
     GTK_THEME "Adwaita:dark"
     QT_QPA_PLATFORM "wayland"
+    {{ if .use_fcitx5 -}}
+    GTK_IM_MODULE "fcitx"
     QT_IM_MODULE "fcitx"
     XMODIFIERS "@im=fcitx"
+    {{ end -}}
     WAYLAND_DISPLAY "wayland-1"
     MOZ_ENABLE_WAYLAND "1"
 }
@@ -16,7 +25,7 @@ gestures {
 input {
     keyboard {
         xkb {
-            layout "us,ru,ua,cn"
+            layout "{{ $layouts | join "," }}"
         }
 
         numlock
@@ -77,7 +86,9 @@ prefer-no-csd
 
 spawn-at-startup "qs" "-c" "noctalia-shell"
 spawn-at-startup "xwayland-satellite"
+{{ if .use_fcitx5 -}}
 spawn-at-startup "fcitx5" "-d"
+{{- end }}
 
 hotkey-overlay {
     skip-at-startup

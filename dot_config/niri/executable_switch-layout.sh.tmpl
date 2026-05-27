@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 
 declare -A LAYOUT_MAP
-LAYOUT_MAP["English (US)"]="keyboard-us"
-LAYOUT_MAP["Russian"]="keyboard-ru"
-LAYOUT_MAP["Ukrainian"]="keyboard-ua"
-LAYOUT_MAP["Chinese"]="pinyin"
-
+{{ if has "english"   .languages -}}LAYOUT_MAP["English (US)"]="keyboard-us"
+{{ end -}}
+{{ if has "russian"   .languages -}}LAYOUT_MAP["Russian"]="keyboard-ru"
+{{ end -}}
+{{ if has "ukrainian" .languages -}}LAYOUT_MAP["Ukrainian"]="keyboard-ua"
+{{ end -}}
+{{ if and .use_fcitx5 (has "chinese" .languages) -}}LAYOUT_MAP["Chinese"]="pinyin"
+{{ end }}
 PARAM="${1:-next}"
 
 if [[ "$PARAM" == "next" ]]; then
@@ -20,11 +23,19 @@ fi
 active_name=$(niri msg keyboard-layouts | grep '\*' | cut -d' ' -f4-)
 
 echo "Active name: $active_name"
+{{ if .use_fcitx5 -}}
 fcitx5_im="${LAYOUT_MAP[$active_name]}"
 
 if [ -z "$fcitx5_im" ]; then
     echo "Warning: no fcitx5 mapping for layout '$active_name'" >&2
     fcitx5-remote -s keyboard-us
+    fcitx5-remote -c
 else
     fcitx5-remote -s "$fcitx5_im"
+    if [[ "$active_name" == "Chinese" ]]; then
+        fcitx5-remote -o
+    else
+        fcitx5-remote -c
+    fi
 fi
+{{- end }}
