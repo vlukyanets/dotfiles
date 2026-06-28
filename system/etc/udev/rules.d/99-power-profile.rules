@@ -1,5 +1,0 @@
-SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ATTR{online}=="1", \
-    RUN+="/usr/local/bin/power-profile-switch.sh ac"
-
-SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ATTR{online}=="0", \
-    RUN+="/usr/local/bin/power-profile-switch.sh battery"

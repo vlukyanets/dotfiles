@@ -23,9 +23,9 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `04-install-paru` | `paru` | Installs rustup (pacman) then builds paru from AUR; sets `MAKEFLAGS=-j$(nproc)` |
 | `05-install-nvidia` | `nvidia` | Detects GPU generation via `lspci`; installs matching DKMS driver + kernel headers + lib32 |
 | `06-install-zsh` | `zsh` | Installs zsh, oh-my-zsh, powerlevel10k, autosuggestions, syntax-highlighting; sets default shell |
-| `07-install-base-tools` | `base_tools_enabled` | `eza fd fzf htop jq yq rsync tree tmux` and more |
-| `08-install-advanced-tools` | `advanced_tools_enabled` | `ncdu duf btop zellij neovim just fastfetch ripgrep` and more |
-| `09-install-niri` | `niri_enabled` | Niri compositor, greetd/tuigreet, fonts, `wl-clipboard`; deploys greetd system config |
+| `07-install-base-tools` | `base_tools_enabled` | `curl wget fzf htop iotop jq yq rsync tree tmux unzip zip 7zip` |
+| `08-install-advanced-tools` | `advanced_tools_enabled` | `fd ncdu duf btop zellij neovim fastfetch ripgrep zoxide yazi` |
+| `09-install-niri` | `niri_enabled` | Niri compositor, `brightnessctl`, greetd/tuigreet, fonts, `wl-clipboard`; deploys greetd system config |
 | `10-install-noctalia-shell` | `niri_enabled` + `paru` | Installs noctalia-shell, pipewire-jack, qt6-multimedia-ffmpeg from AUR |
 | `11-install-pipewire` | always | Installs PipeWire stack; enables pipewire, pipewire-pulse, wireplumber user services |
 | `12-install-desktop-programs` | `niri_enabled` | GUI apps via pacman + AUR (see below) |
@@ -37,15 +37,16 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `18-install-ai-clients` | `ai.clients.*` | Installs enabled AI clients from AUR via paru |
 | `19-install-yubikey` | `yubikey_enabled` | Installs `yubikey-manager`, `libfido2`, `ccid`, `pcsclite`, `usbutils`; enables `pcscd.socket`; deploys `70-u2f.rules`; deploys `yubikey-next-id.sh` script to `/usr/local/bin/` |
 | `20-install-plymouth` | always | Installs Plymouth; uses `plymouth-theme-arch-logo-new` (AUR, requires paru) or `bgrt` fallback; inserts `plymouth` hook into `/etc/mkinitcpio.conf`; rebuilds initramfs |
-| `21-configure-acpi` | always | Installs `acpid`, `swayidle`, `power-profiles-daemon`; deploys lid-switch handler, logind.conf patch, udev power-profile rules, `power-profile-switch.sh`; strictly recommends to add ACPI-related kernel parameters to kernel command line |
-| `22-install-tailscale` | `tailscale_enabled` | Installs `tailscale`; enables `tailscaled.service`; sets current user as operator |
+| `21-install-tailscale` | `tailscale_enabled` | Installs `tailscale`; enables `tailscaled.service`; sets current user as operator |
+| `22-install-fcitx5` | `niri_enabled` + `use_fcitx5` | Installs `fcitx5 fcitx5-chinese-addons fcitx5-gtk fcitx5-qt fcitx5-configtool` |
+| `after_23-update-fcitx5-profile` | `use_fcitx5` | `run_onchange` — rewrites `~/.config/fcitx5/profile` from `languages` list; restarts fcitx5 |
 
 ### Desktop programs (script 12)
 
 | Source | Packages |
 |---|---|
-| pacman | `kitty` `firefox` `discord` `telegram-desktop` `evince` `qbittorrent` `cava` `cmatrix` `obsidian` `termusic` `doublecmd-qt6` `vlc` |
-| AUR (paru) | `onlyoffice-bin` `zoom` |
+| pacman | `kitty` `firefox` `discord` `telegram-desktop` `evince` `qbittorrent` `cava` `cmatrix` `obsidian` `termusic` `doublecmd-qt6` `veracrypt` `vlc` `mission-center` |
+| AUR (paru) | `onlyoffice-bin` `zoom` `clock-rs-git` |
 
 ### Development tools (script 15)
 
@@ -79,6 +80,8 @@ Flags are set per-host in `.chezmoidata.toml`. Unknown hosts are prompted intera
 | `rbw_enabled` | bool | `false` | Install rbw Bitwarden CLI + pinentry |
 | `yubikey_enabled` | bool | `false` | Install YubiKey tools, enable `pcscd.socket`, deploy U2F udev rules |
 | `tailscale_enabled` | bool | `false` | Install Tailscale, enable `tailscaled.service`, set user as operator |
+| `use_fcitx5` | bool | `false` | Install fcitx5 input method framework and configure profile |
+| `languages` | array | `[]` | Input methods to configure in fcitx5 (`english`, `russian`, `ukrainian`, `chinese`) |
 
 ### `[hostname.pacman]`
 
