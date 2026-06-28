@@ -200,6 +200,14 @@
                     "showPowerProfiles": false
                 },
                 {
+                    "defaultSettings": {
+                        "compactMode": false,
+                        "ctlPath": "draind-ctl",
+                        "refreshInterval": 5000
+                    },
+                    "id": "plugin:ef2bc0:draind"
+                },
+                {
                     "displayMode": "onhover",
                     "iconColor": "none",
                     "id": "Volume",
@@ -343,9 +351,6 @@
             "right": [
                 {
                     "id": "Notifications"
-                },
-                {
-                    "id": "PowerProfile"
                 },
                 {
                     "id": "KeepAwake"

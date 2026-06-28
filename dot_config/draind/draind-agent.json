@@ -1,0 +1,4 @@
+{
+  "lock_cmd": "~/.config/niri/lock-screen.sh",
+  "before_sleep_cmd": ""
+}

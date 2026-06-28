@@ -4,9 +4,18 @@
             "enabled": true,
             "name": "Noctalia Plugins",
             "url": "https://github.com/noctalia-dev/noctalia-plugins"
+        },
+        {
+            "enabled": true,
+            "name": "Noctalia Plugins - Personal vlukyanets Repo",
+            "url": "https://github.com/vlukyanets/noctalia-plugins"
         }
     ],
     "states": {
+        "ef2bc0:draind": {
+            "enabled": true,
+            "sourceUrl": "https://github.com/vlukyanets/noctalia-plugins"
+        },
         "tailscale": {
             "enabled": true,
             "sourceUrl": "https://github.com/noctalia-dev/noctalia-plugins"
