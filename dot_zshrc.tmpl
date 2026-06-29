@@ -27,6 +27,10 @@ if command -v zoxide &>/dev/null; then
     eval "$(zoxide init zsh)"
 fi
 
+{{ if .ai.clients.lmstudio -}}
+export PATH="$HOME/.lmstudio/bin:$PATH"
+{{- end }}
+
 if command -v eza &>/dev/null; then
     alias lf='eza --icons --group-directories-first'
     alias ll='eza -lh --icons --group-directories-first'

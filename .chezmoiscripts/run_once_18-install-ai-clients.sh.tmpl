@@ -24,4 +24,11 @@ packages=(
 
 paru -S --needed --noconfirm "${packages[@]}"
 
+{{- if .ai.clients.lmstudio }}
+
+echo "==> Installing LM Studio CLI (lms)..."
+curl -fsSL https://lmstudio.ai/install.sh | bash
+
+{{- end }}
+
 echo "==> AI clients installed."
