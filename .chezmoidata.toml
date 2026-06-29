@@ -53,5 +53,5 @@ sort      = "rate"
 servers   = 10
 
 [echo-server.ai.clients]
-lmstudio = false
+lmstudio = true
 claude   = false
