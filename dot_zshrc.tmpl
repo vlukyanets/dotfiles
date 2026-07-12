@@ -15,6 +15,8 @@ source $ZSH/oh-my-zsh.sh
 
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
+export PATH="$HOME/.local/bin:$PATH"
+
 if command -v nvim &>/dev/null; then
     export EDITOR=nvim
 elif command -v vim &>/dev/null; then
