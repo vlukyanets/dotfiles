@@ -1,4 +1,6 @@
 {
   "lock_cmd": "~/.config/niri/lock-screen.sh",
-  "before_sleep_cmd": ""
+  "before_sleep_cmd": "",
+  "screen_off_cmd": "niri msg action power-off-monitors",
+  "screen_on_cmd": "niri msg action power-on-monitors"
 }
