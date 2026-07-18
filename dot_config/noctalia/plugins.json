@@ -12,10 +12,6 @@
         }
     ],
     "states": {
-        "ef2bc0:draind": {
-            "enabled": true,
-            "sourceUrl": "https://github.com/vlukyanets/noctalia-plugins"
-        },
         "tailscale": {
             "enabled": true,
             "sourceUrl": "https://github.com/noctalia-dev/noctalia-plugins"

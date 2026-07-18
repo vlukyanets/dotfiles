@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-{{ if and (not .ai.clients.lmstudio) (not .ai.clients.claude) -}}
+{{ if and (not .ai.clients.claude_desktop) (not .ai.clients.claude_code) -}}
 echo "==> AI clients installation skipped (all disabled in config)."
 exit 0
 {{- end }}
@@ -14,21 +14,14 @@ fi
 echo "==> Installing AI clients..."
 
 packages=(
-{{- if .ai.clients.lmstudio }}
-    lmstudio-bin
-{{- end }}
-{{- if .ai.clients.claude }}
+{{- if .ai.clients.claude_desktop }}
     claude-desktop-bin
+{{- end }}
+{{- if .ai.clients.claude_code }}
+    claude-code
 {{- end }}
 )
 
 paru -S --needed --noconfirm "${packages[@]}"
-
-{{- if .ai.clients.lmstudio }}
-
-echo "==> Installing LM Studio CLI (lms)..."
-curl -fsSL https://lmstudio.ai/install.sh | bash
-
-{{- end }}
 
 echo "==> AI clients installed."

@@ -191,14 +191,6 @@
                     "unreadBadgeColor": "primary"
                 },
                 {
-                    "defaultSettings": {
-                        "compactMode": false,
-                        "ctlPath": "draind-ctl",
-                        "refreshInterval": 5000
-                    },
-                    "id": "plugin:ef2bc0:draind"
-                },
-                {
                     "displayMode": "onhover",
                     "iconColor": "none",
                     "id": "Volume",

@@ -59,7 +59,7 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 
 | Source | Packages |
 |---|---|
-| AUR (paru) | `lmstudio` `claude-desktop-bin` |
+| AUR (paru) | `claude-desktop-bin` `claude-code` |
 
 ## Host feature flags
 
@@ -102,8 +102,8 @@ Flags are set per-host in `.chezmoidata.toml`. Unknown hosts are prompted intera
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
-| `lmstudio` | bool | `false` | Install LM Studio (local AI model runner) |
-| `claude` | bool | `false` | Install Claude desktop client |
+| `claude_desktop` | bool | `false` | Install Claude desktop client (GUI) |
+| `claude_code` | bool | `false` | Install Claude Code (CLI) |
 
 ## Base packages
 

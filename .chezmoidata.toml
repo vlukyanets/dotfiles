@@ -12,7 +12,6 @@ dev_tools_enabled      = true
 rbw_enabled            = true
 yubikey_enabled        = true
 tailscale_enabled      = true
-draind_enabled         = true
 identity               = "~/.ssh/id_ed25519"
 
 [hyper-lin.pacman]
@@ -25,8 +24,8 @@ sort      = "rate"
 servers   = 20
 
 [hyper-lin.ai.clients]
-lmstudio = true
-claude   = true
+claude_desktop = true
+claude_code    = true
 
 [echo-server]
 paru_enabled           = true
@@ -40,7 +39,6 @@ dev_tools_enabled      = false
 rbw_enabled            = false
 yubikey_enabled        = false
 tailscale_enabled      = true
-draind_enabled         = false
 identity               = "~/.ssh/id_ed25519"
 
 [echo-server.pacman]
@@ -53,5 +51,5 @@ sort      = "rate"
 servers   = 10
 
 [echo-server.ai.clients]
-lmstudio = false
-claude   = false
+claude_desktop = false
+claude_code    = false

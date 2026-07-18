@@ -21,8 +21,3 @@ keys
 .config/swayidle
 .config/systemd
 {{- end }}
-
-# draind power manager
-{{- if not .draind_enabled }}
-.config/draind
-{{- end }}

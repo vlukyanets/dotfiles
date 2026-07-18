@@ -89,9 +89,6 @@ spawn-at-startup "xwayland-satellite"
 {{ if .use_fcitx5 -}}
 spawn-at-startup "fcitx5" "-d"
 {{- end }}
-{{ if .draind_enabled -}}
-spawn-at-startup "draind-agent"
-{{- end }}
 
 hotkey-overlay {
     skip-at-startup
