@@ -1,0 +1,89 @@
+{
+    "chat.disableAIFeatures": true,
+    "github.copilot.enable": {
+        "*": false
+    },
+    "github.copilot.editor.enableAutoCompletions": false,
+    "github.copilot.nextEditSuggestions.enabled": false,
+    "git.addAICoAuthor": "off",
+
+    "editor.fontSize": 14,
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.wordWrap": "on",
+    "editor.minimap.enabled": false,
+    "editor.linkedEditing": true,
+    "editor.bracketPairColorization.enabled": true,
+    "editor.guides.bracketPairs": true,
+    "editor.renderWhitespace": "selection",
+    "editor.cursorBlinking": "smooth",
+    "editor.cursorSmoothCaretAnimation": "on",
+
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": false,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit",
+        "source.fixAll": "explicit"
+    },
+
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "files.autoSave": "onFocusChange",
+
+    "explorer.confirmDelete": false,
+    "explorer.confirmDragAndDrop": false,
+    "files.exclude": {
+        "**/.git": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "**/node_modules": true
+    },
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/.hg/store/**": true,
+        "**/.svn/**": true,
+
+        "**/target/**": true,
+
+        "**/node_modules/**": true,
+        "**/.next/**": true,
+        "**/.nuxt/**": true,
+        "**/.astro/**": true,
+        "**/.svelte-kit/**": true,
+        "**/dist/**": true,
+        "**/build/**": true,
+
+        "**/.venv/**": true,
+        "**/venv/**": true,
+        "**/__pycache__/**": true,
+        "**/.pytest_cache/**": true,
+        "**/.mypy_cache/**": true,
+        "**/.ruff_cache/**": true,
+
+        "**/.gradle/**": true,
+        "**/build/**": true,
+        "**/.bsp/**": true,
+
+        "**/vendor/**": true,
+        "**/.cmake/**": true,
+        "**/.idea/**": true
+    },
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/build": true,
+        "**/.next": true,
+        "**/target": true
+    },
+
+    "terminal.integrated.smoothScrolling": true,
+    "terminal.integrated.cursorBlinking": true,
+    "terminal.integrated.scrollback": 10000,
+
+    "telemetry.telemetryLevel": "off",
+    "security.workspace.trust.enabled": true,
+    "workbench.startupEditor": "none"
+}
+
