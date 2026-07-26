@@ -75,6 +75,18 @@
 {{-   $reflectorServers   = promptIntOnce    . "reflector_servers"    "Number of reflector mirrors to select" -}}
 {{- end -}}
 
+{{/* Derived "is this app actually installed" flags, computed from the toggles
+     above so .chezmoiignore can gate each app's config on its real install
+     condition instead of a raw package-manager check. Keep in sync with the
+     conditions in .chezmoiscripts/*.tmpl. */}}
+{{- $vscodeEnabled    := and $devTools $paru -}}
+{{- $veracryptEnabled := $niri -}}
+{{- $kittyEnabled     := $niri -}}
+{{- $noctaliaEnabled  := $niri -}}
+{{- $systemdEnabled   := $niri -}}
+{{- $termusicEnabled  := $niri -}}
+{{- $fcitx5Enabled    := and $niri $useFcitx5 -}}
+
 encryption = "age"
 
 [age]
@@ -95,6 +107,13 @@ encryption = "age"
     tailscale_enabled      = {{ $tailscale }}
     languages              = {{ toJson $languages }}
     use_fcitx5             = {{ $useFcitx5 }}
+    vscode_enabled         = {{ $vscodeEnabled }}
+    veracrypt_enabled      = {{ $veracryptEnabled }}
+    kitty_enabled          = {{ $kittyEnabled }}
+    noctalia_enabled       = {{ $noctaliaEnabled }}
+    systemd_enabled        = {{ $systemdEnabled }}
+    termusic_enabled       = {{ $termusicEnabled }}
+    fcitx5_enabled         = {{ $fcitx5Enabled }}
 
 [data.pacman]
     multilib_enabled = {{ $multilibEnabled }}

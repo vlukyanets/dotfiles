@@ -3,9 +3,7 @@
 
 # Repo-only files — not deployed to ~
 README.md
-bootstrap.sh
 system
-keys
 
 # ZSH files
 {{- if not .zsh_enabled }}
@@ -13,11 +11,49 @@ keys
 .p10k.zsh
 {{- end }}
 
-# Niri desktop environment configs
+# Niri desktop environment
 {{- if not .niri_enabled }}
-.config/kitty
 .config/niri
-.config/noctalia
 .config/swayidle
+{{- end }}
+
+# kitty — installed alongside niri desktop programs
+{{- if not .kitty_enabled }}
+.config/kitty
+{{- end }}
+
+# noctalia shell — installed alongside niri desktop programs
+{{- if not .noctalia_enabled }}
+.config/noctalia
+{{- end }}
+
+# systemd user units (swayidle, …) — installed alongside niri desktop programs
+{{- if not .systemd_enabled }}
 .config/systemd
+{{- end }}
+
+# termusic — installed alongside niri desktop programs
+{{- if not .termusic_enabled }}
+.config/termusic
+{{- end }}
+
+# rbw (Bitwarden CLI) config — only if rbw is installed
+{{- if not .rbw_enabled }}
+.config/rbw
+{{- end }}
+
+# fcitx5 input method config — only if niri + fcitx5 are installed
+{{- if not .fcitx5_enabled }}
+.config/fcitx5
+.local/share/fcitx5
+{{- end }}
+
+# VS Code — only if dev tools + paru (AUR) are installed
+{{- if not .vscode_enabled }}
+.config/Code
+{{- end }}
+
+# VeraCrypt — only if niri desktop programs are installed
+{{- if not .veracrypt_enabled }}
+.config/VeraCrypt
 {{- end }}
