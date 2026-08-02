@@ -8,11 +8,11 @@ Modular chezmoi dotfiles targeting Arch Linux. Supports multiple hosts with per-
 |---|---|---|
 | `curl` | Download bootstrap script | `sudo pacman -S curl` |
 | `git` | Clone repo, run hooks | `sudo pacman -S git` |
-| `chezmoi` | Apply dotfiles | see Bootstrap below |
+| `chezmoi` | Apply dotfiles | `sudo pacman -S chezmoi` |
 
 ## Install scripts
 
-Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-run only if their content changes (which happens automatically when the package list or any rendered template value changes).
+Scripts run in order on first `chezmoi apply`. Most are `run_once_` — fire once ever, regardless of later template changes. Scripts marked `run_onchange` below re-run automatically whenever their rendered template output changes (e.g. a flag or value they read is edited in `.chezmoidata.toml`).
 
 | Script | Condition | What it does |
 |---|---|---|
@@ -41,6 +41,8 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `22-install-fcitx5` | `niri_enabled` + `use_fcitx5` | Installs `fcitx5 fcitx5-chinese-addons fcitx5-gtk fcitx5-qt fcitx5-configtool` |
 | `after_23-update-fcitx5-profile` | `use_fcitx5` | `run_onchange` — rewrites `~/.config/fcitx5/profile` from `languages` list; restarts fcitx5 |
 | `24-install-winpodx` | `winpodx_enabled` + `paru` | Installs `winpodx` |
+| `25-install-zram` | `ram.zram_enabled` | `run_onchange` — installs `zram-generator`; writes `/etc/systemd/zram-generator.conf` from host `zram_size`/`zram_algo`; sets `swap-priority=100`; restarts `systemd-zram-setup@zram0.service` |
+| `26-install-hugepages` | `ram.hugepages_enabled` | `run_onchange` — mode `thp`: writes `/etc/tmpfiles.d/transparent-hugepage.conf` (THP sysfs mode); mode `static`: writes `/etc/sysctl.d/hugepages.conf` (`vm.nr_hugepages`) — per-VM libvirt XML still needed to consume reserved pages |
 
 ### Desktop programs (script 12)
 
@@ -106,6 +108,20 @@ Flags are set per-host in `.chezmoidata.toml`. Unknown hosts are prompted intera
 |---|---|---|---|
 | `claude_desktop` | bool | `false` | Install Claude desktop client (GUI) |
 | `claude_code` | bool | `false` | Install Claude Code (CLI) |
+
+### `[hostname.ram]`
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `zram_enabled` | bool | `false` | Install zram-generator, configure `zram0` swap device |
+| `zram_size` | int | `4096` | zram device size in MiB |
+| `zram_algo` | string | `"zstd"` | Compression algorithm (`zstd`, `lz4`, `lzo-rle`…) |
+| `hugepages_enabled` | bool | `false` | Configure hugepages tuning |
+| `hugepages_mode` | string | `"thp"` | `"thp"` (transparent hugepages sysfs mode) or `"static"` (pinned reservation) |
+| `thp_mode` | string | `"madvise"` | Used when `hugepages_mode="thp"`: `madvise`, `always`, or `never` |
+| `hugepages_count` | int | `0` | Used when `hugepages_mode="static"`: number of 2MB pages to reserve (`vm.nr_hugepages`) |
+
+zram and hugepages are independent — hugepages are not gated on zram and vice versa.
 
 ## Base packages
 
