@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+{{ if not .ram.hugepages_enabled -}}
+echo "==> Hugepages configuration skipped (hugepages disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+{{ if eq .ram.hugepages_mode "thp" -}}
+echo "==> Configuring transparent hugepages (mode={{ .ram.thp_mode }})..."
+
+sudo mkdir -p /etc/tmpfiles.d
+sudo tee /etc/tmpfiles.d/transparent-hugepage.conf > /dev/null << 'EOF'
+w /sys/kernel/mm/transparent_hugepage/enabled - - - - {{ .ram.thp_mode }}
+EOF
+
+sudo systemd-tmpfiles --create /etc/tmpfiles.d/transparent-hugepage.conf
+
+echo "==> Transparent hugepages configured."
+
+# Config: hugepages_mode=thp thp_mode={{ .ram.thp_mode }}
+{{- else if eq .ram.hugepages_mode "static" -}}
+echo "==> Reserving {{ .ram.hugepages_count }} static hugepages (2MB pages, ~{{ div .ram.hugepages_count 512 }}GB)..."
+
+sudo mkdir -p /etc/sysctl.d
+sudo tee /etc/sysctl.d/hugepages.conf > /dev/null << 'EOF'
+vm.nr_hugepages = {{ .ram.hugepages_count }}
+EOF
+
+sudo sysctl --system
+
+echo "==> Static hugepages reserved."
+echo "==> NOTE: per-VM libvirt domain XML still needs <memoryBacking><hugepages/></memoryBacking> for a VM to consume reserved pages — not automated by this script."
+
+# Config: hugepages_mode=static hugepages_count={{ .ram.hugepages_count }}
+{{- end }}

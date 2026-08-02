@@ -21,6 +21,13 @@
 {{- $reflectorCountries := "" -}}
 {{- $reflectorSort      := "age" -}}
 {{- $reflectorServers   := 5 -}}
+{{- $zramEnabled        := false -}}
+{{- $zramSize           := 4096 -}}
+{{- $zramAlgo           := "zstd" -}}
+{{- $hugepagesEnabled   := false -}}
+{{- $hugepagesMode      := "thp" -}}
+{{- $thpMode            := "madvise" -}}
+{{- $hugepagesCount     := 0 -}}
 
 {{- if stat (joinPath .chezmoi.sourceDir ".chezmoidata.toml") -}}
 {{-   $allHosts := fromToml (include ".chezmoidata.toml") -}}
@@ -51,6 +58,14 @@
 {{-     $reflectorCountries = get $reflector "countries" | default "" -}}
 {{-     $reflectorSort      = get $reflector "sort"      | default "age" -}}
 {{-     $reflectorServers   = get $reflector "servers"   | default 5 -}}
+{{-     $ram            := get $cfg "ram"              | default dict -}}
+{{-     $zramEnabled        = get $ram "zram_enabled"        | default false -}}
+{{-     $zramSize           = get $ram "zram_size"           | default 4096 -}}
+{{-     $zramAlgo           = get $ram "zram_algo"           | default "zstd" -}}
+{{-     $hugepagesEnabled   = get $ram "hugepages_enabled"   | default false -}}
+{{-     $hugepagesMode      = get $ram "hugepages_mode"      | default "thp" -}}
+{{-     $thpMode            = get $ram "thp_mode"            | default "madvise" -}}
+{{-     $hugepagesCount     = get $ram "hugepages_count"     | default 0 -}}
 {{-   end -}}
 {{- else -}}
 {{-   $paru            = promptBoolOnce   . "paru_enabled"            "Enable paru AUR helper installation" -}}
@@ -75,6 +90,13 @@
 {{-   $reflectorCountries = promptStringOnce . "reflector_countries"  "Reflector mirror countries (comma-separated, empty for no filter)" -}}
 {{-   $reflectorSort      = promptStringOnce . "reflector_sort"       "Reflector sort method (age, rate, country, score, delay)" -}}
 {{-   $reflectorServers   = promptIntOnce    . "reflector_servers"    "Number of reflector mirrors to select" -}}
+{{-   $zramEnabled        = promptBoolOnce   . "zram_enabled"          "Enable zram swap installation" -}}
+{{-   $zramSize           = promptIntOnce    . "zram_size"             "zram swap size in MiB (e.g. 4096, 8192)" -}}
+{{-   $zramAlgo           = promptStringOnce . "zram_algo"             "zram compression algorithm (zstd, lz4, lzo-rle…)" -}}
+{{-   $hugepagesEnabled   = promptBoolOnce   . "hugepages_enabled"     "Enable hugepages configuration" -}}
+{{-   $hugepagesMode      = promptStringOnce . "hugepages_mode"        "Hugepages mode (thp or static)" -}}
+{{-   $thpMode            = promptStringOnce . "thp_mode"              "Transparent hugepage mode (madvise, always, never)" -}}
+{{-   $hugepagesCount     = promptIntOnce    . "hugepages_count"       "Static hugepages count (2MB pages, 0 if using thp mode)" -}}
 {{- end -}}
 
 {{/* Derived "is this app actually installed" flags, computed from the toggles
@@ -111,6 +133,15 @@
     termusic_enabled       = {{ $termusicEnabled }}
     fcitx5_enabled         = {{ $fcitx5Enabled }}
     winpodx_enabled        = {{ $winpodxEnabled }}
+
+[data.ram]
+    zram_enabled      = {{ $zramEnabled }}
+    zram_size         = {{ $zramSize }}
+    zram_algo         = "{{ $zramAlgo }}"
+    hugepages_enabled = {{ $hugepagesEnabled }}
+    hugepages_mode    = "{{ $hugepagesMode }}"
+    thp_mode          = "{{ $thpMode }}"
+    hugepages_count   = {{ $hugepagesCount }}
 
 [data.pacman]
     multilib_enabled = {{ $multilibEnabled }}

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+{{ if not .ram.zram_enabled -}}
+echo "==> zram installation skipped (zram disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+echo "==> Installing zram-generator..."
+
+sudo pacman -S --needed --noconfirm zram-generator
+
+echo "==> Writing zram-generator config (size={{ .ram.zram_size }}MiB, algo={{ .ram.zram_algo }})..."
+
+sudo tee /etc/systemd/zram-generator.conf > /dev/null << 'EOF'
+[zram0]
+zram-size = {{ .ram.zram_size }}
+compression-algorithm = {{ .ram.zram_algo }}
+swap-priority = 100
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart systemd-zram-setup@zram0.service
+
+echo "==> zram installed."
+
+# Config: zram_size={{ .ram.zram_size }} zram_algo={{ .ram.zram_algo }}

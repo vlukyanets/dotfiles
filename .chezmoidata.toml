@@ -14,6 +14,14 @@ yubikey_enabled        = true
 tailscale_enabled      = true
 winpodx_enabled        = true
 
+[hyper-lin.ram]
+zram_enabled           = true
+zram_size              = 8192
+zram_algo              = "zstd"
+hugepages_enabled      = true
+hugepages_mode         = "thp"
+thp_mode               = "madvise"
+
 [hyper-lin.pacman]
 multilib_enabled = true
 parallel         = 4
@@ -40,6 +48,14 @@ rbw_enabled            = false
 yubikey_enabled        = false
 tailscale_enabled      = true
 winpodx_enabled        = false
+
+[echo-server.ram]
+zram_enabled           = true
+zram_size              = 6144
+zram_algo              = "zstd"
+hugepages_enabled      = true
+hugepages_mode         = "static"
+hugepages_count        = 2048
 
 [echo-server.pacman]
 multilib_enabled = true
