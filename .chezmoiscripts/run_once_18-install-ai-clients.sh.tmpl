@@ -15,7 +15,7 @@ echo "==> Installing AI clients..."
 
 packages=(
 {{- if .ai.clients.claude_desktop }}
-    claude-desktop-bin
+    claude-desktop
 {{- end }}
 {{- if .ai.clients.claude_code }}
     claude-code

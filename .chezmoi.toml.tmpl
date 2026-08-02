@@ -1,5 +1,4 @@
 {{- $hostname := .chezmoi.hostname -}}
-{{- $identity := env "AGE_IDENTITY" | default (joinPath .chezmoi.homeDir ".ssh/id_ed25519") -}}
 
 {{- $paru               := false -}}
 {{- $nvidia             := false -}}
@@ -86,12 +85,6 @@
 {{- $systemdEnabled   := $niri -}}
 {{- $termusicEnabled  := $niri -}}
 {{- $fcitx5Enabled    := and $niri $useFcitx5 -}}
-
-encryption = "age"
-
-[age]
-    command        = "{{ env "AGE_CMD" | default "age" }}"
-    identity       = "{{ $identity }}"
 
 [data]
     paru_enabled           = {{ $paru }}

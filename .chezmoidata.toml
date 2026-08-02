@@ -7,12 +7,11 @@ zsh_enabled            = true
 base_tools_enabled     = true
 advanced_tools_enabled = true
 niri_enabled           = true
-libvirt_enabled        = true
+libvirt_enabled        = false
 dev_tools_enabled      = true
 rbw_enabled            = true
 yubikey_enabled        = true
 tailscale_enabled      = true
-identity               = "~/.ssh/id_ed25519"
 
 [hyper-lin.pacman]
 multilib_enabled = true
@@ -39,7 +38,6 @@ dev_tools_enabled      = false
 rbw_enabled            = false
 yubikey_enabled        = false
 tailscale_enabled      = true
-identity               = "~/.ssh/id_ed25519"
 
 [echo-server.pacman]
 multilib_enabled = true
