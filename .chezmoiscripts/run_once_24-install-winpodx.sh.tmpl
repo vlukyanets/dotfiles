@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+{{ if not .winpodx_enabled -}}
+echo "==> WinPodX installation skipped (winpodx disabled in config)."
+exit 0
+{{- end }}
+
+set -euo pipefail
+
+if ! command -v paru &>/dev/null; then
+    echo "ERROR: paru is required for AI clients (AUR packages) but not found."
+    exit 1
+fi
+
+echo "==> Installing WinPodX..."
+
+paru -S --needed --noconfirm winpodx
+
+echo "==> WinPodX installed."

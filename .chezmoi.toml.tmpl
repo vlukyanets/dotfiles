@@ -39,6 +39,7 @@
 {{-     $rbw             = get $cfg "rbw_enabled"             | default false -}}
 {{-     $yubikey         = get $cfg "yubikey_enabled"         | default false -}}
 {{-     $tailscale       = get $cfg "tailscale_enabled"       | default false -}}
+{{-     $winpodxEnabled  = get $cfg "winpodx_enabled"         | default false -}}
 {{-     $ai             := get $cfg "ai"              | default dict -}}
 {{-     $aiClients      := get $ai  "clients"         | default dict -}}
 {{-     $aiClaudeDesktop = get $aiClients "claude_desktop" | default false -}}
@@ -64,6 +65,7 @@
 {{-   $rbw             = promptBoolOnce   . "rbw_enabled"             "Install rbw (Bitwarden CLI)" -}}
 {{-   $yubikey         = promptBoolOnce   . "yubikey_enabled"         "Install YubiKey tools and udev rules" -}}
 {{-   $tailscale       = promptBoolOnce   . "tailscale_enabled"       "Install Tailscale and enable tailscaled service" -}}
+{{-   $winpodxEnabled  = promptBoolInce   . "winpodx_enabled"         "Install WinPodX" -}}
 {{-   $aiClaudeDesktop = promptBoolOnce   . "ai_claude_desktop"       "Install Claude desktop client (GUI)" -}}
 {{-   $aiClaudeCode    = promptBoolOnce   . "ai_claude_code"          "Install Claude Code (CLI)" -}}
 {{-   $languagesStr   := promptStringOnce . "languages"               "Enabled keyboard layouts (comma-separated: english,russian,ukrainian,chinese)" -}}
@@ -107,6 +109,7 @@
     systemd_enabled        = {{ $systemdEnabled }}
     termusic_enabled       = {{ $termusicEnabled }}
     fcitx5_enabled         = {{ $fcitx5Enabled }}
+    winpodx_enabled        = {{ $winpodxEnabled }}
 
 [data.pacman]
     multilib_enabled = {{ $multilibEnabled }}

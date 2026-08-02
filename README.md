@@ -40,6 +40,7 @@ Scripts run in order on first `chezmoi apply`. All are `run_once_` — they re-r
 | `21-install-tailscale` | `tailscale_enabled` | Installs `tailscale`; enables `tailscaled.service`; sets current user as operator |
 | `22-install-fcitx5` | `niri_enabled` + `use_fcitx5` | Installs `fcitx5 fcitx5-chinese-addons fcitx5-gtk fcitx5-qt fcitx5-configtool` |
 | `after_23-update-fcitx5-profile` | `use_fcitx5` | `run_onchange` — rewrites `~/.config/fcitx5/profile` from `languages` list; restarts fcitx5 |
+| `24-install-winpodx` | `winpodx_enabled` + `paru` | Installs `winpodx` |
 
 ### Desktop programs (script 12)
 
@@ -80,6 +81,7 @@ Flags are set per-host in `.chezmoidata.toml`. Unknown hosts are prompted intera
 | `rbw_enabled` | bool | `false` | Install rbw Bitwarden CLI + pinentry |
 | `yubikey_enabled` | bool | `false` | Install YubiKey tools, enable `pcscd.socket`, deploy U2F udev rules |
 | `tailscale_enabled` | bool | `false` | Install Tailscale, enable `tailscaled.service`, set user as operator |
+| `winpodx_enabled` | bool | `false` | Installs WinPodX |
 | `use_fcitx5` | bool | `false` | Install fcitx5 input method framework and configure profile |
 | `languages` | array | `[]` | Input methods to configure in fcitx5 (`english`, `russian`, `ukrainian`, `chinese`) |
 
