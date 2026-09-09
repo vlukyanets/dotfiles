@@ -1,0 +1,33 @@
+{{- $hostname := .chezmoi.hostname -}}
+{{- $allHosts := fromToml (include ".hosts.toml") -}}
+{{- if not (hasKey $allHosts $hostname) -}}
+{{-   fail (printf "\nchezmoi init aborted: this machine's hostname, %q, has no entry in .hosts.toml.\n\nEvery machine has to be registered before chezmoi init will touch it — add a table for it (it can be empty) in the source directory's .hosts.toml, e.g.:\n\n    [%s]\n\nIf you added it on a different machine, commit and push it there first:\n\n    chezmoi cd && git add .hosts.toml && git commit -m \"add host %s\" && git push\n\n...then re-run chezmoi init here, once the clone it pulls from has that entry. See README.md's \"Adding a new machine\" section for the full workflow.\n" $hostname $hostname $hostname) -}}
+{{- end -}}
+{{- $cfg := get $allHosts $hostname -}}
+
+{{- $git     := get $cfg "git" | default dict -}}
+{{- $gitUser := get $git "user" | default dict -}}
+{{- $name    := get $gitUser "name" -}}
+{{- $email   := get $gitUser "email" -}}
+
+{{- $pkgMgmt                  := get $cfg "pkg-mgmt" | default dict -}}
+{{- $pacman                   := get $pkgMgmt "pacman" | default dict -}}
+{{- $pkgMgmtParallelDownloads := get $pacman "parallel-downloads" | default 4 -}}
+
+{{- $makepkg        := get $pkgMgmt "makepkg" | default dict -}}
+{{- $makepkgJobs    := get $makepkg "jobs" | default 1 -}}
+{{- $makepkgOptions := get $makepkg "options" | default (list) -}}
+
+[data]
+    hostname = {{ $hostname | quote }}
+
+    [data.git.user]
+    name  = {{ $name | quote }}
+    email = {{ $email | quote }}
+
+    [data.pkg-mgmt.pacman]
+    parallel-downloads = {{ $pkgMgmtParallelDownloads }}
+
+    [data.pkg-mgmt.makepkg]
+    jobs    = {{ if kindIs "string" $makepkgJobs }}{{ $makepkgJobs | quote }}{{ else }}{{ $makepkgJobs }}{{ end }}
+    options = {{ toJson $makepkgOptions }}

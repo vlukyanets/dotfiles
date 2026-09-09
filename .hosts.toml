@@ -1,0 +1,58 @@
+# Per-host configuration. Hostname is the top-level table key. Every field
+# is optional — anything omitted falls back to the default hardcoded in
+# .chezmoi.toml.tmpl (there's no shared [default] table here; that's where
+# defaults live instead).
+#
+# Recognized fields:
+#   [<host>.git.user]
+#     name   string  git user.name (default: "Valentin Lukyanets")
+#     email  string  git user.email (no default — omitted means an empty
+#                     value, not a shared fallback address)
+#   [<host>.pkg-mgmt.pacman]
+#     parallel_downloads  int     pacman.conf ParallelDownloads (default: 5)
+#                                 — a fixed integer only; pacman.conf isn't
+#                                 shell, so it can't take the percentage or
+#                                 shell-expression forms makepkg.jobs does
+#                                 below (chezmoi init fails loudly if given
+#                                 e.g. "20%")
+#   [<host>.pkg-mgmt.makepkg]
+#     jobs   int or string  makepkg.conf MAKEFLAGS="-j<value>" (default: "$(nproc)"),
+#                    any of:
+#                      - a plain integer (4, not quoted)  — used as-is
+#                      - a percentage of CPU count ("20%", a string) —
+#                        resolved to floor(cpus * pct/100), clamped up to a
+#                        minimum of 1 whenever the percentage is > 0%
+#                      - a raw shell expression ("$(nproc)", a string, the
+#                        default) — written through unresolved and evaluated
+#                        fresh at every build instead of once at apply time,
+#                        since makepkg.conf (unlike pacman.conf) is sourced
+#                        as shell
+#     options  list of strings  entries for makepkg.conf's OPTIONS array,
+#                    e.g. ["ccache", "!debug"] (a leading "!" negates one of
+#                    makepkg's built-in defaults, same as in OPTIONS=(...)
+#                    itself). Joined into one OPTIONS+=(...) line. Default:
+#                    [] — no line at all, makepkg's own OPTIONS stand as-is.
+#
+# To register a new machine, add a [<hostname>] table below (it can be
+# empty — its presence is what marks the host as known). `chezmoi init`
+# fails outright on any hostname not listed here — it does not prompt and
+# does not fall back to the defaults above.
+
+[hyper-lin]
+
+[hyper-lin.git]
+user.name = "Valentin Lukyanets"
+user.email = "valikluks95@gmail.com"
+
+[hyper-lin.pkg-mgmt.pacman]
+parallel-downloads = 2
+
+[hyper-lin.pkg-mgmt.makepkg]
+jobs = "20%"
+
+# --- examples for future machines (uncomment and adjust) -------------------
+#
+# [homelab]
+# [homelab.pkg-mgmt.makepkg]
+# jobs    = 2     # low-memory box: cap build parallelism instead of using every core
+# options = ["ccache", "!debug"]

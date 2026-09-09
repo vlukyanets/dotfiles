@@ -1,0 +1,63 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+resolve_parallel() {
+    value=$1
+    case "$value" in
+        *%)
+            pct=${value%\%}
+            cores=$(nproc)
+            n=$(( pct * cores / 100 ))
+            if [ "$pct" -gt 0 ] && [ "$n" -lt 1 ]; then
+                n=1
+            fi
+            printf '%s' "$n"
+            ;;
+        *)
+            printf '%s' "$value"
+            ;;
+    esac
+}
+
+MAKEPKG_JOBS=$(resolve_parallel '{{ .pkg_mgmt.makepkg.jobs }}')
+
+$SUDO_CMD mkdir -p /etc/pacman.conf.d
+
+echo "==> Wiring up /etc/pacman.conf.d/options.conf (one-time)"
+if ! grep -qF 'Include = /etc/pacman.conf.d/options.conf' /etc/pacman.conf; then
+    $SUDO_CMD sed -i '/^\[core\]/i Include = /etc/pacman.conf.d/options.conf\n' /etc/pacman.conf
+fi
+$SUDO_CMD tee /etc/pacman.conf.d/options.conf >/dev/null <<CONF
+# Managed by chezmoi (.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl)
+ParallelDownloads = {{ .pkg_mgmt.pacman.parallel_downloads }}
+CONF
+
+echo "==> Configuring multilib repo"
+if grep -qE '^\[multilib\]' /etc/pacman.conf; then
+    echo "    already enabled directly in pacman.conf — leaving as-is"
+else
+    if ! grep -qF 'Include = /etc/pacman.conf.d/multilib.conf' /etc/pacman.conf; then
+        printf '\nInclude = /etc/pacman.conf.d/multilib.conf\n' | $SUDO_CMD tee -a /etc/pacman.conf >/dev/null
+    fi
+    $SUDO_CMD tee /etc/pacman.conf.d/multilib.conf >/dev/null <<CONF
+# Managed by chezmoi (.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl)
+[multilib]
+Include = /etc/pacman.d/mirrorlist
+CONF
+fi
+
+echo "==> Writing /etc/makepkg.conf.d/dotfiles.conf"
+$SUDO_CMD mkdir -p /etc/makepkg.conf.d
+$SUDO_CMD tee /etc/makepkg.conf.d/dotfiles.conf >/dev/null <<CONF
+# Managed by chezmoi (.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl)
+MAKEFLAGS="-j$MAKEPKG_JOBS"
+{{- if .pkg_mgmt.makepkg.options }}
+OPTIONS+=({{ join " " .pkg_mgmt.makepkg.options }})
+{{- end }}
+CONF
+
+echo "==> Syncing package databases (multilib now enabled)"
+$SUDO_CMD pacman -Sy

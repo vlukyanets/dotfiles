@@ -1,0 +1,136 @@
+# dotfiles
+
+Personal dotfiles for multiple machines, managed with [chezmoi](https://www.chezmoi.io/).
+
+## Prerequisites
+
+- [git](https://git-scm.com/)
+- [chezmoi](https://www.chezmoi.io/install/)
+
+## Conventions
+
+**`SUDO_CMD`** — the privilege-escalation command used everywhere in this
+repo (`dot_zshrc.tmpl`'s `update` alias, `.chezmoiscripts/*`). There's no
+real cross-tool standard for this (checked sudo/doas, doas-sudo-shim,
+topgrade — which only exposes it as a config-file option), so this repo
+defines its own: every script/alias reads `${SUDO_CMD:-sudo}`, so exporting
+`SUDO_CMD=doas` (in a profile sourced before `~/.zshrc`, or in the
+environment a `chezmoi apply` run inherits) switches every one of them over
+without touching this repo.
+
+## How host config works
+
+Machines are declared once in **[`.hosts.toml`](.hosts.toml)**,
+keyed by hostname:
+
+```toml
+[hyper-lin]
+```
+
+The name deliberately avoids chezmoi's own `.chezmoidata` prefix. A file
+named that way gets auto-merged into *every* template's top-level data on
+every run — which here would mean every host's config (not just the one
+being applied) becomes visible to every template, even though none of them
+would use it. `.hosts.toml` is instead read explicitly, only by
+`.chezmoi.toml.tmpl`, so the one host being applied is the only thing that
+was ever exposed anywhere.
+
+A host entry can be empty — its presence in the file is what marks the
+machine as known. There's no shared `[default]` table; every field's
+fallback lives in `.chezmoi.toml.tmpl` instead, and a host only needs a
+sub-table for what it wants to override, e.g.:
+
+```toml
+[homelab.pkg-mgmt.makepkg]
+jobs = "2"
+```
+
+**[`.chezmoi.toml.tmpl`](.chezmoi.toml.tmpl)** runs once at `chezmoi init`
+time, looks up the current machine by hostname, and flattens its entry
+(falling back to the hardcoded default for anything unset) into plain
+template variables saved to `~/.config/chezmoi/chezmoi.toml`:
+
+| variable                        | meaning                                                |
+|-----------------------------------|-----------------------------------------------------------|
+| `.hostname`                        | machine hostname                                           |
+| `.git.user.name`                   | git user.name                                              |
+| `.git.user.email`                  | git user.email (no default — empty unless a host sets one) |
+| `.pkg_mgmt.pacman.parallel_downloads` | pacman.conf `ParallelDownloads`                         |
+| `.pkg_mgmt.makepkg.jobs`           | makepkg.conf `MAKEFLAGS="-j<value>"` build parallelism      |
+
+(Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
+`pkg_mgmt` with an underscore instead, because a hyphen can't appear in a Go
+template field name — see the comment in `.chezmoi.toml.tmpl`.)
+
+`makepkg.jobs` accepts a plain integer ("4"), a percentage of CPU count
+("20%", floored and clamped up to a minimum of 1 whenever the percentage is
+> 0%, resolved by `resolve_parallel()` in the script below), or a raw shell
+expression like `"$(nproc)"` (the default) — which, unlike the other two
+forms, is written through unresolved and evaluated fresh at every build
+rather than once at apply time, since `makepkg.conf` is sourced as shell.
+
+`pacman.parallel_downloads` is a fixed integer only — `pacman.conf` isn't
+shell, so there's no later point where a percentage or shell expression
+could still be evaluated. `chezmoi init` fails loudly (rather than silently
+misbehaving) if given one.
+
+Every other template in the repo can branch on these, plus chezmoi's built-in
+`.chezmoi.hostname`, `.chezmoi.os`, `.chezmoi.arch`, `.chezmoi.osRelease.id`,
+etc. See [`dot_zshrc.tmpl`](dot_zshrc.tmpl) and
+[`dot_gitconfig.tmpl`](dot_gitconfig.tmpl) for worked examples of branching
+on `.chezmoi.*`, and
+[`.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl`](.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl)
+for one that uses the host-configurable values above.
+[`.chezmoiignore.tmpl`](.chezmoiignore.tmpl) is where to skip whole files on
+hosts where they don't apply.
+
+Running `chezmoi init` on a machine that isn't registered fails outright —
+there's no interactive prompt and no silent all-defaults fallback. Add a
+`[<hostname>]` table to `.hosts.toml` (it can be empty) first.
+
+**`.chezmoi.toml.tmpl` only runs at `chezmoi init`, not at `chezmoi apply`.**
+Editing `[<host>.pkg-mgmt.*]` (or any other field it reads) in
+`.hosts.toml` does *not* take effect on the next plain `apply` — the
+already-generated `~/.config/chezmoi/chezmoi.toml` is reused as-is. Re-run
+`chezmoi init` (safe to repeat; it doesn't touch anything outside that one
+config file) to regenerate it, then `apply` — or just `chezmoi init --apply`
+to do both in one step.
+
+## Adding a new machine
+
+1. Add a `[<hostname>]` table to `.hosts.toml` (a template is already
+   there, commented out) from wherever's convenient, then commit and push
+   it:
+   ```sh
+   chezmoi cd && git add .hosts.toml && git commit -m "add host <name>" && git push
+   ```
+   This has to happen *before* step 2 — `chezmoi init` on the new machine
+   clones the repo fresh from the remote, and now fails outright if that
+   clone doesn't already have the new hostname registered.
+2. On the new machine:
+   ```sh
+   sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply vlukyanets
+   ```
+   (already have chezmoi? just `chezmoi init --apply vlukyanets`)
+
+## Everyday commands
+
+| command                    | what it does                                         |
+|-----------------------------|-------------------------------------------------------|
+| `chezmoi edit ~/.zshrc`     | open the source template for a managed file           |
+| `chezmoi diff`              | preview what `apply` would change                     |
+| `chezmoi apply`             | render templates and write them into `$HOME`          |
+| `chezmoi cd`                | drop into the source dir (this repo) as a subshell     |
+| `chezmoi update`            | `git pull` + `apply` in one step                       |
+| `chezmoi status`            | show which managed files differ from source            |
+
+## Layout reference
+
+- `.hosts.toml` — per-host config, keyed by hostname (data, not templates)
+- `.chezmoi.toml.tmpl` — turns a host's entry into template variables, defaults included
+- `.chezmoiignore.tmpl` — per-host file exclusions
+- `dot_*` / `private_dot_*` — become `~/.*` on `apply` (chezmoi's naming
+  convention: `dot_` → `.`, `private_` → mode `0600`)
+- `.chezmoiscripts/run_once_*` — one-time setup scripts (package installs,
+  etc.); `run_once_` means chezmoi runs it once per content hash, re-running
+  automatically whenever the script's content changes
