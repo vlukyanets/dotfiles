@@ -40,6 +40,10 @@
 {{- $localeKeymap   := get $locale "keymap" | default "us" -}}
 {{- $localeTimezone := get $locale "timezone" | default "UTC" -}}
 
+{{- $services         := get $cfg "services" | default dict -}}
+{{- $servicesEnabled  := get $services "enabled" | default (list) -}}
+{{- $servicesPackages := get $services "packages" | default dict -}}
+
 [data]
     hostname = {{ $hostname | quote }}
 
@@ -76,3 +80,10 @@
     keymap   = {{ $localeKeymap | quote }}
     timezone = {{ $localeTimezone | quote }}
 
+    [data.services]
+    enabled = {{ toJson $servicesEnabled }}
+
+    [data.services.packages]
+    {{- range $unit, $pkgs := $servicesPackages }}
+    {{ $unit | quote }} = {{ toJson $pkgs }}
+    {{- end }}

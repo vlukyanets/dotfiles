@@ -80,6 +80,23 @@
 #                    exist under /usr/share/zoneinfo/ (default: "UTC").
 #                    Symlinked to /etc/localtime; hwclock --systohc then
 #                    syncs the hardware clock to match.
+#   [<host>.services]
+#     enabled  list of strings  systemd unit names to `systemctl enable --now`,
+#                    e.g. ["NetworkManager", "bluetooth", "sshd"] (default: []
+#                    — no units, script exits without touching systemd).
+#                    Idempotent: already-enabled/running units are left as-is.
+#   [<host>.services.packages]
+#     <unit> = list of strings  pacman packages that provide that unit, e.g.
+#                    NetworkManager = ["networkmanager"], bluetooth =
+#                    ["bluez", "bluez-utils"]. Quote the key if the unit name
+#                    itself contains a "." (e.g. "systemd-timesyncd.service")
+#                    — TOML would otherwise read it as a nested table path.
+#                    Every package across every entry in `enabled` is
+#                    installed together in one deduplicated `pacman -S
+#                    --needed` call before any unit is enabled. A unit with
+#                    no entry here gets nothing installed for it (e.g. sshd
+#                    ships in `openssh`, which may already be present) — it's
+#                    just enabled as-is.
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -100,6 +117,12 @@ jobs = "20%"
 
 [hyper-lin.pkg-mgmt.reflector]
 country = ["Ukraine", "Poland", "Slovakia"]
+
+[hyper-lin.services]
+enabled = ["sshd"]
+
+[hyper-lin.services.packages]
+sshd = ["openssh"]
 
 # --- examples for future machines (uncomment and adjust) -------------------
 #

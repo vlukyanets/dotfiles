@@ -61,6 +61,8 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.pkg_mgmt.reflector.timer.*`      | reflector.timer override (on_calendar, on_boot_sec)         |
 | `.pkg_mgmt.aur.enabled`            | whether to build and install paru from the AUR              |
 | `.locale.*`                        | locale.conf LANG, locale.gen entries, vconsole KEYMAP, timezone |
+| `.services.enabled`                | systemd units to `enable --now`                             |
+| `.services.packages`                | unit → pacman packages that provide it                      |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
 `pkg_mgmt` with an underscore instead, because a hyphen can't appear in a Go
@@ -120,6 +122,18 @@ if it's already there commented out, appending it otherwise) and runs
 independent fields — `locales` only controls what `locale-gen` compiles, so
 if it doesn't already include whatever `lang` names, `LANG` ends up pointing
 at a locale that was never generated.
+
+[`.chezmoiscripts/run_once_before_04-configure-services.sh.tmpl`](.chezmoiscripts/run_once_before_04-configure-services.sh.tmpl)
+runs `systemctl enable --now` for each unit listed in `services.enabled`
+(default `[]` — the script exits immediately without touching systemd on
+hosts that don't set it). Before enabling anything, it looks up each unit
+in `services.packages` (unit name → list of pacman packages that provide
+it), collects the packages for every enabled unit into one deduplicated
+list, and installs them in a single `pacman -S --needed` call — a unit with
+no entry in `services.packages` is just enabled as-is, nothing installed.
+`enable --now` is idempotent on its own, so re-running this script (or
+applying on a host where a unit is already enabled and running) is always a
+no-op for that unit.
 
 [`.chezmoiignore.tmpl`](.chezmoiignore.tmpl) is where to skip whole files on
 hosts where they don't apply.
