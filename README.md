@@ -59,6 +59,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.pkg_mgmt.makepkg.jobs`           | makepkg.conf `MAKEFLAGS="-j<value>"` build parallelism      |
 | `.pkg_mgmt.reflector.*`            | reflector.conf flags (save, country, protocol, latest, sort, age, download_timeout) |
 | `.pkg_mgmt.reflector.timer.*`      | reflector.timer override (on_calendar, on_boot_sec)         |
+| `.pkg_mgmt.aur.enabled`            | whether to build and install paru from the AUR              |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
 `pkg_mgmt` with an underscore instead, because a hyphen can't appear in a Go
@@ -98,6 +99,15 @@ timer-specific to configure beyond the `OnCalendar`/`OnBootSec` override.
 `pkg_mgmt.reflector.save` is also read by the pacman script's multilib
 `Include=` line, so the two scripts always agree on which mirrorlist file
 is in play — change it once, in `.hosts.toml`, not in either script.
+
+[`.chezmoiscripts/run_once_before_02-configure-aur.sh.tmpl`](.chezmoiscripts/run_once_before_02-configure-aur.sh.tmpl)
+builds and installs [paru](https://github.com/Morganamilo/paru) from the AUR,
+gated entirely behind `pkg_mgmt.aur.enabled` (default `false`) — hosts that
+leave it unset skip the script without touching the network. When enabled,
+it's still a no-op if `paru` is already on `PATH`, otherwise it installs
+`base-devel`/`git`, clones `paru` into a scratch directory, and runs
+`makepkg -si` there (unprefixed by `SUDO_CMD`, since `makepkg` refuses to run
+as root — see the comment in the script).
 
 [`.chezmoiignore.tmpl`](.chezmoiignore.tmpl) is where to skip whole files on
 hosts where they don't apply.

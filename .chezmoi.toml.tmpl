@@ -31,6 +31,9 @@
 {{- $reflectorOnCalendar := get $reflectorTimer "on-calendar" | default "weekly" -}}
 {{- $reflectorOnBootSec  := get $reflectorTimer "on-boot-sec" | default "15min" -}}
 
+{{- $aur        := get $pkgMgmt "aur" | default dict -}}
+{{- $aurEnabled := get $aur "enabled" | default false -}}
+
 [data]
     hostname = {{ $hostname | quote }}
 
@@ -57,3 +60,7 @@
     [data.pkg_mgmt.reflector.timer]
     on_calendar = {{ $reflectorOnCalendar | quote }}
     on_boot_sec = {{ $reflectorOnBootSec | quote }}
+
+    [data.pkg_mgmt.aur]
+    enabled = {{ $aurEnabled }}
+
