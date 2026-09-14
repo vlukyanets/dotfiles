@@ -45,7 +45,7 @@ else
     $SUDO_CMD tee /etc/pacman.conf.d/multilib.conf >/dev/null <<CONF
 # Managed by chezmoi (.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl)
 [multilib]
-Include = /etc/pacman.d/mirrorlist
+Include = {{ .pkg_mgmt.reflector.save }}
 CONF
 fi
 

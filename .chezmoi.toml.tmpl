@@ -18,6 +18,19 @@
 {{- $makepkgJobs    := get $makepkg "jobs" | default 1 -}}
 {{- $makepkgOptions := get $makepkg "options" | default (list) -}}
 
+{{- $reflector          := get $pkgMgmt "reflector" | default dict -}}
+{{- $reflectorSave      := get $reflector "save" | default "/etc/pacman.d/mirrorlist" -}}
+{{- $reflectorCountry   := get $reflector "country" | default (list) -}}
+{{- $reflectorProtocol  := get $reflector "protocol" | default "https" -}}
+{{- $reflectorLatest    := get $reflector "latest" | default 20 -}}
+{{- $reflectorSort      := get $reflector "sort" | default "rate" -}}
+{{- $reflectorAge       := get $reflector "age" | default 12 -}}
+{{- $reflectorTimeout   := get $reflector "download-timeout" | default 5 -}}
+
+{{- $reflectorTimer      := get $reflector "timer" | default dict -}}
+{{- $reflectorOnCalendar := get $reflectorTimer "on-calendar" | default "weekly" -}}
+{{- $reflectorOnBootSec  := get $reflectorTimer "on-boot-sec" | default "15min" -}}
+
 [data]
     hostname = {{ $hostname | quote }}
 
@@ -25,9 +38,22 @@
     name  = {{ $name | quote }}
     email = {{ $email | quote }}
 
-    [data.pkg-mgmt.pacman]
-    parallel-downloads = {{ $pkgMgmtParallelDownloads }}
+    [data.pkg_mgmt.pacman]
+    parallel_downloads = {{ $pkgMgmtParallelDownloads }}
 
-    [data.pkg-mgmt.makepkg]
+    [data.pkg_mgmt.makepkg]
     jobs    = {{ if kindIs "string" $makepkgJobs }}{{ $makepkgJobs | quote }}{{ else }}{{ $makepkgJobs }}{{ end }}
     options = {{ toJson $makepkgOptions }}
+
+    [data.pkg_mgmt.reflector]
+    save             = {{ $reflectorSave | quote }}
+    country          = {{ toJson $reflectorCountry }}
+    protocol         = {{ $reflectorProtocol | quote }}
+    latest           = {{ $reflectorLatest }}
+    sort             = {{ $reflectorSort | quote }}
+    age              = {{ $reflectorAge }}
+    download_timeout = {{ $reflectorTimeout }}
+
+    [data.pkg_mgmt.reflector.timer]
+    on_calendar = {{ $reflectorOnCalendar | quote }}
+    on_boot_sec = {{ $reflectorOnBootSec | quote }}

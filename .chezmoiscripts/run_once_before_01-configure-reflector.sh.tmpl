@@ -1,0 +1,54 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+REFLECTOR_SAVE="{{ .pkg_mgmt.reflector.save }}"
+
+echo "==> Installing reflector"
+$SUDO_CMD pacman -S --needed --noconfirm reflector
+
+echo "==> Writing /etc/xdg/reflector/reflector.conf"
+$SUDO_CMD mkdir -p /etc/xdg/reflector
+$SUDO_CMD tee /etc/xdg/reflector/reflector.conf >/dev/null <<CONF
+# Managed by chezmoi (.chezmoiscripts/run_once_before_01-configure-reflector.sh.tmpl)
+--save $REFLECTOR_SAVE
+{{- if .pkg_mgmt.reflector.country }}
+--country {{ join "," .pkg_mgmt.reflector.country }}
+{{- end }}
+--protocol {{ .pkg_mgmt.reflector.protocol }}
+--latest {{ .pkg_mgmt.reflector.latest }}
+--sort {{ .pkg_mgmt.reflector.sort }}
+--age {{ .pkg_mgmt.reflector.age }}
+--download-timeout {{ .pkg_mgmt.reflector.download_timeout }}
+CONF
+
+echo "==> Configuring reflector.timer (/etc/systemd/system/reflector.timer.d/override.conf)"
+$SUDO_CMD mkdir -p /etc/systemd/system/reflector.timer.d
+$SUDO_CMD tee /etc/systemd/system/reflector.timer.d/override.conf >/dev/null <<CONF
+# Managed by chezmoi (.chezmoiscripts/run_once_before_01-configure-reflector.sh.tmpl)
+[Timer]
+OnCalendar=
+OnCalendar={{ .pkg_mgmt.reflector.timer.on_calendar }}
+OnBootSec=
+OnBootSec={{ .pkg_mgmt.reflector.timer.on_boot_sec }}
+CONF
+
+$SUDO_CMD systemctl daemon-reload
+
+# reflector.timer ships Persistent=true, so "enable --now" on a machine
+# with no prior stamp (systemd's own on-disk record of the timer's last
+# elapse — a fresh install, always) immediately queues a catch-up run of
+# reflector.service on its own. Trigger the refresh through systemd
+# (`systemctl start` on the .service) rather than invoking the `reflector`
+# binary directly: if that catch-up run is already queued or in flight,
+# this attaches to the same unit job instead of racing it with a second,
+# fully independent process writing the same file — either way exactly one
+# run happens. Type=oneshot with RemainAfterExit=no means `systemctl start`
+# still blocks until that single run finishes, so this stays as
+# deterministic as the direct-invocation form it replaces.
+$SUDO_CMD systemctl enable --now reflector.timer
+
+echo "==> Running reflector to refresh $REFLECTOR_SAVE"
+$SUDO_CMD systemctl start reflector.service

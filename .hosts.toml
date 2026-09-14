@@ -9,7 +9,7 @@
 #     email  string  git user.email (no default — omitted means an empty
 #                     value, not a shared fallback address)
 #   [<host>.pkg-mgmt.pacman]
-#     parallel_downloads  int     pacman.conf ParallelDownloads (default: 5)
+#     parallel-downloads  int     pacman.conf ParallelDownloads (default: 5)
 #                                 — a fixed integer only; pacman.conf isn't
 #                                 shell, so it can't take the percentage or
 #                                 shell-expression forms makepkg.jobs does
@@ -32,6 +32,35 @@
 #                    makepkg's built-in defaults, same as in OPTIONS=(...)
 #                    itself). Joined into one OPTIONS+=(...) line. Default:
 #                    [] — no line at all, makepkg's own OPTIONS stand as-is.
+#   [<host>.pkg-mgmt.reflector]
+#     save     string  reflector --save, the mirrorlist path (default:
+#                    "/etc/pacman.d/mirrorlist"). Shared with
+#                    run_once_before_00-configure-pacman.sh.tmpl's multilib
+#                    Include= line, so the two stay pointed at the same file
+#                    — override here, not in that script.
+#                    CAUTION: the reflector package's own reflector.service
+#                    is systemd-sandboxed with a hardcoded
+#                    ReadWritePaths=/etc/pacman.d/mirrorlist (ProtectSystem=
+#                    strict). Our own run_once script writes here fine
+#                    regardless (plain sudo, no sandbox), but every later
+#                    *timer*-triggered run would silently fail to write
+#                    anywhere else — don't set this to a non-default path
+#                    without also shipping a drop-in that widens
+#                    reflector.service's ReadWritePaths to match.
+#     country  list of strings  reflector --country, e.g. ["Germany", "France"]
+#                    (default: [] — flag omitted, reflector considers every
+#                    country)
+#     protocol           string  reflector --protocol (default: "https")
+#     latest             int     reflector --latest (default: 20)
+#     sort               string  reflector --sort (default: "rate")
+#     age                int     reflector --age, hours (default: 12)
+#     download-timeout   int     reflector --download-timeout, seconds
+#                    (default: 5)
+#   [<host>.pkg-mgmt.reflector.timer]
+#     on-calendar  string  reflector.timer OnCalendar= override (default:
+#                    "weekly", the package's own default)
+#     on-boot-sec  string  reflector.timer OnBootSec= override (default:
+#                    "15min", the package's own default)
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -49,6 +78,9 @@ parallel-downloads = 2
 
 [hyper-lin.pkg-mgmt.makepkg]
 jobs = "20%"
+
+[hyper-lin.pkg-mgmt.reflector]
+country = ["Ukraine", "Poland", "Slovakia"]
 
 # --- examples for future machines (uncomment and adjust) -------------------
 #
