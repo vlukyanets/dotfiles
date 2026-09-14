@@ -24,12 +24,11 @@ resolve_parallel() {
 
 MAKEPKG_JOBS=$(resolve_parallel '{{ .pkg_mgmt.makepkg.jobs }}')
 
-$SUDO_CMD mkdir -p /etc/pacman.conf.d
-
 echo "==> Wiring up /etc/pacman.conf.d/options.conf (one-time)"
 if ! grep -qF 'Include = /etc/pacman.conf.d/options.conf' /etc/pacman.conf; then
     $SUDO_CMD sed -i '/^\[core\]/i Include = /etc/pacman.conf.d/options.conf\n' /etc/pacman.conf
 fi
+$SUDO_CMD mkdir -p /etc/pacman.conf.d
 $SUDO_CMD tee /etc/pacman.conf.d/options.conf >/dev/null <<CONF
 # Managed by chezmoi (.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl)
 ParallelDownloads = {{ .pkg_mgmt.pacman.parallel_downloads }}
@@ -42,6 +41,7 @@ else
     if ! grep -qF 'Include = /etc/pacman.conf.d/multilib.conf' /etc/pacman.conf; then
         printf '\nInclude = /etc/pacman.conf.d/multilib.conf\n' | $SUDO_CMD tee -a /etc/pacman.conf >/dev/null
     fi
+    $SUDO_CMD mkdir -p /etc/pacman.conf.d
     $SUDO_CMD tee /etc/pacman.conf.d/multilib.conf >/dev/null <<CONF
 # Managed by chezmoi (.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl)
 [multilib]
