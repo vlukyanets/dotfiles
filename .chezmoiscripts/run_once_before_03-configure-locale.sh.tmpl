@@ -1,0 +1,40 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+LOCALE_LANG="{{ .locale.lang }}"
+LOCALE_KEYMAP="{{ .locale.keymap }}"
+LOCALE_TIMEZONE="{{ .locale.timezone }}"
+
+echo "==> Enabling locales in /etc/locale.gen"
+{{- range .locale.locales }}
+LOCALE_LINE={{ . | quote }}
+if grep -qxF "$LOCALE_LINE" /etc/locale.gen; then
+    : # already enabled
+elif grep -qxF "#$LOCALE_LINE" /etc/locale.gen; then
+    $SUDO_CMD sed -i "s/^#$LOCALE_LINE\$/$LOCALE_LINE/" /etc/locale.gen
+else
+    printf '%s\n' "$LOCALE_LINE" | $SUDO_CMD tee -a /etc/locale.gen >/dev/null
+fi
+{{- end }}
+
+echo "==> Generating locales"
+$SUDO_CMD locale-gen
+
+echo "==> Writing /etc/locale.conf"
+$SUDO_CMD tee /etc/locale.conf >/dev/null <<CONF
+# Managed by chezmoi (.chezmoiscripts/run_once_before_03-configure-locale.sh.tmpl)
+LANG=$LOCALE_LANG
+CONF
+
+echo "==> Writing /etc/vconsole.conf"
+$SUDO_CMD tee /etc/vconsole.conf >/dev/null <<CONF
+# Managed by chezmoi (.chezmoiscripts/run_once_before_03-configure-locale.sh.tmpl)
+KEYMAP=$LOCALE_KEYMAP
+CONF
+
+echo "==> Setting timezone to $LOCALE_TIMEZONE"
+$SUDO_CMD ln -sf "/usr/share/zoneinfo/$LOCALE_TIMEZONE" /etc/localtime
+$SUDO_CMD hwclock --systohc

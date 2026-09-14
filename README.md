@@ -60,6 +60,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.pkg_mgmt.reflector.*`            | reflector.conf flags (save, country, protocol, latest, sort, age, download_timeout) |
 | `.pkg_mgmt.reflector.timer.*`      | reflector.timer override (on_calendar, on_boot_sec)         |
 | `.pkg_mgmt.aur.enabled`            | whether to build and install paru from the AUR              |
+| `.locale.*`                        | locale.conf LANG, locale.gen entries, vconsole KEYMAP, timezone |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
 `pkg_mgmt` with an underscore instead, because a hyphen can't appear in a Go
@@ -108,6 +109,17 @@ it's still a no-op if `paru` is already on `PATH`, otherwise it installs
 `base-devel`/`git`, clones `paru` into a scratch directory, and runs
 `makepkg -si` there (unprefixed by `SUDO_CMD`, since `makepkg` refuses to run
 as root — see the comment in the script).
+
+[`.chezmoiscripts/run_once_before_03-configure-locale.sh.tmpl`](.chezmoiscripts/run_once_before_03-configure-locale.sh.tmpl)
+enables each entry in `locale.locales` in `/etc/locale.gen` (uncommenting it
+if it's already there commented out, appending it otherwise) and runs
+`locale-gen`, then writes `/etc/locale.conf` (`LANG`) and `/etc/vconsole.conf`
+(`KEYMAP`) from `locale.lang`/`locale.keymap`, and finally symlinks
+`/etc/localtime` to `locale.timezone` under `/usr/share/zoneinfo/` and runs
+`hwclock --systohc` to match. `locale.locales` and `locale.lang` are
+independent fields — `locales` only controls what `locale-gen` compiles, so
+if it doesn't already include whatever `lang` names, `LANG` ends up pointing
+at a locale that was never generated.
 
 [`.chezmoiignore.tmpl`](.chezmoiignore.tmpl) is where to skip whole files on
 hosts where they don't apply.

@@ -34,6 +34,12 @@
 {{- $aur        := get $pkgMgmt "aur" | default dict -}}
 {{- $aurEnabled := get $aur "enabled" | default false -}}
 
+{{- $locale         := get $cfg "locale" | default dict -}}
+{{- $localeLang     := get $locale "lang" | default "en_US.UTF-8" -}}
+{{- $localeLocales  := get $locale "locales" | default (list "en_US.UTF-8 UTF-8") -}}
+{{- $localeKeymap   := get $locale "keymap" | default "us" -}}
+{{- $localeTimezone := get $locale "timezone" | default "UTC" -}}
+
 [data]
     hostname = {{ $hostname | quote }}
 
@@ -63,4 +69,10 @@
 
     [data.pkg_mgmt.aur]
     enabled = {{ $aurEnabled }}
+
+    [data.locale]
+    lang     = {{ $localeLang | quote }}
+    locales  = {{ toJson $localeLocales }}
+    keymap   = {{ $localeKeymap | quote }}
+    timezone = {{ $localeTimezone | quote }}
 

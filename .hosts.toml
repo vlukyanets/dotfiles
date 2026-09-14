@@ -67,6 +67,19 @@
 #                    per host). Skips outright, without contacting the AUR,
 #                    when unset or false; also skips (but still exits 0) if
 #                    paru is already on PATH.
+#   [<host>.locale]
+#     lang      string        /etc/locale.conf LANG= (default: "en_US.UTF-8")
+#     locales   list of strings  lines to uncomment/append in /etc/locale.gen
+#                    before running locale-gen, e.g. ["en_US.UTF-8 UTF-8",
+#                    "uk_UA.UTF-8 UTF-8"] (default: ["en_US.UTF-8 UTF-8"]).
+#                    Must include whichever locale `lang` above names, or
+#                    locale-gen will generate it fine but LANG will point at
+#                    a locale libc doesn't actually have compiled.
+#     keymap    string        /etc/vconsole.conf KEYMAP= (default: "us")
+#     timezone  string        tzdata zone name, e.g. "Europe/Kyiv" — must
+#                    exist under /usr/share/zoneinfo/ (default: "UTC").
+#                    Symlinked to /etc/localtime; hwclock --systohc then
+#                    syncs the hardware clock to match.
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
