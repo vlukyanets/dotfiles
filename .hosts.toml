@@ -123,6 +123,47 @@
 #                    and the eza aliases — unlike services.packages, there's
 #                    no unit to enable afterward, just a single deduplicated
 #                    `pacman -S --needed` call.
+#   [<host>.fonts]
+#     enabled  list of strings  pacman packages to install via
+#                    run_once_before_07-configure-fonts.sh.tmpl, e.g.
+#                    ["ttf-meslo-nerd"] (default: [] — script exits without
+#                    installing anything). A Nerd Font is what
+#                    dot_zshrc.tmpl's powerlevel10k prompt (glyphs) and its
+#                    `eza --icons` aliases both need on the terminal side to
+#                    render correctly — enabling shell.zsh.oh_my_zsh or
+#                    putting "eza" in cli_tools.enabled without also listing
+#                    a font here just gets broken/missing glyphs, not an
+#                    error.
+#   [<host>.containers.docker]
+#     enabled  bool  whether run_once_before_08-configure-containers.sh.tmpl
+#                    installs docker, runs `systemctl enable --now
+#                    docker.service`, and adds the applying user to the
+#                    `docker` group (default: false). Idempotent: the group
+#                    add is skipped if the user's already a member. New
+#                    group membership only takes effect in a fresh login
+#                    session — the script prints a reminder rather than
+#                    trying to fix that itself.
+#   [<host>.ssh]
+#     enabled  bool  whether
+#                    run_once_before_09-configure-ssh-hardening.sh.tmpl
+#                    writes anything at all (default: false — sshd's own
+#                    config is left untouched). Independent of whether
+#                    "sshd" appears in services.enabled: the drop-in below
+#                    is written either way, but only reloaded through a unit
+#                    that's actually active — on a host that doesn't run
+#                    sshd yet, it just sits there ready for whenever sshd is
+#                    installed and started.
+#     disable_password_auth  bool  writes PasswordAuthentication no into
+#                    the generated drop-in when true (default: false —
+#                    PasswordAuthentication is left at sshd's own
+#                    compiled-in default of yes). CAUTION: only set true
+#                    once key-based login is confirmed working from a
+#                    session you already have open — this can lock out
+#                    password-only access, and there's no automatic
+#                    rollback.
+#     permit_root_login  string  PermitRootLogin value in the generated
+#                    drop-in, e.g. "no" or "prohibit-password" (default:
+#                    "prohibit-password", sshd's own compiled-in default).
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`

@@ -53,6 +53,18 @@
 {{- $cliTools        := get $cfg "cli_tools" | default dict -}}
 {{- $cliToolsEnabled := get $cliTools "enabled" | default (list) -}}
 
+{{- $fonts        := get $cfg "fonts" | default dict -}}
+{{- $fontsEnabled := get $fonts "enabled" | default (list) -}}
+
+{{- $containers              := get $cfg "containers" | default dict -}}
+{{- $containersDocker        := get $containers "docker" | default dict -}}
+{{- $containersDockerEnabled := get $containersDocker "enabled" | default false -}}
+
+{{- $ssh                       := get $cfg "ssh" | default dict -}}
+{{- $sshEnabled                := get $ssh "enabled" | default false -}}
+{{- $sshDisablePasswordAuth    := get $ssh "disable_password_auth" | default false -}}
+{{- $sshPermitRootLogin        := get $ssh "permit_root_login" | default "prohibit-password" -}}
+
 [data]
     hostname = {{ $hostname | quote }}
 
@@ -105,3 +117,14 @@
 
     [data.cli_tools]
     enabled = {{ toJson $cliToolsEnabled }}
+
+    [data.fonts]
+    enabled = {{ toJson $fontsEnabled }}
+
+    [data.containers.docker]
+    enabled = {{ $containersDockerEnabled }}
+
+    [data.ssh]
+    enabled                = {{ $sshEnabled }}
+    disable_password_auth  = {{ $sshDisablePasswordAuth }}
+    permit_root_login      = {{ $sshPermitRootLogin | quote }}

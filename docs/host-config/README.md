@@ -46,6 +46,11 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.shell.zsh.enabled`                | whether to install zsh and make it the login shell           |
 | `.shell.zsh.oh_my_zsh.enabled`      | whether to also install oh-my-zsh, powerlevel10k, and the zsh plugins dot_zshrc.tmpl expects |
 | `.cli_tools.enabled`                | pacman packages to install (standalone CLI tools, e.g. neovim/zoxide/eza) |
+| `.fonts.enabled`                    | pacman packages to install (fonts, e.g. a Nerd Font for powerlevel10k/eza icons) |
+| `.containers.docker.enabled`        | whether to install docker, enable docker.service, and add the user to the docker group |
+| `.ssh.enabled`                      | whether to write an sshd_config.d hardening drop-in at all |
+| `.ssh.disable_password_auth`        | writes PasswordAuthentication no into that drop-in when true |
+| `.ssh.permit_root_login`            | PermitRootLogin value in that drop-in |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
 `pkg_mgmt` with an underscore instead, because a hyphen can't appear in a Go
@@ -69,6 +74,9 @@ variables above; see its own page for what it does with them:
 5. [Services](services.md)
 6. [Shell](shell.md)
 7. [CLI tools](cli-tools.md)
+8. [Fonts](fonts.md)
+9. [Containers](containers.md)
+10. [SSH hardening](ssh-hardening.md)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

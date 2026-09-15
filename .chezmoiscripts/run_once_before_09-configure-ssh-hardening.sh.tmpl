@@ -1,0 +1,26 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .ssh.enabled }}
+
+echo "==> Skipping sshd hardening (ssh.enabled is false for this host)"
+exit 0
+{{- end }}
+
+echo "==> Writing /etc/ssh/sshd_config.d/dotfiles.conf"
+$SUDO_CMD mkdir -p /etc/ssh/sshd_config.d
+$SUDO_CMD tee /etc/ssh/sshd_config.d/dotfiles.conf >/dev/null <<CONF
+# Managed by chezmoi (.chezmoiscripts/run_once_before_09-configure-ssh-hardening.sh.tmpl)
+PasswordAuthentication {{ if .ssh.disable_password_auth }}no{{ else }}yes{{ end }}
+PermitRootLogin {{ .ssh.permit_root_login }}
+CONF
+
+if $SUDO_CMD systemctl is-active --quiet sshd; then
+    echo "==> Reloading sshd"
+    $SUDO_CMD systemctl reload sshd
+else
+    echo "==> sshd isn't running, skipping reload (drop-in applies whenever it next starts)"
+fi
