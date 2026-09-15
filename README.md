@@ -65,6 +65,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.services.packages`                | unit → pacman packages that provide it                      |
 | `.shell.zsh.enabled`                | whether to install zsh and make it the login shell           |
 | `.shell.zsh.oh_my_zsh.enabled`      | whether to also install oh-my-zsh, powerlevel10k, and the zsh plugins dot_zshrc.tmpl expects |
+| `.cli_tools.enabled`                | pacman packages to install (standalone CLI tools, e.g. neovim/zoxide/eza) |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
 `pkg_mgmt` with an underscore instead, because a hyphen can't appear in a Go
@@ -156,6 +157,17 @@ rendered into `~/.zshrc` when that's also set, matching exactly what
 `05-configure-shell.sh.tmpl` installs — a host with `shell.zsh.enabled` but
 not the oh-my-zsh flag gets a plain, working `~/.zshrc` with none of that
 theming.
+
+[`.chezmoiscripts/run_once_before_06-configure-cli-tools.sh.tmpl`](.chezmoiscripts/run_once_before_06-configure-cli-tools.sh.tmpl)
+installs every package listed in `cli_tools.enabled` (default `[]` — the
+script exits immediately on hosts that don't set it) in one `pacman -S
+--needed` call. It's for standalone CLI tools, distinct from
+`services.packages`: [`dot_zshrc.tmpl`](dot_zshrc.tmpl) checks for `nvim`,
+`zoxide`, and `eza` with `command -v` before wiring up `$EDITOR`, `zoxide
+init`, and the `eza`-backed `ls` aliases, but nothing installed them until
+now — a host that wants that behavior needs `["neovim", "zoxide", "eza"]`
+(or a subset) in `cli_tools.enabled`; a host that leaves it unset just keeps
+falling back to `vim`/`nano` and plain `ls`.
 
 [`.chezmoiignore.tmpl`](.chezmoiignore.tmpl) is where to skip whole files on
 hosts where they don't apply.

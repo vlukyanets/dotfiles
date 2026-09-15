@@ -50,6 +50,9 @@
 {{- $shellOhMyZsh      := get $shellZsh "oh-my-zsh" | default dict -}}
 {{- $shellOhMyZshEnabled := get $shellOhMyZsh "enabled" | default false -}}
 
+{{- $cliTools        := get $cfg "cli_tools" | default dict -}}
+{{- $cliToolsEnabled := get $cliTools "enabled" | default (list) -}}
+
 [data]
     hostname = {{ $hostname | quote }}
 
@@ -99,3 +102,6 @@
 
     [data.shell.zsh.oh_my_zsh]
     enabled = {{ $shellOhMyZshEnabled }}
+
+    [data.cli_tools]
+    enabled = {{ toJson $cliToolsEnabled }}
