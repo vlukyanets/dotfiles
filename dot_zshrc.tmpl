@@ -1,26 +1,26 @@
 # Managed by chezmoi — edit the template, not this file:
 #   chezmoi edit ~/.zshrc
 
+{{- if .shell.zsh.oh_my_zsh.enabled }}
+
 # Enable Powerlevel10k instant prompt. Must stay near the top, before any
-# other output. Guarded on oh-my-zsh being present so a fresh machine that
-# hasn't installed it yet still gets a working (if plain) shell.
-if [[ -d "$HOME/.oh-my-zsh" ]] && [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+# other output.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-if [[ -d "$HOME/.oh-my-zsh" ]]; then
-    export ZSH="$HOME/.oh-my-zsh"
-    ZSH_THEME="powerlevel10k/powerlevel10k"
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="powerlevel10k/powerlevel10k"
 
-    zstyle ':omz:update' mode reminder
-    zstyle ':omz:update' frequency 30
+zstyle ':omz:update' mode reminder
+zstyle ':omz:update' frequency 30
 
-    plugins=(battery git zsh-autosuggestions zsh-syntax-highlighting)
+plugins=(battery git zsh-autosuggestions zsh-syntax-highlighting)
 
-    source $ZSH/oh-my-zsh.sh
+source $ZSH/oh-my-zsh.sh
 
-    [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-fi
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+{{- end }}
 
 export PATH="$HOME/.local/bin:$PATH"
 

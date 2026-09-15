@@ -63,6 +63,8 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.locale.*`                        | locale.conf LANG, locale.gen entries, vconsole KEYMAP, timezone |
 | `.services.enabled`                | systemd units to `enable --now`                             |
 | `.services.packages`                | unit → pacman packages that provide it                      |
+| `.shell.zsh.enabled`                | whether to install zsh and make it the login shell           |
+| `.shell.zsh.oh_my_zsh.enabled`      | whether to also install oh-my-zsh, powerlevel10k, and the zsh plugins dot_zshrc.tmpl expects |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
 `pkg_mgmt` with an underscore instead, because a hyphen can't appear in a Go
@@ -134,6 +136,26 @@ no entry in `services.packages` is just enabled as-is, nothing installed.
 `enable --now` is idempotent on its own, so re-running this script (or
 applying on a host where a unit is already enabled and running) is always a
 no-op for that unit.
+
+[`.chezmoiscripts/run_once_before_05-configure-shell.sh.tmpl`](.chezmoiscripts/run_once_before_05-configure-shell.sh.tmpl)
+is gated behind `shell.zsh.enabled` (default `false`) the same way the AUR
+script is gated behind `pkg_mgmt.aur.enabled` — hosts that leave it unset
+skip it entirely. When enabled, it installs `zsh` and (if it isn't already
+the login shell) runs `chsh` to make it one. If `shell.zsh.oh_my_zsh.enabled`
+is also set, it further clones oh-my-zsh, the `powerlevel10k` theme, and the
+`zsh-autosuggestions`/`zsh-syntax-highlighting` plugins into `$ZSH_CUSTOM`.
+Every clone is skipped if its directory already exists, so re-running (or
+applying to a machine that already has these installed by hand) is a no-op.
+
+[`.chezmoiignore.tmpl`](.chezmoiignore.tmpl) skips `~/.zshrc` entirely on any
+host with `shell.zsh.enabled` unset or `false` — there's no point writing a
+zsh config on a host that isn't opting into zsh. On a host that does,
+[`dot_zshrc.tmpl`](dot_zshrc.tmpl) itself further branches on
+`shell.zsh.oh_my_zsh.enabled`: the oh-my-zsh/Powerlevel10k block is only
+rendered into `~/.zshrc` when that's also set, matching exactly what
+`05-configure-shell.sh.tmpl` installs — a host with `shell.zsh.enabled` but
+not the oh-my-zsh flag gets a plain, working `~/.zshrc` with none of that
+theming.
 
 [`.chezmoiignore.tmpl`](.chezmoiignore.tmpl) is where to skip whole files on
 hosts where they don't apply.

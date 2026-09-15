@@ -97,6 +97,20 @@
 #                    no entry here gets nothing installed for it (e.g. sshd
 #                    ships in `openssh`, which may already be present) — it's
 #                    just enabled as-is.
+#   [<host>.shell.zsh]
+#     enabled  bool  whether run_once_before_05-configure-shell.sh.tmpl
+#                    installs zsh and makes it the login shell (default:
+#                    false — opt in per host; dot_zshrc.tmpl is still written
+#                    for every host regardless, this only controls whether
+#                    it's actually installed/activated). Idempotent: a
+#                    no-op if zsh is already the login shell.
+#   [<host>.shell.zsh.oh-my-zsh]
+#     enabled  bool  whether the same script also installs oh-my-zsh, the
+#                    powerlevel10k theme, and the zsh-autosuggestions /
+#                    zsh-syntax-highlighting plugins dot_zshrc.tmpl expects
+#                    (default: false). Meaningless unless shell.zsh.enabled
+#                    is also true. Idempotent: skips anything already
+#                    cloned.
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`

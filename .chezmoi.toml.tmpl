@@ -44,6 +44,12 @@
 {{- $servicesEnabled  := get $services "enabled" | default (list) -}}
 {{- $servicesPackages := get $services "packages" | default dict -}}
 
+{{- $shell             := get $cfg "shell" | default dict -}}
+{{- $shellZsh          := get $shell "zsh" | default dict -}}
+{{- $shellZshEnabled   := get $shellZsh "enabled" | default false -}}
+{{- $shellOhMyZsh      := get $shellZsh "oh-my-zsh" | default dict -}}
+{{- $shellOhMyZshEnabled := get $shellOhMyZsh "enabled" | default false -}}
+
 [data]
     hostname = {{ $hostname | quote }}
 
@@ -87,3 +93,9 @@
     {{- range $unit, $pkgs := $servicesPackages }}
     {{ $unit | quote }} = {{ toJson $pkgs }}
     {{- end }}
+
+    [data.shell.zsh]
+    enabled = {{ $shellZshEnabled }}
+
+    [data.shell.zsh.oh_my_zsh]
+    enabled = {{ $shellOhMyZshEnabled }}

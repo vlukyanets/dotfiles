@@ -1,0 +1,58 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .shell.zsh.enabled }}
+
+echo "==> Skipping shell setup (shell.zsh.enabled is false for this host)"
+exit 0
+{{- end }}
+
+echo "==> Installing zsh"
+$SUDO_CMD pacman -S --needed --noconfirm zsh
+
+ZSH_PATH=$(command -v zsh)
+CURRENT_SHELL=$(getent passwd "$(whoami)" | cut -d: -f7)
+if [ "$CURRENT_SHELL" != "$ZSH_PATH" ]; then
+    echo "==> Setting zsh as the default shell"
+    $SUDO_CMD chsh -s "$ZSH_PATH" "$(whoami)"
+else
+    echo "==> zsh is already the default shell, skipping chsh"
+fi
+
+{{- if not .shell.zsh.oh_my_zsh.enabled }}
+
+echo "==> Skipping oh-my-zsh setup (shell.zsh.oh_my_zsh.enabled is false for this host)"
+exit 0
+{{- end }}
+
+echo "==> Installing oh-my-zsh build dependency (git)"
+$SUDO_CMD pacman -S --needed --noconfirm git
+
+if [ -d "$HOME/.oh-my-zsh" ]; then
+    echo "==> oh-my-zsh already installed, skipping"
+else
+    echo "==> Cloning oh-my-zsh"
+    git clone --depth 1 https://github.com/ohmyzsh/ohmyzsh.git "$HOME/.oh-my-zsh"
+fi
+
+ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+
+clone_if_missing() {
+    repo=$1
+    dest=$2
+    if [ -d "$dest" ]; then
+        echo "==> $(basename "$dest") already installed, skipping"
+    else
+        echo "==> Cloning $(basename "$dest")"
+        git clone --depth 1 "$repo" "$dest"
+    fi
+}
+
+# dot_zshrc.tmpl's theme and plugins= list are what these need to match —
+# update both places together if either changes.
+clone_if_missing https://github.com/romkatv/powerlevel10k.git "$ZSH_CUSTOM/themes/powerlevel10k"
+clone_if_missing https://github.com/zsh-users/zsh-autosuggestions.git "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+clone_if_missing https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
