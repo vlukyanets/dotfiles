@@ -1,6 +1,16 @@
 # Managed by chezmoi — edit the template, not this file:
 #   chezmoi edit ~/.zshrc
 
+# Guard against non-interactive shells (e.g. scp/rsync over ssh invoking a
+# login shell just to run one command) sourcing this file: skip straight to
+# returning rather than paying for prompt/completion/plugin setup only an
+# interactive session needs.
+[[ $- == *i* ]] || return
+
+# Guard against being sourced by something other than zsh — the `${(%):-...}`
+# expansion below and everything past it is zsh-specific syntax.
+[[ -n "$ZSH_VERSION" ]] || return
+
 {{- if .shell.zsh.oh_my_zsh.enabled }}
 
 # Enable Powerlevel10k instant prompt. Must stay near the top, before any
