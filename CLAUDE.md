@@ -1,5 +1,10 @@
 # CLAUDE.md
 
+## Documentation
+
+`README.md` is the main document about this repo — start there. It links
+out to the detailed docs in `docs/`.
+
 ## Commit messages
 
 - First line: brief summary in the style "Added new <feature>" or "Fixed
