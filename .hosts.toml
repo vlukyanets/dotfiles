@@ -330,6 +330,9 @@ environment = "niri"
 [hyper-lin.greeter]
 type = "noctalia-greeter"
 
+[hyper-lin.nvidia]
+enabled = true
+
 # --- examples for future machines (uncomment and adjust) -------------------
 #
 # [homelab]
