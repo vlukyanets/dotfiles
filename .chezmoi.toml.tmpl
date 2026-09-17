@@ -93,6 +93,8 @@
 {{- $nvidia        := get $cfg "nvidia" | default dict -}}
 {{- $nvidiaEnabled := get $nvidia "enabled" | default false -}}
 
+{{- $browsers := get $cfg "browsers" | default dict -}}
+
 [data]
     hostname = {{ $hostname | quote }}
 
@@ -184,3 +186,15 @@
 
     [data.nvidia]
     enabled = {{ $nvidiaEnabled }}
+
+    [data.browsers]
+    {{- range $name, $browser := $browsers }}
+
+    [data.browsers.{{ $name | quote }}]
+    package = {{ (get $browser "package" | default "") | quote }}
+
+    [data.browsers.{{ $name | quote }}.settings]
+    {{- range $pref, $value := (get $browser "settings" | default dict) }}
+    {{ $pref | quote }} = {{ $value | toJson }}
+    {{- end }}
+    {{- end }}

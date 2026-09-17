@@ -264,6 +264,31 @@
 #                    current generation comes from the AUR, requiring
 #                    pkg-mgmt.aur.enabled = true; its lib32 counterpart
 #                    additionally requires pkg-mgmt.pacman.multilib = true.
+#   [<host>.browsers.<name>]
+#     <name> is an arbitrary label, not read anywhere except log output —
+#                    pick one per browser you want installed (e.g. "firefox",
+#                    "librewolf"; two channels of the same browser, e.g.
+#                    "firefox" and "firefox-nightly", both work too, each
+#                    with its own package).
+#     package  string  pacman package to install via
+#                    run_once_before_16-configure-browsers.sh.tmpl (required
+#                    — the script errors on an empty value). Must be a
+#                    Firefox-based package whose install layout matches
+#                    Arch's own firefox package (binary and policies.json
+#                    both under /usr/lib/<package>/) for `settings` below to
+#                    land anywhere; a non-Firefox-based browser can still be
+#                    listed with no `settings` table, for the install alone.
+#   [<host>.browsers.<name>.settings]
+#     <pref> = value  about:config preferences to set as this browser's new
+#                    *defaults* (bool, int, or string — whatever type the
+#                    pref itself takes), e.g. "browser.tabs.warnOnClose" =
+#                    false. Default: {} (no settings table at all — the
+#                    script installs the package and skips writing
+#                    policies.json entirely). Written as Firefox distribution
+#                    policy ("Status": "default"), not locked — the user can
+#                    still change it by hand in about:config afterward; see
+#                    docs/host-config/browsers.md for why "default" was
+#                    chosen over "locked".
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -326,3 +351,13 @@ type = "noctalia-greeter"
 #
 # [homelab.nvidia]
 # enabled = true    # no-op if the host turns out to have no NVIDIA GPU
+#
+# [homelab.browsers.firefox]
+# package = "firefox"
+# [homelab.browsers.firefox.settings]
+# "browser.aboutConfig.showWarning" = false
+# "browser.tabs.warnOnClose"        = false
+# "browser.startup.homepage"        = "about:blank"
+#
+# [homelab.browsers.librewolf]
+# package = "librewolf"    # no settings table — installed with its own defaults as-is
