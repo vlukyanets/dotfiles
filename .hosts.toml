@@ -312,16 +312,25 @@ jobs = "20%"
 country = ["Ukraine", "Poland", "Slovakia"]
 
 [hyper-lin.services]
-enabled = ["sshd"]
+enabled = ["sshd", "tailscaled"]
 
 [hyper-lin.services.packages]
 sshd = ["openssh"]
+tailscaled = ["tailscale"]
 
 [hyper-lin.zram]
 enabled = true
 
 [hyper-lin.pkg-mgmt.aur]
 enabled = true
+
+# pipewire-pulse and wireplumber, not services.enabled: their units are
+# systemd --user units (pipewire.service etc. live under
+# /usr/lib/systemd/user/), auto-enabled by the package's own systemd
+# preset — nothing here needs an explicit `systemctl enable`, just the
+# packages themselves. pipewire itself comes along as their dependency.
+[hyper-lin.cli_tools]
+enabled = ["pipewire-pulse", "wireplumber"]
 
 [hyper-lin.desktop]
 enabled = true
