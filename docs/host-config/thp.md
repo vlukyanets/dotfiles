@@ -1,6 +1,6 @@
 # Transparent hugepages (THP)
 
-[`.chezmoiscripts/run_once_before_11-configure-thp.sh.tmpl`](../../.chezmoiscripts/run_once_before_11-configure-thp.sh.tmpl)
+[`.chezmoiscripts/run_once_before_12-configure-thp.sh.tmpl`](../../.chezmoiscripts/run_once_before_12-configure-thp.sh.tmpl)
 is gated behind `thp.enabled` (default `false`) the same way the
 [zram script](zram.md) is gated behind `zram.enabled` — hosts that leave it
 unset skip it entirely, and `/sys/kernel/mm/transparent_hugepage/enabled`

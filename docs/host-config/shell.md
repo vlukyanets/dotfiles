@@ -1,6 +1,6 @@
 # Shell
 
-[`.chezmoiscripts/run_once_before_05-configure-shell.sh.tmpl`](../../.chezmoiscripts/run_once_before_05-configure-shell.sh.tmpl)
+[`.chezmoiscripts/run_once_before_06-configure-shell.sh.tmpl`](../../.chezmoiscripts/run_once_before_06-configure-shell.sh.tmpl)
 is gated behind `shell.zsh.enabled` (default `false`) the same way the
 [AUR script](aur.md) is gated behind `pkg_mgmt.aur.enabled` — hosts that
 leave it unset skip it entirely. When enabled, it installs `zsh` and (if it

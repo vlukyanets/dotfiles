@@ -1,6 +1,6 @@
 # Greeter
 
-[`.chezmoiscripts/run_once_before_13-configure-greeter.sh.tmpl`](../../.chezmoiscripts/run_once_before_13-configure-greeter.sh.tmpl)
+[`.chezmoiscripts/run_once_before_14-configure-greeter.sh.tmpl`](../../.chezmoiscripts/run_once_before_14-configure-greeter.sh.tmpl)
 is gated behind `greeter.type` (default `""`) — hosts that leave it unset
 skip it entirely and `greetd` is never installed. It's a separate,
 top-level concern from [`desktop.*`](desktop.md): nothing here checks

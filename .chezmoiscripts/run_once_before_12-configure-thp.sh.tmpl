@@ -12,7 +12,7 @@ exit 0
 
 echo "==> Writing /etc/tmpfiles.d/thp.conf"
 $SUDO_CMD tee /etc/tmpfiles.d/thp.conf >/dev/null <<CONF
-# Managed by chezmoi (.chezmoiscripts/run_once_before_11-configure-thp.sh.tmpl)
+# Managed by chezmoi (.chezmoiscripts/run_once_before_12-configure-thp.sh.tmpl)
 w /sys/kernel/mm/transparent_hugepage/enabled - - - - {{ .thp.mode }}
 CONF
 

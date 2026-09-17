@@ -15,6 +15,9 @@
 #                                 shell-expression forms makepkg.jobs does
 #                                 below (chezmoi init fails loudly if given
 #                                 e.g. "20%")
+#     multilib  bool  whether to enable the [multilib] repo (default: false
+#                    — opt in per host). Needed for any 32-bit package, e.g.
+#                    the lib32-nvidia*-utils packages below.
 #   [<host>.pkg-mgmt.makepkg]
 #     jobs   int or string  makepkg.conf MAKEFLAGS="-j<value>" (default: "$(nproc)"),
 #                    any of:
@@ -98,7 +101,7 @@
 #                    ships in `openssh`, which may already be present) — it's
 #                    just enabled as-is.
 #   [<host>.shell.zsh]
-#     enabled  bool  whether run_once_before_05-configure-shell.sh.tmpl
+#     enabled  bool  whether run_once_before_06-configure-shell.sh.tmpl
 #                    installs zsh and makes it the login shell (default:
 #                    false — opt in per host). Also controls whether
 #                    dot_zshrc.tmpl is written at all: .chezmoiignore.tmpl
@@ -115,7 +118,7 @@
 #                    Idempotent: skips anything already cloned.
 #   [<host>.cli_tools]
 #     enabled  list of strings  pacman packages to install via
-#                    run_once_before_06-configure-cli-tools.sh.tmpl, e.g.
+#                    run_once_before_07-configure-cli-tools.sh.tmpl, e.g.
 #                    ["neovim", "zoxide", "eza"] (default: [] — script exits
 #                    without installing anything). This is for standalone
 #                    CLI tools dot_zshrc.tmpl already checks for with
@@ -125,7 +128,7 @@
 #                    `pacman -S --needed` call.
 #   [<host>.fonts]
 #     enabled  list of strings  pacman packages to install via
-#                    run_once_before_07-configure-fonts.sh.tmpl, e.g.
+#                    run_once_before_08-configure-fonts.sh.tmpl, e.g.
 #                    ["ttf-meslo-nerd"] (default: [] — script exits without
 #                    installing anything). A Nerd Font is what
 #                    dot_zshrc.tmpl's powerlevel10k prompt (glyphs) and its
@@ -135,7 +138,7 @@
 #                    a font here just gets broken/missing glyphs, not an
 #                    error.
 #   [<host>.containers.docker]
-#     enabled  bool  whether run_once_before_08-configure-containers.sh.tmpl
+#     enabled  bool  whether run_once_before_09-configure-containers.sh.tmpl
 #                    installs docker, runs `systemctl enable --now
 #                    docker.service`, and adds the applying user to the
 #                    `docker` group (default: false). Idempotent: the group
@@ -145,7 +148,7 @@
 #                    trying to fix that itself.
 #   [<host>.ssh]
 #     enabled  bool  whether
-#                    run_once_before_09-configure-ssh-hardening.sh.tmpl
+#                    run_once_before_10-configure-ssh-hardening.sh.tmpl
 #                    writes anything at all (default: false — sshd's own
 #                    config is left untouched). Independent of whether
 #                    "sshd" appears in services.enabled: the drop-in below
@@ -165,7 +168,7 @@
 #                    drop-in, e.g. "no" or "prohibit-password" (default:
 #                    "prohibit-password", sshd's own compiled-in default).
 #   [<host>.zram]
-#     enabled  bool  whether run_once_before_10-configure-zram.sh.tmpl
+#     enabled  bool  whether run_once_before_11-configure-zram.sh.tmpl
 #                    installs zram-generator and writes a zram0 config
 #                    (default: false — opt in per host, e.g. skip it on a
 #                    host that already has real swap or plenty of RAM).
@@ -183,7 +186,7 @@
 #                    100, zram-generator's own default — high enough that
 #                    the kernel prefers zram over any disk-backed swap).
 #   [<host>.thp]
-#     enabled  bool  whether run_once_before_11-configure-thp.sh.tmpl
+#     enabled  bool  whether run_once_before_12-configure-thp.sh.tmpl
 #                    touches transparent hugepage config at all (default:
 #                    false — left unset, the kernel's own compiled-in mode
 #                    stands, usually "madvise").
@@ -201,7 +204,7 @@
 #                    reboots the same way, since sysfs itself resets to the
 #                    kernel default on every boot.
 #   [<host>.desktop]
-#     enabled      bool    whether run_once_before_12-configure-desktop.sh.tmpl
+#     enabled      bool    whether run_once_before_13-configure-desktop.sh.tmpl
 #                    installs a desktop environment at all (default: false —
 #                    opt in per host; leave unset on a headless/server host).
 #     environment  string  which desktop environment to install. The only
@@ -224,7 +227,7 @@
 #                    doesn't care; it just needs something under
 #                    /usr/share/*sessions to hand the user afterward. One of:
 #                      - "" (default) — no greeter is installed; run
-#                        run_once_before_13-configure-greeter.sh.tmpl exits
+#                        run_once_before_14-configure-greeter.sh.tmpl exits
 #                        immediately.
 #                      - "tuigreet" — installs greetd-tuigreet from the
 #                        configured pacman repositories (which depends on
@@ -249,6 +252,18 @@
 #     user     string  skips the user list and goes straight to the
 #                    password prompt for this login (default: "" — full
 #                    user list shown).
+#   [<host>.nvidia]
+#     enabled  bool  whether run_once_before_05-configure-nvidia.sh.tmpl
+#                    detects and installs an NVIDIA driver at all (default:
+#                    false — opt in per host; leave unset on a host with no
+#                    NVIDIA GPU, or an Intel/AMD one — enabling this on such
+#                    a host is a harmless no-op, but there's no reason to).
+#                    The driver package itself is picked by GPU generation
+#                    and kernel flavor at apply time, not configurable here
+#                    — see docs/host-config/nvidia.md. Anything but the
+#                    current generation comes from the AUR, requiring
+#                    pkg-mgmt.aur.enabled = true; its lib32 counterpart
+#                    additionally requires pkg-mgmt.pacman.multilib = true.
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -263,6 +278,7 @@ user.email = "valikluks95@gmail.com"
 
 [hyper-lin.pkg-mgmt.pacman]
 parallel-downloads = 2
+multilib = true
 
 [hyper-lin.pkg-mgmt.makepkg]
 jobs = "20%"
@@ -307,3 +323,6 @@ type = "noctalia-greeter"
 # [homelab.greeter.noctalia-greeter]
 # session = "niri"    # skip the session picker, always launch niri
 # user    = "homelab"    # skip the user list too
+#
+# [homelab.nvidia]
+# enabled = true    # no-op if the host turns out to have no NVIDIA GPU

@@ -36,6 +36,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.git.user.name`                   | git user.name                                              |
 | `.git.user.email`                  | git user.email (no default — empty unless a host sets one) |
 | `.pkg_mgmt.pacman.parallel_downloads` | pacman.conf `ParallelDownloads`                         |
+| `.pkg_mgmt.pacman.multilib`         | whether to enable the `[multilib]` repo (needed for any 32-bit package) |
 | `.pkg_mgmt.makepkg.jobs`           | makepkg.conf `MAKEFLAGS="-j<value>"` build parallelism      |
 | `.pkg_mgmt.reflector.*`            | reflector.conf flags (save, country, protocol, latest, sort, age, download_timeout) |
 | `.pkg_mgmt.reflector.timer.*`      | reflector.timer override (on_calendar, on_boot_sec)         |
@@ -63,6 +64,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.greeter.type`                      | which greetd greeter to install and configure — `""` (none, default), `"tuigreet"`, or `"noctalia-greeter"` from the AUR. Independent of `.desktop.*` |
 | `.greeter.noctalia_greeter.session`   | forces a specific Wayland session for noctalia-greeter instead of showing its session picker (only read when `.greeter.type` is `"noctalia-greeter"`) |
 | `.greeter.noctalia_greeter.user`      | skips noctalia-greeter's user list, straight to the password prompt for this login (only read when `.greeter.type` is `"noctalia-greeter"`) |
+| `.nvidia.enabled`                    | whether to detect and install an NVIDIA driver at all |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
 `pkg_mgmt` with an underscore instead, because a hyphen can't appear in a Go
@@ -84,15 +86,17 @@ variables above; see its own page for what it does with them:
 3. [AUR / paru](aur.md)
 4. [Locale](locale.md)
 5. [Services](services.md)
-6. [Shell](shell.md)
-7. [CLI tools](cli-tools.md)
-8. [Fonts](fonts.md)
-9. [Containers](containers.md)
-10. [SSH hardening](ssh-hardening.md)
-11. [zram](zram.md)
-12. [Transparent hugepages](thp.md)
-13. [Desktop](desktop.md)
-14. [Greeter](greeter.md)
+6. [NVIDIA](nvidia.md)
+7. [Shell](shell.md)
+8. [CLI tools](cli-tools.md)
+9. [Fonts](fonts.md)
+10. [Containers](containers.md)
+11. [SSH hardening](ssh-hardening.md)
+12. [zram](zram.md)
+13. [Transparent hugepages](thp.md)
+14. [Desktop](desktop.md)
+15. [Greeter](greeter.md)
+16. [System files](system-files.md)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

@@ -34,6 +34,8 @@ $SUDO_CMD tee /etc/pacman.conf.d/options.conf >/dev/null <<CONF
 ParallelDownloads = {{ .pkg_mgmt.pacman.parallel_downloads }}
 CONF
 
+{{- if .pkg_mgmt.pacman.multilib }}
+
 echo "==> Configuring multilib repo"
 if grep -qE '^\[multilib\]' /etc/pacman.conf; then
     echo "    already enabled directly in pacman.conf — leaving as-is"
@@ -48,6 +50,10 @@ else
 Include = {{ .pkg_mgmt.reflector.save }}
 CONF
 fi
+{{- else }}
+
+echo "==> Skipping multilib repo (pkg_mgmt.pacman.multilib is false for this host)"
+{{- end }}
 
 echo "==> Writing /etc/makepkg.conf.d/dotfiles.conf"
 $SUDO_CMD mkdir -p /etc/makepkg.conf.d
@@ -59,5 +65,5 @@ OPTIONS+=({{ join " " .pkg_mgmt.makepkg.options }})
 {{- end }}
 CONF
 
-echo "==> Syncing package databases (multilib now enabled)"
+echo "==> Syncing package databases"
 $SUDO_CMD pacman -Sy

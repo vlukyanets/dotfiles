@@ -21,7 +21,7 @@ echo "    entry) before this takes effect, or you may lock yourself out."
 echo "==> Writing /etc/ssh/sshd_config.d/dotfiles.conf"
 $SUDO_CMD mkdir -p /etc/ssh/sshd_config.d
 $SUDO_CMD tee /etc/ssh/sshd_config.d/dotfiles.conf >/dev/null <<CONF
-# Managed by chezmoi (.chezmoiscripts/run_once_before_09-configure-ssh-hardening.sh.tmpl)
+# Managed by chezmoi (.chezmoiscripts/run_once_before_10-configure-ssh-hardening.sh.tmpl)
 PasswordAuthentication {{ if .ssh.disable_password_auth }}no{{ else }}yes{{ end }}
 PermitRootLogin {{ .ssh.permit_root_login }}
 CONF
