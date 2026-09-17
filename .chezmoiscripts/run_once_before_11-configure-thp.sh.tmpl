@@ -1,0 +1,20 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .thp.enabled }}
+
+echo "==> Skipping THP config (thp.enabled is false for this host)"
+exit 0
+{{- end }}
+
+echo "==> Writing /etc/tmpfiles.d/thp.conf"
+$SUDO_CMD tee /etc/tmpfiles.d/thp.conf >/dev/null <<CONF
+# Managed by chezmoi (.chezmoiscripts/run_once_before_11-configure-thp.sh.tmpl)
+w /sys/kernel/mm/transparent_hugepage/enabled - - - - {{ .thp.mode }}
+CONF
+
+echo "==> Applying THP mode now (also persists across reboots via systemd-tmpfiles)"
+$SUDO_CMD systemd-tmpfiles --create /etc/tmpfiles.d/thp.conf

@@ -51,6 +51,12 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.ssh.enabled`                      | whether to write an sshd_config.d hardening drop-in at all |
 | `.ssh.disable_password_auth`        | writes PasswordAuthentication no into that drop-in when true |
 | `.ssh.permit_root_login`            | PermitRootLogin value in that drop-in |
+| `.zram.enabled`                     | whether to install zram-generator and set up a zram0 swap device |
+| `.zram.size`                        | zram-generator.conf zram-size= formula for the zram0 section |
+| `.zram.compression_algorithm`       | zram-generator.conf compression-algorithm= for the zram0 section |
+| `.zram.swap_priority`               | zram-generator.conf swap-priority= for the zram0 section |
+| `.thp.enabled`                      | whether to override transparent hugepage mode at all |
+| `.thp.mode`                         | value written to /sys/kernel/mm/transparent_hugepage/enabled |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
 `pkg_mgmt` with an underscore instead, because a hyphen can't appear in a Go
@@ -77,6 +83,8 @@ variables above; see its own page for what it does with them:
 8. [Fonts](fonts.md)
 9. [Containers](containers.md)
 10. [SSH hardening](ssh-hardening.md)
+11. [zram](zram.md)
+12. [Transparent hugepages](thp.md)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

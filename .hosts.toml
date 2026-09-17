@@ -164,6 +164,42 @@
 #     permit_root_login  string  PermitRootLogin value in the generated
 #                    drop-in, e.g. "no" or "prohibit-password" (default:
 #                    "prohibit-password", sshd's own compiled-in default).
+#   [<host>.zram]
+#     enabled  bool  whether run_once_before_10-configure-zram.sh.tmpl
+#                    installs zram-generator and writes a zram0 config
+#                    (default: false — opt in per host, e.g. skip it on a
+#                    host that already has real swap or plenty of RAM).
+#     size     string  zram-size= expression written into
+#                    /etc/systemd/zram-generator.conf's [zram0] section,
+#                    e.g. "4096" (a fixed MiB size) or "ram / 4" (a formula
+#                    referencing total RAM, per zram-generator.conf(5))
+#                    (default: "min(ram / 2, 4096)", zram-generator's own
+#                    default).
+#     compression-algorithm  string  compression-algorithm= in that same
+#                    section (default: "zstd" — this repo's own choice; the
+#                    package itself defaults to whatever the running kernel
+#                    picks when this is left unset upstream).
+#     swap-priority  int  swap-priority= in that same section (default:
+#                    100, zram-generator's own default — high enough that
+#                    the kernel prefers zram over any disk-backed swap).
+#   [<host>.thp]
+#     enabled  bool  whether run_once_before_11-configure-thp.sh.tmpl
+#                    touches transparent hugepage config at all (default:
+#                    false — left unset, the kernel's own compiled-in mode
+#                    stands, usually "madvise").
+#     mode     string  value written to
+#                    /sys/kernel/mm/transparent_hugepage/enabled, one of
+#                    "always", "madvise", or "never" (default: "always" —
+#                    this repo's own choice for when this is turned on at
+#                    all, not upstream's default; "always" can help with
+#                    frame-time stability in memory-hungry games/engines
+#                    that never explicitly ask for hugepages themselves,
+#                    at the cost of some extra kernel-side compaction work
+#                    under memory pressure — measure before assuming it
+#                    helps on any given workload). Applied immediately via
+#                    `systemd-tmpfiles --create` and persisted across
+#                    reboots the same way, since sysfs itself resets to the
+#                    kernel default on every boot.
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -190,6 +226,9 @@ enabled = ["sshd"]
 
 [hyper-lin.services.packages]
 sshd = ["openssh"]
+
+[hyper-lin.zram]
+enabled = true
 
 # --- examples for future machines (uncomment and adjust) -------------------
 #

@@ -1,0 +1,34 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .zram.enabled }}
+
+echo "==> Skipping zram setup (zram.enabled is false for this host)"
+exit 0
+{{- end }}
+
+echo "==> Installing zram-generator"
+$SUDO_CMD pacman -S --needed --noconfirm zram-generator
+
+echo "==> Writing /etc/systemd/zram-generator.conf"
+$SUDO_CMD tee /etc/systemd/zram-generator.conf >/dev/null <<CONF
+# Managed by chezmoi (.chezmoiscripts/run_once_before_10-configure-zram.sh.tmpl)
+[zram0]
+zram-size = {{ .zram.size }}
+compression-algorithm = {{ .zram.compression_algorithm }}
+swap-priority = {{ .zram.swap_priority }}
+CONF
+
+echo "==> Reloading systemd generators"
+$SUDO_CMD systemctl daemon-reload
+
+if $SUDO_CMD systemctl is-active --quiet systemd-zram-setup@zram0.service; then
+    echo "==> systemd-zram-setup@zram0.service already active, restarting to pick up config"
+    $SUDO_CMD systemctl restart systemd-zram-setup@zram0.service
+else
+    echo "==> Starting systemd-zram-setup@zram0.service"
+    $SUDO_CMD systemctl start systemd-zram-setup@zram0.service
+fi

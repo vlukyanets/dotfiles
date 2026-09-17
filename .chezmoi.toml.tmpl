@@ -65,6 +65,16 @@
 {{- $sshDisablePasswordAuth    := get $ssh "disable_password_auth" | default false -}}
 {{- $sshPermitRootLogin        := get $ssh "permit_root_login" | default "prohibit-password" -}}
 
+{{- $zram                      := get $cfg "zram" | default dict -}}
+{{- $zramEnabled               := get $zram "enabled" | default false -}}
+{{- $zramSize                  := get $zram "size" | default "min(ram / 2, 4096)" -}}
+{{- $zramCompressionAlgorithm  := get $zram "compression-algorithm" | default "zstd" -}}
+{{- $zramSwapPriority          := get $zram "swap-priority" | default 100 -}}
+
+{{- $thp        := get $cfg "thp" | default dict -}}
+{{- $thpEnabled := get $thp "enabled" | default false -}}
+{{- $thpMode    := get $thp "mode" | default "always" -}}
+
 [data]
     hostname = {{ $hostname | quote }}
 
@@ -128,3 +138,13 @@
     enabled                = {{ $sshEnabled }}
     disable_password_auth  = {{ $sshDisablePasswordAuth }}
     permit_root_login      = {{ $sshPermitRootLogin | quote }}
+
+    [data.zram]
+    enabled                = {{ $zramEnabled }}
+    size                   = {{ $zramSize | quote }}
+    compression_algorithm  = {{ $zramCompressionAlgorithm | quote }}
+    swap_priority          = {{ $zramSwapPriority }}
+
+    [data.thp]
+    enabled = {{ $thpEnabled }}
+    mode    = {{ $thpMode | quote }}
