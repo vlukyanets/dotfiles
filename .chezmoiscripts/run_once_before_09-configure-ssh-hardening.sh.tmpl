@@ -10,6 +10,14 @@ echo "==> Skipping sshd hardening (ssh.enabled is false for this host)"
 exit 0
 {{- end }}
 
+{{- if .ssh.disable_password_auth }}
+
+echo "==> WARNING: disabling SSH password authentication for this host."
+echo "    Make sure a key-based login already works from a session you"
+echo "    have open right now (e.g. 'ssh-copy-id' or an authorized_keys"
+echo "    entry) before this takes effect, or you may lock yourself out."
+{{- end }}
+
 echo "==> Writing /etc/ssh/sshd_config.d/dotfiles.conf"
 $SUDO_CMD mkdir -p /etc/ssh/sshd_config.d
 $SUDO_CMD tee /etc/ssh/sshd_config.d/dotfiles.conf >/dev/null <<CONF
