@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Sets the applying user as tailscale's operator, so `tailscale up`/`status`/
+# etc. work without sudo. Independent of services.enabled — that installs
+# tailscale and enables tailscaled.service, this only sets the operator once
+# it's running.
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .tailscale.operator }}
+
+echo "==> Skipping tailscale operator setup (tailscale.operator is false for this host)"
+exit 0
+{{- end }}
+
+if ! systemctl is-active --quiet tailscaled.service; then
+    echo "==> tailscaled.service is not active — add \"tailscaled\" to services.enabled (with services.packages.tailscaled = [\"tailscale\"]) first" >&2
+    exit 1
+fi
+
+USER_NAME=$(whoami)
+echo "==> Setting $USER_NAME as tailscale operator"
+$SUDO_CMD tailscale set --operator="$USER_NAME"

@@ -67,6 +67,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.nvidia.enabled`                    | whether to detect and install an NVIDIA driver at all |
 | `.browsers.<name>.package`           | pacman package to install for this browser entry |
 | `.browsers.<name>.settings`          | about:config preference name → value, written into that browser's `policies.json` |
+| `.tailscale.operator`                | whether to set the applying user as tailscale's operator, so `tailscale` works without sudo (independent of installing/enabling tailscale itself — see [services](#scripts)) |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
 `pkg_mgmt` with an underscore instead, because a hyphen can't appear in a Go
@@ -100,6 +101,7 @@ variables above; see its own page for what it does with them:
 15. [Greeter](greeter.md)
 16. [System files](system-files.md)
 17. [Browsers](browsers.md)
+18. [Tailscale](tailscale.md)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

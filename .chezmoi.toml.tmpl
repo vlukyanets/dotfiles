@@ -95,6 +95,9 @@
 
 {{- $browsers := get $cfg "browsers" | default dict -}}
 
+{{- $tailscale         := get $cfg "tailscale" | default dict -}}
+{{- $tailscaleOperator := get $tailscale "operator" | default false -}}
+
 [data]
     hostname = {{ $hostname | quote }}
 
@@ -198,3 +201,6 @@
     {{ $pref | quote }} = {{ $value | toJson }}
     {{- end }}
     {{- end }}
+
+    [data.tailscale]
+    operator = {{ $tailscaleOperator }}

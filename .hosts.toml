@@ -289,6 +289,16 @@
 #                    still change it by hand in about:config afterward; see
 #                    docs/host-config/browsers.md for why "default" was
 #                    chosen over "locked".
+#   [<host>.tailscale]
+#     operator  bool  whether run_once_before_17-configure-tailscale.sh.tmpl
+#                    sets the applying user as tailscale's operator
+#                    (`tailscale set --operator=<user>`), so `tailscale`
+#                    works without sudo afterward (default: false).
+#                    Independent of installing tailscale itself — that's
+#                    services.enabled/services.packages, same as sshd (see
+#                    above). The script errors if tailscaled.service isn't
+#                    active yet, rather than silently no-op'ing, so add
+#                    "tailscaled" to services.enabled first.
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -317,6 +327,9 @@ enabled = ["sshd", "tailscaled"]
 [hyper-lin.services.packages]
 sshd = ["openssh"]
 tailscaled = ["tailscale"]
+
+[hyper-lin.tailscale]
+operator = true
 
 [hyper-lin.zram]
 enabled = true
