@@ -1,0 +1,65 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .greeter.type }}
+
+echo "==> Skipping greeter setup (greeter.type is empty for this host)"
+exit 0
+{{- else if eq .greeter.type "tuigreet" }}
+
+# greetd-tuigreet depends on greetd itself, so --needed pulls it in too.
+echo "==> Installing greetd-tuigreet"
+$SUDO_CMD pacman -S --needed --noconfirm greetd-tuigreet
+
+GREETD_COMMAND="tuigreet --remember --remember-session --sessions /usr/share/xsessions:/usr/share/wayland-sessions"
+{{- else if eq .greeter.type "noctalia-greeter" }}
+{{-   if not .pkg_mgmt.aur.enabled }}
+
+echo "==> greeter.type is \"noctalia-greeter\" (an AUR package), but pkg_mgmt.aur.enabled is false for this host — enable it first" >&2
+exit 1
+{{-   end }}
+
+# noctalia-greeter's own AUR Depends= also lists greetd, so this pulls it
+# in via paru too, same as the tuigreet branch above does via pacman.
+echo "==> Installing noctalia-greeter via paru (AUR)"
+paru -S --needed --noconfirm noctalia-greeter
+
+# noctalia-greeter-session forwards anything after "--" to noctalia-greeter
+# itself; --session/--user only mean something to it, not to greetd.
+GREETD_COMMAND="noctalia-greeter-session"
+{{-   if or .greeter.noctalia_greeter.session .greeter.noctalia_greeter.user }}
+GREETD_COMMAND="$GREETD_COMMAND --"
+{{-     if .greeter.noctalia_greeter.session }}
+GREETD_COMMAND="$GREETD_COMMAND --session {{ .greeter.noctalia_greeter.session }}"
+{{-     end }}
+{{-     if .greeter.noctalia_greeter.user }}
+GREETD_COMMAND="$GREETD_COMMAND --user {{ .greeter.noctalia_greeter.user }}"
+{{-     end }}
+{{-   end }}
+{{- else }}
+
+echo "==> Unknown greeter.type '{{ .greeter.type }}' — supported values: \"tuigreet\", \"noctalia-greeter\"" >&2
+exit 1
+{{- end }}
+
+echo "==> Writing /etc/greetd/config.toml"
+$SUDO_CMD mkdir -p /etc/greetd
+$SUDO_CMD tee /etc/greetd/config.toml >/dev/null <<CONF
+# Managed by chezmoi (.chezmoiscripts/run_once_before_13-configure-greeter.sh.tmpl)
+[terminal]
+vt = 1
+
+[default_session]
+command = "$GREETD_COMMAND"
+user = "greeter"
+CONF
+
+if $SUDO_CMD systemctl is-enabled --quiet greetd.service 2>/dev/null; then
+    echo "==> greetd.service already enabled, skipping"
+else
+    echo "==> Enabling greetd.service"
+    $SUDO_CMD systemctl enable greetd.service
+fi

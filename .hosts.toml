@@ -216,6 +216,39 @@
 #                    (and meaningful) only when desktop.environment = "niri"
 #                    — ignored otherwise. Default: "" — niri is installed
 #                    bare, with no shell/bar layer.
+#   [<host>.greeter]
+#     type  string  which greetd greeter to install and write into
+#                    /etc/greetd/config.toml. A separate, top-level concern
+#                    from desktop.* — nothing here checks which desktop
+#                    environment (if any) is enabled, since greetd itself
+#                    doesn't care; it just needs something under
+#                    /usr/share/*sessions to hand the user afterward. One of:
+#                      - "" (default) — no greeter is installed; run
+#                        run_once_before_13-configure-greeter.sh.tmpl exits
+#                        immediately.
+#                      - "tuigreet" — installs greetd-tuigreet from the
+#                        configured pacman repositories (which depends on
+#                        greetd itself, so that comes along too).
+#                      - "noctalia-greeter" — installs noctalia-greeter
+#                        from the AUR via paru (same story: its AUR
+#                        Depends= lists greetd). Requires
+#                        pkg-mgmt.aur.enabled = true on this host (see
+#                        AUR/paru above) — the script exits with an error if
+#                        it isn't, rather than silently falling back to
+#                        tuigreet.
+#                    Any other value is an error, not a silent no-op.
+#   [<host>.greeter.noctalia-greeter]
+#     Per-greeter options, read only when greeter.type = "noctalia-greeter"
+#     (a "tuigreet" host has nothing to configure yet — add a matching
+#     [<host>.greeter.tuigreet] table here if/when that changes). Both
+#     fields end up on noctalia-greeter-session's own command line, after
+#     a "--" separator greetd itself never sees.
+#     session  string  forces a specific Wayland session (e.g. "niri")
+#                    instead of showing noctalia-greeter's session picker
+#                    (default: "" — picker shown).
+#     user     string  skips the user list and goes straight to the
+#                    password prompt for this login (default: "" — full
+#                    user list shown).
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -246,9 +279,15 @@ sshd = ["openssh"]
 [hyper-lin.zram]
 enabled = true
 
+[hyper-lin.pkg-mgmt.aur]
+enabled = true
+
 [hyper-lin.desktop]
 enabled = true
 environment = "niri"
+
+[hyper-lin.greeter]
+type = "noctalia-greeter"
 
 # --- examples for future machines (uncomment and adjust) -------------------
 #
@@ -262,3 +301,9 @@ environment = "niri"
 # environment = "niri"
 # [homelab.desktop.niri]
 # shell = "noctalia"
+#
+# [homelab.greeter]
+# type = "noctalia-greeter"    # or "tuigreet"; the AUR one needs pkg-mgmt.aur.enabled = true
+# [homelab.greeter.noctalia-greeter]
+# session = "niri"    # skip the session picker, always launch niri
+# user    = "homelab"    # skip the user list too

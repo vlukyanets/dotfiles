@@ -60,6 +60,9 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.desktop.enabled`                  | whether to install a desktop environment at all |
 | `.desktop.environment`              | which desktop environment to install (only `"niri"` implemented) |
 | `.desktop.niri.shell`                | which shell/bar layer to install on top of niri (only `"noctalia"` implemented; only read when `.desktop.environment` is `"niri"`) |
+| `.greeter.type`                      | which greetd greeter to install and configure — `""` (none, default), `"tuigreet"`, or `"noctalia-greeter"` from the AUR. Independent of `.desktop.*` |
+| `.greeter.noctalia_greeter.session`   | forces a specific Wayland session for noctalia-greeter instead of showing its session picker (only read when `.greeter.type` is `"noctalia-greeter"`) |
+| `.greeter.noctalia_greeter.user`      | skips noctalia-greeter's user list, straight to the password prompt for this login (only read when `.greeter.type` is `"noctalia-greeter"`) |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
 `pkg_mgmt` with an underscore instead, because a hyphen can't appear in a Go
@@ -89,6 +92,7 @@ variables above; see its own page for what it does with them:
 11. [zram](zram.md)
 12. [Transparent hugepages](thp.md)
 13. [Desktop](desktop.md)
+14. [Greeter](greeter.md)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

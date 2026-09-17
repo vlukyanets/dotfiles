@@ -82,6 +82,13 @@
 {{- $desktopNiri      := get $desktop "niri" | default dict -}}
 {{- $desktopNiriShell := get $desktopNiri "shell" | default "" -}}
 
+{{- $greeter     := get $cfg "greeter" | default dict -}}
+{{- $greeterType := get $greeter "type" | default "" -}}
+
+{{- $greeterNoctalia        := get $greeter "noctalia-greeter" | default dict -}}
+{{- $greeterNoctaliaSession := get $greeterNoctalia "session" | default "" -}}
+{{- $greeterNoctaliaUser    := get $greeterNoctalia "user" | default "" -}}
+
 [data]
     hostname = {{ $hostname | quote }}
 
@@ -162,3 +169,10 @@
 
     [data.desktop.niri]
     shell = {{ $desktopNiriShell | quote }}
+
+    [data.greeter]
+    type = {{ $greeterType | quote }}
+
+    [data.greeter.noctalia_greeter]
+    session = {{ $greeterNoctaliaSession | quote }}
+    user    = {{ $greeterNoctaliaUser | quote }}
