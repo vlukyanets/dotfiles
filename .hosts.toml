@@ -200,6 +200,22 @@
 #                    `systemd-tmpfiles --create` and persisted across
 #                    reboots the same way, since sysfs itself resets to the
 #                    kernel default on every boot.
+#   [<host>.desktop]
+#     enabled      bool    whether run_once_before_12-configure-desktop.sh.tmpl
+#                    installs a desktop environment at all (default: false —
+#                    opt in per host; leave unset on a headless/server host).
+#     environment  string  which desktop environment to install. The only
+#                    value currently implemented is "niri" (a Wayland
+#                    compositor). Required whenever enabled = true — the
+#                    script exits with an error if this is left unset or set
+#                    to anything unrecognized, rather than silently installing
+#                    nothing.
+#   [<host>.desktop.niri]
+#     shell    string  which shell/bar layer to install on top of niri. The
+#                    only value currently implemented is "noctalia". Read
+#                    (and meaningful) only when desktop.environment = "niri"
+#                    — ignored otherwise. Default: "" — niri is installed
+#                    bare, with no shell/bar layer.
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -230,9 +246,19 @@ sshd = ["openssh"]
 [hyper-lin.zram]
 enabled = true
 
+[hyper-lin.desktop]
+enabled = true
+environment = "niri"
+
 # --- examples for future machines (uncomment and adjust) -------------------
 #
 # [homelab]
 # [homelab.pkg-mgmt.makepkg]
 # jobs    = 2     # low-memory box: cap build parallelism instead of using every core
 # options = ["ccache", "!debug"]
+#
+# [homelab.desktop]
+# enabled     = true
+# environment = "niri"
+# [homelab.desktop.niri]
+# shell = "noctalia"

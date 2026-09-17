@@ -75,6 +75,13 @@
 {{- $thpEnabled := get $thp "enabled" | default false -}}
 {{- $thpMode    := get $thp "mode" | default "always" -}}
 
+{{- $desktop            := get $cfg "desktop" | default dict -}}
+{{- $desktopEnabled     := get $desktop "enabled" | default false -}}
+{{- $desktopEnvironment := get $desktop "environment" | default "" -}}
+
+{{- $desktopNiri      := get $desktop "niri" | default dict -}}
+{{- $desktopNiriShell := get $desktopNiri "shell" | default "" -}}
+
 [data]
     hostname = {{ $hostname | quote }}
 
@@ -148,3 +155,10 @@
     [data.thp]
     enabled = {{ $thpEnabled }}
     mode    = {{ $thpMode | quote }}
+
+    [data.desktop]
+    enabled     = {{ $desktopEnabled }}
+    environment = {{ $desktopEnvironment | quote }}
+
+    [data.desktop.niri]
+    shell = {{ $desktopNiriShell | quote }}

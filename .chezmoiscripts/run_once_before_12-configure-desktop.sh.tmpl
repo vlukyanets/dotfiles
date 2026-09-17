@@ -1,0 +1,30 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .desktop.enabled }}
+
+echo "==> Skipping desktop environment install (desktop.enabled is false for this host)"
+exit 0
+{{- else if eq .desktop.environment "niri" }}
+
+echo "==> Installing niri desktop environment"
+$SUDO_CMD pacman -S --needed --noconfirm \
+    niri xwayland-satellite xdg-desktop-portal-gtk xdg-utils wl-clipboard
+
+{{-   if eq .desktop.niri.shell "noctalia" }}
+
+echo "==> Installing noctalia shell"
+$SUDO_CMD pacman -S --needed --noconfirm noctalia
+{{-   else if .desktop.niri.shell }}
+
+echo "==> Unknown desktop.niri.shell '{{ .desktop.niri.shell }}' — supported values: \"noctalia\"" >&2
+exit 1
+{{-   end }}
+{{- else }}
+
+echo "==> Unknown desktop.environment '{{ .desktop.environment }}' (desktop.enabled is true) — supported values: \"niri\"" >&2
+exit 1
+{{- end }}
