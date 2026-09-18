@@ -1,0 +1,19 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .fcitx5.enabled }}
+
+echo "==> Skipping fcitx5 install (fcitx5.enabled is false for this host)"
+exit 0
+{{- end }}
+
+{{- $packages := list "fcitx5" "fcitx5-gtk" "fcitx5-qt" -}}
+{{- if has "chinese" .locale.languages -}}
+{{-   $packages = append $packages "fcitx5-pinyin" -}}
+{{- end }}
+
+echo "==> Installing fcitx5"
+$SUDO_CMD pacman -S --needed --noconfirm {{ join " " $packages }}

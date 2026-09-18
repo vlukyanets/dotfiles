@@ -13,3 +13,7 @@ system
 {{- if not (and .desktop.enabled (eq .desktop.environment "niri")) }}
 .config/niri
 {{- end }}
+
+{{- if not .fcitx5.enabled }}
+.config/fcitx5
+{{- end }}

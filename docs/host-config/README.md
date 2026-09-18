@@ -66,7 +66,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.greeter.noctalia_greeter.session`   | forces a specific Wayland session for noctalia-greeter instead of showing its session picker (only read when `.greeter.type` is `"noctalia-greeter"`) |
 | `.greeter.noctalia_greeter.user`      | skips noctalia-greeter's user list, straight to the password prompt for this login (only read when `.greeter.type` is `"noctalia-greeter"`) |
 | `.nvidia.enabled`                    | whether to detect and install an NVIDIA driver at all |
-| `.fcitx5.enabled`                    | reserved for the upcoming fcitx5 feature — today only changes niri's config (see [niri](desktop/niri.md#fcitx5)) |
+| `.fcitx5.enabled`                    | whether to install fcitx5 and write its config/profile — see [fcitx5](fcitx5.md) |
 | `.browsers.<name>.package`           | pacman package to install for this browser entry |
 | `.browsers.<name>.settings`          | about:config preference name → value, written into that browser's `policies.json` |
 | `.terminals.<name>.enabled`          | whether to install this terminal emulator (`<name>` is the pacman package) and write its own dotfile, e.g. `~/.config/kitty/kitty.conf` for `terminals.kitty` |
@@ -106,6 +106,7 @@ variables above; see its own page for what it does with them:
 17. [Browsers](browsers.md)
 18. [Tailscale](tailscale.md)
 19. [Terminals](terminals.md)
+20. [fcitx5](fcitx5.md)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

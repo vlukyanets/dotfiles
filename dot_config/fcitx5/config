@@ -1,0 +1,9 @@
+[Behavior]
+# Start with IME inactive; switch-layout.sh activates/deactivates explicitly
+ActiveByDefault=False
+# Share IME active/inactive state across all windows so fcitx5-remote -o/-c
+# takes effect globally when the layout is switched
+ShareInputState=All
+# Disable the tooltip popup that appears when switching input methods
+ShowInputMethodInformation=False
+ShowFirstInputMethodInformation=False

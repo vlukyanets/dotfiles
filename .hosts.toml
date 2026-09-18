@@ -283,17 +283,16 @@
 #                    pkg-mgmt.aur.enabled = true; its lib32 counterpart
 #                    additionally requires pkg-mgmt.pacman.multilib = true.
 #   [<host>.fcitx5]
-#     enabled  bool  reserved for the upcoming fcitx5 input-method feature
-#                    (default: false). No script installs fcitx5 itself
-#                    yet — today this flag only changes what
-#                    dot_config/niri/config.kdl.tmpl and
-#                    dot_config/niri/switch-layout.sh.tmpl render (IM
+#     enabled  bool  whether run_once_before_19-configure-fcitx5.sh.tmpl
+#                    installs fcitx5 (plus fcitx5-gtk, fcitx5-qt, and
+#                    fcitx5-pinyin when "chinese" is in locale.languages)
+#                    at all (default: false). Also controls whether
+#                    dot_config/fcitx5/* is written (config, profile.tmpl)
+#                    and, in dot_config/niri/config.kdl.tmpl and
+#                    dot_config/niri/switch-layout.sh.tmpl, the IM
 #                    environment variables, spawning fcitx5 at startup, and
-#                    syncing its active input method on layout switch).
-#                    Leave this false until fcitx5's own install script
-#                    lands — turning it on before that just points
-#                    GTK_IM_MODULE/QT_IM_MODULE at a daemon that isn't
-#                    installed.
+#                    syncing its active input method on layout switch —
+#                    see docs/host-config/fcitx5.md.
 #   [<host>.browsers.<name>]
 #     <name> is an arbitrary label, not read anywhere except log output —
 #                    pick one per browser you want installed (e.g. "firefox",
@@ -383,12 +382,11 @@
 user.name = "Valentin Lukyanets"
 user.email = "valikluks95@gmail.com"
 
-# "chinese" is listed even though fcitx5.enabled is still false (see
-# [<host>.fcitx5] above) — niri offers it as a plain "cn" xkb layout with
-# no IME behind it until fcitx5 lands, same as any other host without
-# fcitx5.enabled.
 [hyper-lin.locale]
 languages = ["english", "russian", "ukrainian", "chinese"]
+
+[hyper-lin.fcitx5]
+enabled = true
 
 [hyper-lin.pkg-mgmt.pacman]
 parallel-downloads = 2

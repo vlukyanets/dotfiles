@@ -49,11 +49,9 @@ list two files both read.
 block) gates every fcitx5-related line in both files: the
 `GTK_IM_MODULE`/`QT_IM_MODULE`/`XMODIFIERS` environment variables and
 `spawn-at-startup "fcitx5" "-d"` in `config.kdl.tmpl`, and the whole
-IM-switching block in `switch-layout.sh.tmpl`. No script installs the
-`fcitx5` package yet — that, plus its own `dot_config/fcitx5/*`, is a
-separate, not-yet-ported feature. Until it lands, leave `fcitx5.enabled`
-false; turning it on early just points GTK/Qt apps at an input method
-daemon that isn't running.
+IM-switching block in `switch-layout.sh.tmpl`. Installing the `fcitx5`
+package itself, and writing its own `dot_config/fcitx5/*` config, is a
+separate feature behind the same flag — see [fcitx5](../fcitx5.md).
 
 ## Hardware note
 
