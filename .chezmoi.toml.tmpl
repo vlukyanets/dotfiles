@@ -95,6 +95,10 @@
 
 {{- $browsers := get $cfg "browsers" | default dict -}}
 
+{{- $terminal        := get $cfg "terminal" | default dict -}}
+{{- $terminalKitty    := get $terminal "kitty" | default dict -}}
+{{- $terminalKittyEnabled := get $terminalKitty "enabled" | default false -}}
+
 {{- $tailscale         := get $cfg "tailscale" | default dict -}}
 {{- $tailscaleOperator := get $tailscale "operator" | default false -}}
 
@@ -201,6 +205,9 @@
     {{ $pref | quote }} = {{ $value | toJson }}
     {{- end }}
     {{- end }}
+
+    [data.terminal.kitty]
+    enabled = {{ $terminalKittyEnabled }}
 
     [data.tailscale]
     operator = {{ $tailscaleOperator }}

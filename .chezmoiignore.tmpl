@@ -4,3 +4,7 @@ system
 {{- if not .shell.zsh.enabled }}
 .zshrc
 {{- end }}
+
+{{- if not .terminal.kitty.enabled }}
+.config/kitty
+{{- end }}

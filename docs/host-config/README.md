@@ -67,6 +67,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.nvidia.enabled`                    | whether to detect and install an NVIDIA driver at all |
 | `.browsers.<name>.package`           | pacman package to install for this browser entry |
 | `.browsers.<name>.settings`          | about:config preference name → value, written into that browser's `policies.json` |
+| `.terminal.kitty.enabled`            | whether to install kitty and write `~/.config/kitty/kitty.conf` at all |
 | `.tailscale.operator`                | whether to set the applying user as tailscale's operator, so `tailscale` works without sudo (independent of installing/enabling tailscale itself — see [services](#scripts)) |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
@@ -102,6 +103,7 @@ variables above; see its own page for what it does with them:
 16. [System files](system-files.md)
 17. [Browsers](browsers.md)
 18. [Tailscale](tailscale.md)
+19. [Terminal (kitty)](terminal.md)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

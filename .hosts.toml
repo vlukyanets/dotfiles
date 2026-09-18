@@ -299,6 +299,16 @@
 #                    above). The script errors if tailscaled.service isn't
 #                    active yet, rather than silently no-op'ing, so add
 #                    "tailscaled" to services.enabled first.
+#   [<host>.terminal.kitty]
+#     enabled  bool  whether run_once_before_18-configure-terminal.sh.tmpl
+#                    installs kitty (default: false). Also controls whether
+#                    dot_config/kitty/kitty.conf is written at all:
+#                    .chezmoiignore.tmpl skips ~/.config/kitty entirely on a
+#                    host that leaves this unset. kitty.conf expects a Nerd
+#                    Font plus a symbols/emoji fallback — list matching
+#                    packages in fonts.enabled, e.g. ["ttf-firacode-nerd",
+#                    "ttf-nerd-fonts-symbols-mono", "noto-fonts-emoji"], or
+#                    glyphs render broken/missing (not an error).
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -351,6 +361,12 @@ environment = "niri"
 
 [hyper-lin.greeter]
 type = "noctalia-greeter"
+
+[hyper-lin.fonts]
+enabled = ["ttf-firacode-nerd", "ttf-nerd-fonts-symbols-mono", "noto-fonts-emoji"]
+
+[hyper-lin.terminal.kitty]
+enabled = true
 
 [hyper-lin.nvidia]
 enabled = true
