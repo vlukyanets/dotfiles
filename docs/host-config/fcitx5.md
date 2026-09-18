@@ -76,3 +76,29 @@ generic keyboard icon that only visually changes between "inactive" and
 "pinyin active". Without this, `keyboard-us`/`keyboard-ru`/`keyboard-ua`
 have no distinct icon of their own in most icon themes, so the tray
 can't otherwise show which of them is actually active.
+
+## Cloud Pinyin
+
+`fcitx5.cloudpinyin` (default `false`) turns on cloudpinyin: pinyin
+candidates get topped up from an online backend, useful for names/slang/
+rare words a local dictionary doesn't have. No separate package —
+`libcloudpinyin.so` already ships inside `fcitx5-chinese-addons`
+(`OnDemand=True`, dormant until switched on), so this flag only touches
+config, not the install script.
+
+- [`dot_config/fcitx5/conf/pinyin.conf.tmpl`](../../dot_config/fcitx5/conf/pinyin.conf.tmpl)
+  — the actual on/off switch, `CloudPinyinEnabled` set straight from
+  `fcitx5.cloudpinyin`.
+- [`dot_config/fcitx5/conf/cloudpinyin.conf`](../../dot_config/fcitx5/conf/cloudpinyin.conf)
+  — the backend's own settings, currently just `Backend=Baidu`. Shipped
+  unconditionally alongside the rest of `dot_config/fcitx5/conf/` (dormant,
+  same as the addon itself, when the flag above is off) rather than
+  gated separately — one inert file is simpler than a second
+  `.chezmoiignore.tmpl` rule for what `CloudPinyinEnabled` already
+  controls. Google's backend needs a VPN from most networks that also
+  need cloudpinyin's help; Baidu doesn't, hence the default.
+
+Every pinyin syllable typed leaves the machine for whichever backend is
+configured while this is on — that's the tradeoff for the better
+candidates, so it defaults off and is a separate flag from `enabled`
+rather than following `"chinese" in locale.languages` automatically.

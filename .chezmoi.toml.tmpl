@@ -94,8 +94,9 @@
 {{- $nvidia        := get $cfg "nvidia" | default dict -}}
 {{- $nvidiaEnabled := get $nvidia "enabled" | default false -}}
 
-{{- $fcitx5        := get $cfg "fcitx5" | default dict -}}
-{{- $fcitx5Enabled := get $fcitx5 "enabled" | default false -}}
+{{- $fcitx5            := get $cfg "fcitx5" | default dict -}}
+{{- $fcitx5Enabled     := get $fcitx5 "enabled" | default false -}}
+{{- $fcitx5Cloudpinyin := get $fcitx5 "cloudpinyin" | default false -}}
 
 {{- $browsers := get $cfg "browsers" | default dict -}}
 
@@ -198,7 +199,8 @@
     enabled = {{ $nvidiaEnabled }}
 
     [data.fcitx5]
-    enabled = {{ $fcitx5Enabled }}
+    enabled     = {{ $fcitx5Enabled }}
+    cloudpinyin = {{ $fcitx5Cloudpinyin }}
 
     [data.browsers]
     {{- range $name, $browser := $browsers }}

@@ -283,16 +283,25 @@
 #                    pkg-mgmt.aur.enabled = true; its lib32 counterpart
 #                    additionally requires pkg-mgmt.pacman.multilib = true.
 #   [<host>.fcitx5]
-#     enabled  bool  whether run_once_before_19-configure-fcitx5.sh.tmpl
+#     enabled      bool  whether run_once_before_19-configure-fcitx5.sh.tmpl
 #                    installs fcitx5 (plus fcitx5-gtk, fcitx5-qt, and
-#                    fcitx5-pinyin when "chinese" is in locale.languages)
-#                    at all (default: false). Also controls whether
-#                    dot_config/fcitx5/* is written (config, profile.tmpl)
-#                    and, in dot_config/niri/config.kdl.tmpl and
+#                    fcitx5-chinese-addons when "chinese" is in
+#                    locale.languages) at all (default: false). Also
+#                    controls whether dot_config/fcitx5/* is written
+#                    (config, profile.tmpl) and, in
+#                    dot_config/niri/config.kdl.tmpl and
 #                    dot_config/niri/switch-layout.sh.tmpl, the IM
 #                    environment variables, spawning fcitx5 at startup, and
 #                    syncing its active input method on layout switch —
 #                    see docs/host-config/fcitx5.md.
+#     cloudpinyin  bool  whether pinyin candidates also query an online
+#                    backend (Baidu by default) for better coverage of
+#                    rare words/names/slang (default: false). No extra
+#                    package — the cloudpinyin module ships inside
+#                    fcitx5-chinese-addons already, just dormant until
+#                    this turns it on. Every pinyin syllable typed while
+#                    it's on leaves the machine, so it's opt-in and
+#                    separate from enabled — see docs/host-config/fcitx5.md.
 #   [<host>.browsers.<name>]
 #     <name> is an arbitrary label, not read anywhere except log output —
 #                    pick one per browser you want installed (e.g. "firefox",
