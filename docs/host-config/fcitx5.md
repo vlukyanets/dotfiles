@@ -30,6 +30,15 @@ just cosmetic defaults:
   suppresses fcitx5's own switch-notification popup, since niri's
   `Mod+Space` bind already retitles the hotkey overlay
   (`hotkey-overlay-title="Switch Language"`) instead.
+- `DisabledAddons=notificationitem` — disables the "Notification Item"
+  addon (`libnotificationitem.so`), the one that publishes a
+  StatusNotifierItem (SNI) over D-Bus. On niri there's no XEmbed tray for
+  classicui's own X11 tray window to fall back to either, so this is the
+  only thing actually putting a fcitx5 icon in any tray/status bar —
+  disabling it hides that icon outright. `classicui.conf`'s
+  `PreferTextIcon`/`ShowLayoutNameInIcon` (see [Theme](#theme) below) are
+  left as-is even though they're now moot — harmless dormant config, same
+  as `cloudpinyin.conf` when [Cloud Pinyin](#cloud-pinyin) is off.
 
 ## `dot_config/fcitx5/profile.tmpl`
 
