@@ -3,8 +3,8 @@
 [`.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl`](../../.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl)
 wires up `/etc/pacman.conf.d/options.conf` (`ParallelDownloads`), optionally
 enables the `[multilib]` repo via `/etc/pacman.conf.d/multilib.conf`, and
-writes `/etc/makepkg.conf.d/dotfiles.conf` (`MAKEFLAGS`), all driven by
-`.hosts.toml`:
+writes `/etc/makepkg.conf.d/dotfiles.conf` (`MAKEFLAGS`, `OPTIONS`, and
+`PACKAGER`), all driven by `.hosts.toml`:
 
 - `pkg_mgmt.pacman.parallel_downloads` is a fixed integer only —
   `pacman.conf` isn't shell, so there's no later point where a percentage or
@@ -27,3 +27,9 @@ writes `/etc/makepkg.conf.d/dotfiles.conf` (`MAKEFLAGS`), all driven by
 `pkg_mgmt.reflector.save` is also read by this script's multilib `Include=`
 line, so it always agrees with [reflector](reflector.md) on which mirrorlist
 file is in play — change it once, in `.hosts.toml`, not in either script.
+
+`PACKAGER` is built from `.git.user.name`/`.git.user.email` — the same
+fields [`~/.gitconfig`](../../dot_gitconfig.tmpl) already uses — rather
+than a new field of its own: it's build metadata makepkg stamps into
+every locally-built package's `.PKGINFO`, and whoever's building it is
+already identified by that same name/email pair.
