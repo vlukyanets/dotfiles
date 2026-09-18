@@ -8,8 +8,13 @@ environment {
     GTK_THEME "Adwaita:dark"
     QT_QPA_PLATFORM "wayland"
     {{ if .fcitx5.enabled -}}
-    GTK_IM_MODULE "fcitx"
-    QT_IM_MODULE "fcitx"
+    // No GTK_IM_MODULE: native-Wayland GTK/Qt clients pick up fcitx5's
+    // Wayland input-method frontend on their own, and forcing the
+    // "fcitx" module anyway makes fcitx5 nag about the redundant IM
+    // module with a warning popup at login. QT_IM_MODULES (Qt6) falls
+    // back to the "fcitx" compat module for XWayland/older Qt clients;
+    // XMODIFIERS covers plain X11/XIM clients the same way.
+    QT_IM_MODULES "wayland;fcitx"
     XMODIFIERS "@im=fcitx"
     {{ end -}}
     WAYLAND_DISPLAY "wayland-1"

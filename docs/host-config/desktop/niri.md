@@ -47,11 +47,22 @@ list two files both read.
 
 `fcitx5.enabled` (see [`.hosts.toml`](../../../.hosts.toml)'s comment
 block) gates every fcitx5-related line in both files: the
-`GTK_IM_MODULE`/`QT_IM_MODULE`/`XMODIFIERS` environment variables and
+`QT_IM_MODULES`/`XMODIFIERS` environment variables and
 `spawn-at-startup "fcitx5" "-d"` in `config.kdl.tmpl`, and the whole
 IM-switching block in `switch-layout.sh.tmpl`. Installing the `fcitx5`
 package itself, and writing its own `dot_config/fcitx5/*` config, is a
 separate feature behind the same flag — see [fcitx5](../fcitx5.md).
+
+Deliberately no `GTK_IM_MODULE`. Native-Wayland GTK/Qt clients pick up
+fcitx5's Wayland input-method frontend by themselves; forcing
+`GTK_IM_MODULE=fcitx` on top of that makes fcitx5 detect the redundant
+IM module and nag about it with a warning popup at login. `QT_IM_MODULES`
+(the Qt6 list form, not the singular `QT_IM_MODULE`) lists `"wayland;fcitx"`
+so Qt still falls back to the `fcitx` compat module for XWayland/older Qt
+clients that don't speak the Wayland protocol; `XMODIFIERS` covers plain
+X11/XIM clients (GTK's XWayland fallback included) the same way, and
+isn't affected by the nag since it's a different integration path from
+fcitx5's Wayland frontend.
 
 ## Hardware note
 
