@@ -49,6 +49,19 @@ picked over the `dns=dnsmasq` plugin because:
 4. Restarts `NetworkManager.service`, but only if it's already active —
    on a host where it isn't (or isn't installed yet), the `dns.conf` drop-in
    is just sitting there ready for whenever NetworkManager does start.
+5. After that restart specifically, waits on `nm-online -s -q -t 30` before
+   letting the rest of `chezmoi apply` continue — restarting NetworkManager
+   briefly drops DNS while it reactivates every connection, and every later
+   `run_once_before_*` script that needs the network (reflector, AUR, any
+   `pacman -S`) would otherwise race that gap and fail with something like
+   "failed to lookup address information". `nm-online -s` is the same check
+   `NetworkManager-wait-online.service` itself uses to block
+   `network-online.target` — it waits on NetworkManager's own activation
+   state rather than polling a specific hostname, so it doesn't depend on
+   some external site being reachable to decide "network's up". A 30s
+   timeout just logs a warning and lets the script finish either way,
+   rather than hanging `chezmoi apply` forever on a host where something
+   else is actually wrong.
 
 Every step is idempotent (`ln -sf` re-points an existing symlink instead
 of erroring, `tee` rewrites the same file content, `enable --now` and the

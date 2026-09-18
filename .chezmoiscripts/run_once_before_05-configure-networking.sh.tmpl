@@ -26,4 +26,7 @@ EOF
 if systemctl is-active --quiet NetworkManager.service; then
     echo "==> Restarting NetworkManager to pick up the dns.conf change"
     $SUDO_CMD systemctl restart NetworkManager.service
+
+    echo "==> Waiting for NetworkManager to finish reactivating (same check as NetworkManager-wait-online.service)"
+    nm-online -s -q -t 30 || echo "==> Still not up after 30s - continuing anyway, later scripts needing network may fail" >&2
 fi
