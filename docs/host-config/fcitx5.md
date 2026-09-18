@@ -87,8 +87,16 @@ rare words a local dictionary doesn't have. No separate package —
 config, not the install script.
 
 - [`dot_config/fcitx5/conf/pinyin.conf.tmpl`](../../dot_config/fcitx5/conf/pinyin.conf.tmpl)
-  — the actual on/off switch, `CloudPinyinEnabled` set straight from
-  `fcitx5.cloudpinyin`.
+  — the pinyin addon's own config file, in fcitx5's own generated format
+  (a `#`-commented description above each key, its default value also
+  commented out unless actually set — same as what fcitx5 itself writes
+  the first time it runs). Every key here is left exactly as fcitx5's own
+  defaults except `CloudPinyinEnabled`, the one line templated straight
+  from `fcitx5.cloudpinyin` and left uncommented (an active setting,
+  same convention as the pre-existing `FirstRun=False` line below it) —
+  keeping the rest of the file intact avoids silently wiping out fcitx5's
+  own reference documentation of every other pinyin setting on every
+  `chezmoi apply`.
 - [`dot_config/fcitx5/conf/cloudpinyin.conf`](../../dot_config/fcitx5/conf/cloudpinyin.conf)
   — the backend's own settings, currently just `Backend=Baidu`. Shipped
   unconditionally alongside the rest of `dot_config/fcitx5/conf/` (dormant,
