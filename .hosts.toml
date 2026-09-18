@@ -383,6 +383,7 @@ user.name = "Valentin Lukyanets"
 user.email = "valikluks95@gmail.com"
 
 [hyper-lin.locale]
+locales = ["en_US.UTF-8 UTF-8", "ru_RU.UTF-8 UTF-8"]
 languages = ["english", "russian", "ukrainian", "chinese"]
 
 [hyper-lin.fcitx5]
