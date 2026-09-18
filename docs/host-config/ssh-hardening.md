@@ -1,6 +1,6 @@
 # SSH hardening
 
-[`.chezmoiscripts/run_once_before_10-configure-ssh-hardening.sh.tmpl`](../../.chezmoiscripts/run_once_before_10-configure-ssh-hardening.sh.tmpl)
+[`.chezmoiscripts/run_once_before_11-configure-ssh-hardening.sh.tmpl`](../../.chezmoiscripts/run_once_before_11-configure-ssh-hardening.sh.tmpl)
 is gated behind `ssh.enabled` (default `false`) — hosts that leave it unset
 skip it entirely and sshd's own config is never touched. When enabled, it
 writes `/etc/ssh/sshd_config.d/dotfiles.conf` with `PasswordAuthentication`

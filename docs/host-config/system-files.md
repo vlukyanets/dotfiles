@@ -1,6 +1,6 @@
 # System files
 
-[`.chezmoiscripts/run_once_before_15-configure-system-files.sh.tmpl`](../../.chezmoiscripts/run_once_before_15-configure-system-files.sh.tmpl)
+[`.chezmoiscripts/run_once_before_16-configure-system-files.sh.tmpl`](../../.chezmoiscripts/run_once_before_16-configure-system-files.sh.tmpl)
 copies static files that are identical on every host from
 [`system/`](../../system) (relative to this repo's source directory) onto
 the real filesystem, root-owned. It's unconditional — no host-config flag

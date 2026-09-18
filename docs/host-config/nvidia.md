@@ -1,6 +1,6 @@
 # NVIDIA
 
-[`.chezmoiscripts/run_once_before_05-configure-nvidia.sh.tmpl`](../../.chezmoiscripts/run_once_before_05-configure-nvidia.sh.tmpl)
+[`.chezmoiscripts/run_once_before_06-configure-nvidia.sh.tmpl`](../../.chezmoiscripts/run_once_before_06-configure-nvidia.sh.tmpl)
 is gated behind `nvidia.enabled` (default `false`) — hosts that leave it
 unset skip it entirely, including the `lspci` detection below. This is
 deliberately a single on/off flag, not a driver choice: which package

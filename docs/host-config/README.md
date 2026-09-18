@@ -45,6 +45,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.locale.languages`                 | which keyboard layouts a graphical session should offer (niri's xkb layout list, fcitx5 input methods) |
 | `.services.enabled`                | systemd units to `enable --now`                             |
 | `.services.packages`                | unit → pacman packages that provide it                      |
+| `.networking.systemd_resolved.enabled` | whether to enable systemd-resolved and hand NetworkManager's DNS off to it — see [Networking](networking.md) |
 | `.shell.zsh.enabled`                | whether to install zsh and make it the login shell           |
 | `.shell.zsh.oh_my_zsh.enabled`      | whether to also install oh-my-zsh, powerlevel10k, and the zsh plugins dot_zshrc.tmpl expects |
 | `.cli_tools.enabled`                | pacman packages to install (standalone CLI tools, e.g. neovim/zoxide/eza) |
@@ -100,23 +101,24 @@ variables above; see its own page for what it does with them:
 3. [AUR / paru](aur.md)
 4. [Locale](locale.md)
 5. [Services](services.md)
-6. [NVIDIA](nvidia.md)
-7. [Shell](shell.md)
-8. [CLI tools](cli-tools.md)
-9. [Fonts](fonts.md)
-10. [Containers](containers.md)
-11. [SSH hardening](ssh-hardening.md)
-12. [zram](zram.md)
-13. [Transparent hugepages](thp.md)
-14. [Desktop](desktop.md)
-15. [Greeter](greeter.md)
-16. [System files](system-files.md)
-17. [Browsers](browsers.md)
-18. [Tailscale](tailscale.md)
-19. [Terminals](terminals.md)
-20. [fcitx5](fcitx5.md)
-21. [Password managers](password-managers.md)
-22. [Office](office.md)
+6. [Networking](networking.md)
+7. [NVIDIA](nvidia.md)
+8. [Shell](shell.md)
+9. [CLI tools](cli-tools.md)
+10. [Fonts](fonts.md)
+11. [Containers](containers.md)
+12. [SSH hardening](ssh-hardening.md)
+13. [zram](zram.md)
+14. [Transparent hugepages](thp.md)
+15. [Desktop](desktop.md)
+16. [Greeter](greeter.md)
+17. [System files](system-files.md)
+18. [Browsers](browsers.md)
+19. [Tailscale](tailscale.md)
+20. [Terminals](terminals.md)
+21. [fcitx5](fcitx5.md)
+22. [Password managers](password-managers.md)
+23. [Office](office.md)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

@@ -62,6 +62,10 @@
 {{- $containersDocker        := get $containers "docker" | default dict -}}
 {{- $containersDockerEnabled := get $containersDocker "enabled" | default false -}}
 
+{{- $networking                     := get $cfg "networking" | default dict -}}
+{{- $networkingSystemdResolved      := get $networking "systemd_resolved" | default dict -}}
+{{- $networkingSystemdResolvedEnabled := get $networkingSystemdResolved "enabled" | default false -}}
+
 {{- $ssh                       := get $cfg "ssh" | default dict -}}
 {{- $sshEnabled                := get $ssh "enabled" | default false -}}
 {{- $sshDisablePasswordAuth    := get $ssh "disable_password_auth" | default false -}}
@@ -169,6 +173,9 @@
 
     [data.containers.docker]
     enabled = {{ $containersDockerEnabled }}
+
+    [data.networking.systemd_resolved]
+    enabled = {{ $networkingSystemdResolvedEnabled }}
 
     [data.ssh]
     enabled                = {{ $sshEnabled }}

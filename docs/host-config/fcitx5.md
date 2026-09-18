@@ -1,6 +1,6 @@
 # fcitx5
 
-[`.chezmoiscripts/run_once_before_19-configure-fcitx5.sh.tmpl`](../../.chezmoiscripts/run_once_before_19-configure-fcitx5.sh.tmpl)
+[`.chezmoiscripts/run_once_before_20-configure-fcitx5.sh.tmpl`](../../.chezmoiscripts/run_once_before_20-configure-fcitx5.sh.tmpl)
 installs `fcitx5`, `fcitx5-gtk`, `fcitx5-qt`, and `fcitx5-configtool` when
 `fcitx5.enabled` is true (default `false` — the script exits immediately
 otherwise), plus `fcitx5-chinese-addons` (pinyin and the other Chinese

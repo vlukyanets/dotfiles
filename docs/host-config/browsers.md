@@ -1,6 +1,6 @@
 # Browsers
 
-[`.chezmoiscripts/run_once_before_16-configure-browsers.sh.tmpl`](../../.chezmoiscripts/run_once_before_16-configure-browsers.sh.tmpl)
+[`.chezmoiscripts/run_once_before_17-configure-browsers.sh.tmpl`](../../.chezmoiscripts/run_once_before_17-configure-browsers.sh.tmpl)
 installs whatever's listed under `browsers.<name>` (default `{}` — no
 entries, script exits immediately) with `enabled` not explicitly set to
 `false`. Each entry is independent: its own `packages` list, installed
