@@ -51,3 +51,6 @@ options, a new `desktop.<environment>.*` sub-table next to `desktop.niri.*`
 
 - [niri](desktop/niri.md) — `dot_config/niri/*`, the compositor config
   itself (this page only covers installing the package)
+- [noctalia](desktop/noctalia.md) — `dot_local/state/noctalia/settings.toml`,
+  the shell's own settings file (this page only covers installing the
+  package)

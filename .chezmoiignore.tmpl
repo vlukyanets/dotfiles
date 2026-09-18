@@ -27,3 +27,7 @@ system
 .config/fcitx5
 .local/share/fcitx5
 {{- end }}
+
+{{- if not (eq .desktop.niri.shell "noctalia") }}
+.local/state/noctalia
+{{- end }}
