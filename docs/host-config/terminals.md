@@ -3,12 +3,12 @@
 [`.chezmoiscripts/run_once_before_18-configure-terminals.sh.tmpl`](../../.chezmoiscripts/run_once_before_18-configure-terminals.sh.tmpl)
 installs whatever's listed under `terminals.<name>` with `enabled = true`
 (default `{}` — no entries, script exits immediately), the same shape as
-[Browsers](browsers.md). Each entry gets its own `pacman -S --needed` call.
-Unlike `browsers.<name>`, there's no separate `package` field: `<name>` is
-installed as-is, so it has to be the terminal emulator's actual Arch
-package name (e.g. `"kitty"`, `"alacritty"`, `"wezterm"`), not an arbitrary
-label. An entry can be present with `enabled = false` — e.g. while trying
-out a replacement without uninstalling the current one.
+[Browsers](browsers.md). Each entry's own `packages` list (default `[]` —
+enabling an entry with none listed just errors out on pacman's own "no
+targets specified") is installed with its own `pacman -S --needed` call.
+`<name>` itself is just a label, same as `browsers.<name>` — pick anything,
+e.g. `"kitty"`. An entry can be present with `enabled = false` — e.g. while
+trying out a replacement without uninstalling the current one.
 
 ## Per-app config
 

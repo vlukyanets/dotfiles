@@ -2,12 +2,18 @@
 
 [`.chezmoiscripts/run_once_before_16-configure-browsers.sh.tmpl`](../../.chezmoiscripts/run_once_before_16-configure-browsers.sh.tmpl)
 installs whatever's listed under `browsers.<name>` (default `{}` — no
-entries, script exits immediately). Each entry is independent: its own
-pacman package, installed with its own `pacman -S --needed` call, so one
-host can list several browsers (or several channels of the same one, e.g.
-`firefox` and `firefox-nightly`) side by side. `<name>` itself is just a
-label for log output — pick anything; it doesn't have to match the package
-name.
+entries, script exits immediately) with `enabled` not explicitly set to
+`false`. Each entry is independent: its own `packages` list, installed
+with its own `pacman -S --needed` call, so one host can list several
+browsers (or several channels of the same one, e.g. `firefox` and
+`firefox-nightly`) side by side. `<name>` itself is just a label for log
+output — pick anything; it doesn't have to match a package name.
+
+`enabled` defaults to `true` — an entry just being present installs it,
+same as before this field existed. Setting it `false` keeps the entry (and
+its `settings`) declared without installing or configuring it, e.g. while
+trying out a replacement browser without tearing down the current one's
+config yet.
 
 ## Settings
 
@@ -16,17 +22,19 @@ about:config preference name to the value it should default to, e.g.:
 
 ```toml
 [hyper-lin.browsers.firefox]
-package = "firefox"
+packages = ["firefox"]
 [hyper-lin.browsers.firefox.settings]
 "browser.aboutConfig.showWarning" = false
 "browser.tabs.warnOnClose"        = false
 ```
 
 These are written into
-`/usr/lib/<package>/distribution/policies.json` (root-owned, `pacman
--S`-installed browser layout — see [System files](system-files.md) for the
-repo's other, unrelated use of a similar "drop a file next to the package"
-approach) as a Firefox [distribution policy][enterprise-policies]:
+`/usr/lib/<first-package>/distribution/policies.json` — the *first* entry
+in `packages`, since that's the one expected to actually be the browser
+(root-owned, `pacman -S`-installed browser layout — see
+[System files](system-files.md) for the repo's other, unrelated use of a
+similar "drop a file next to the package" approach) — as a Firefox
+[distribution policy][enterprise-policies]:
 
 ```json
 {
@@ -52,22 +60,22 @@ this stays overridable rather than adding a second policy shape
 
 A browser entry with no `settings` table at all (like `librewolf` in
 `.hosts.toml`'s example block) just gets installed — no
-`/usr/lib/<package>/distribution/` directory is touched.
+`/usr/lib/<first-package>/distribution/` directory is touched.
 
 ## Caveat: package layout
 
-`/usr/lib/<package>/distribution/policies.json` assumes the installed
-package's directory under `/usr/lib/` matches `package` exactly — true for
-Arch's own `firefox` and for Firefox-based AUR packages that follow the
-same convention (e.g. `librewolf`, `floorp`). The script doesn't check this
-before writing: with a `settings` table given, it always creates
-`/usr/lib/<package>/distribution/` and writes `policies.json` into it,
-regardless of where the package actually put its binary. For a browser
-that installs somewhere else, or isn't Firefox-based and doesn't read
-`policies.json` at all, that write just lands somewhere the browser never
-looks — harmless, but no different from not having set `settings`. Such a
-browser can still be listed, just without a `settings` table, for the
-install alone.
+`/usr/lib/<first-package>/distribution/policies.json` assumes that first
+`packages` entry's directory under `/usr/lib/` matches its own package
+name exactly — true for Arch's own `firefox` and for Firefox-based AUR
+packages that follow the same convention (e.g. `librewolf`, `floorp`). The
+script doesn't check this before writing: with a `settings` table given,
+it always creates `/usr/lib/<first-package>/distribution/` and writes
+`policies.json` into it, regardless of where the package actually put its
+binary. For a browser that installs somewhere else, or isn't Firefox-based
+and doesn't read `policies.json` at all, that write just lands somewhere
+the browser never looks — harmless, but no different from not having set
+`settings`. Such a browser can still be listed, just without a `settings`
+table, for the install alone.
 
 ## Per-browser docs
 

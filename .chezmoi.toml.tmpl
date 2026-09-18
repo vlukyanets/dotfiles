@@ -202,9 +202,12 @@
 
     [data.browsers]
     {{- range $name, $browser := $browsers }}
+    {{- $browserEnabled := true -}}
+    {{- if hasKey $browser "enabled" -}}{{- $browserEnabled = get $browser "enabled" -}}{{- end }}
 
     [data.browsers.{{ $name | quote }}]
-    package = {{ (get $browser "package" | default "") | quote }}
+    enabled  = {{ $browserEnabled }}
+    packages = {{ toJson (get $browser "packages" | default (list)) }}
 
     [data.browsers.{{ $name | quote }}.settings]
     {{- range $pref, $value := (get $browser "settings" | default dict) }}
@@ -216,7 +219,8 @@
     {{- range $name, $terminal := $terminals }}
 
     [data.terminals.{{ $name | quote }}]
-    enabled = {{ get $terminal "enabled" | default false }}
+    enabled  = {{ get $terminal "enabled" | default false }}
+    packages = {{ toJson (get $terminal "packages" | default (list)) }}
     {{- end }}
 
     [data.tailscale]

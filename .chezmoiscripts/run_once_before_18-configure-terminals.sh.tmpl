@@ -13,7 +13,7 @@ exit 0
 {{- range $name, $terminal := .terminals }}
 {{- if $terminal.enabled }}
 
-echo "==> Installing {{ $name }}"
-$SUDO_CMD pacman -S --needed --noconfirm {{ $name }}
+echo "==> Installing {{ $name }} ({{ join " " $terminal.packages }})"
+$SUDO_CMD pacman -S --needed --noconfirm {{ join " " $terminal.packages }}
 {{- end }}
 {{- end }}

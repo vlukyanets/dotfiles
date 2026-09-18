@@ -300,14 +300,28 @@
 #                    "librewolf"; two channels of the same browser, e.g.
 #                    "firefox" and "firefox-nightly", both work too, each
 #                    with its own package).
-#     package  string  pacman package to install via
-#                    run_once_before_16-configure-browsers.sh.tmpl (required
-#                    — the script errors on an empty value). Must be a
-#                    Firefox-based package whose install layout matches
-#                    Arch's own firefox package (binary and policies.json
-#                    both under /usr/lib/<package>/) for `settings` below to
-#                    land anywhere; a non-Firefox-based browser can still be
-#                    listed with no `settings` table, for the install alone.
+#     enabled  bool  whether run_once_before_16-configure-browsers.sh.tmpl
+#                    installs this entry at all (default: true — an entry
+#                    just being present installs it, same as before this
+#                    field existed). Set false to keep an entry (and its
+#                    settings) declared in .hosts.toml without actually
+#                    installing or configuring it, e.g. while trying out a
+#                    replacement browser without tearing down the current
+#                    one's config yet.
+#     packages  list of strings  pacman packages to install via
+#                    run_once_before_16-configure-browsers.sh.tmpl in one
+#                    call (default: [] — enabling an entry with none listed
+#                    just errors out on pacman's own "no targets
+#                    specified"). The *first* entry is what `settings`
+#                    below writes policies.json under
+#                    (/usr/lib/<first-package>/distribution/) — it has to
+#                    be the actual browser package, one whose install
+#                    layout matches Arch's own firefox package, for
+#                    `settings` to land anywhere. Any further entries are
+#                    just installed alongside it (e.g. a native messaging
+#                    host or extension package) — a non-Firefox-based
+#                    browser can still be listed with no `settings` table,
+#                    for the install alone.
 #   [<host>.browsers.<name>.settings]
 #     <pref> = value  about:config preferences to set as this browser's new
 #                    *defaults* (bool, int, or string — whatever type the
@@ -330,11 +344,10 @@
 #                    active yet, rather than silently no-op'ing, so add
 #                    "tailscaled" to services.enabled first.
 #   [<host>.terminals.<name>]
-#     <name> is both the label used in log output *and* the pacman package
-#                    name installed for it (unlike browsers.<name>, there's
-#                    no separate `package` field — a terminal emulator's
-#                    label and its Arch package share the same name, e.g.
-#                    "kitty", "alacritty", "wezterm").
+#     <name> is an arbitrary label, not read anywhere except log output and
+#                    .chezmoiignore.tmpl's dotfile gating (see `enabled`
+#                    below) — pick one per terminal you want installed,
+#                    e.g. "kitty".
 #     enabled  bool  whether run_once_before_18-configure-terminals.sh.tmpl
 #                    installs this terminal (default: false — an entry can
 #                    be present but turned off, e.g. while trying out a
@@ -344,6 +357,12 @@
 #                    in .chezmoiignore.tmpl, the same "one flag controls
 #                    both the install and the dotfile" shape as
 #                    shell.zsh.enabled.
+#     packages  list of strings  pacman packages to install for this entry
+#                    (default: [] — enabling a terminal with no packages
+#                    listed just errors out on pacman's own "no targets
+#                    specified"). Usually a single package, e.g. ["kitty"],
+#                    but can list companions too (e.g. a shell-integration
+#                    or theme package).
 #     Anything else under [<host>.terminals.<name>] is that terminal's own
 #                    config knobs, added as named fields on demand (e.g. a
 #                    future font_size) — there's no shared, generic
@@ -364,11 +383,12 @@
 user.name = "Valentin Lukyanets"
 user.email = "valikluks95@gmail.com"
 
-# "chinese" deliberately left out for now: it needs fcitx5.enabled = true
-# to be useful, which isn't turned on for this host yet (see
-# [<host>.fcitx5] above).
+# "chinese" is listed even though fcitx5.enabled is still false (see
+# [<host>.fcitx5] above) — niri offers it as a plain "cn" xkb layout with
+# no IME behind it until fcitx5 lands, same as any other host without
+# fcitx5.enabled.
 [hyper-lin.locale]
-languages = ["english", "russian", "ukrainian"]
+languages = ["english", "russian", "ukrainian", "chinese"]
 
 [hyper-lin.pkg-mgmt.pacman]
 parallel-downloads = 2
@@ -396,18 +416,21 @@ enabled = true
 [hyper-lin.pkg-mgmt.aur]
 enabled = true
 
-# pipewire-pulse and wireplumber, not services.enabled: their units are
-# systemd --user units (pipewire.service etc. live under
+# pipewire-pulse, pipewire-alsa, and wireplumber, not services.enabled:
+# their units are systemd --user units (pipewire.service etc. live under
 # /usr/lib/systemd/user/), auto-enabled by the package's own systemd
 # preset — nothing here needs an explicit `systemctl enable`, just the
 # packages themselves. pipewire itself comes along as their dependency.
+# pipewire-alsa routes plain ALSA clients through pipewire instead of
+# ALSA's own dmix — without it, an ALSA-only app can grab the device
+# exclusively and silence everything else.
 #
 # jq, playerctl, and brightnessctl are niri-adjacent (see
 # docs/host-config/desktop.md): config.kdl.tmpl's media/brightness key
 # binds spawn playerctl/brightnessctl directly, and switch-layout.sh.tmpl
 # shells out to jq to parse `niri msg -j keyboard-layouts`.
 [hyper-lin.cli_tools]
-enabled = ["pipewire-pulse", "wireplumber", "jq", "playerctl", "brightnessctl"]
+enabled = ["pipewire-pulse", "pipewire-alsa", "wireplumber", "jq", "playerctl", "brightnessctl"]
 
 [hyper-lin.desktop]
 enabled = true
@@ -421,6 +444,7 @@ enabled = ["ttf-firacode-nerd", "ttf-nerd-fonts-symbols-mono", "noto-fonts-emoji
 
 [hyper-lin.terminals.kitty]
 enabled = true
+packages = ["kitty"]
 
 [hyper-lin.nvidia]
 enabled = true
@@ -437,7 +461,7 @@ enabled = true
 # this changes in practice (blank new tab, no disk cache, HTTPS-Only mode,
 # ETP strict, cookies/cache/form-data wiped on every shutdown).
 [hyper-lin.browsers.firefox]
-package = "firefox"
+packages = ["firefox"]
 [hyper-lin.browsers.firefox.settings]
 # 0100: startup / new tab
 "browser.startup.page"                                        = 0
@@ -602,11 +626,11 @@ package = "firefox"
 # enabled = true    # no-op if the host turns out to have no NVIDIA GPU
 #
 # [homelab.browsers.firefox]
-# package = "firefox"
+# packages = ["firefox"]
 # [homelab.browsers.firefox.settings]
 # "browser.aboutConfig.showWarning" = false
 # "browser.tabs.warnOnClose"        = false
 # "browser.startup.homepage"        = "about:blank"
 #
 # [homelab.browsers.librewolf]
-# package = "librewolf"    # no settings table — installed with its own defaults as-is
+# packages = ["librewolf"]    # no settings table — installed with its own defaults as-is
