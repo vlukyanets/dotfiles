@@ -9,3 +9,7 @@ system
 {{- if not (get $kittyTerminal "enabled" | default false) }}
 .config/kitty
 {{- end }}
+
+{{- if not (and .desktop.enabled (eq .desktop.environment "niri")) }}
+.config/niri
+{{- end }}

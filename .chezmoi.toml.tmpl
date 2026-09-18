@@ -40,6 +40,7 @@
 {{- $localeLocales  := get $locale "locales" | default (list "en_US.UTF-8 UTF-8") -}}
 {{- $localeKeymap   := get $locale "keymap" | default "us" -}}
 {{- $localeTimezone := get $locale "timezone" | default "UTC" -}}
+{{- $localeLanguages := get $locale "languages" | default (list "english") -}}
 
 {{- $services         := get $cfg "services" | default dict -}}
 {{- $servicesEnabled  := get $services "enabled" | default (list) -}}
@@ -93,6 +94,9 @@
 {{- $nvidia        := get $cfg "nvidia" | default dict -}}
 {{- $nvidiaEnabled := get $nvidia "enabled" | default false -}}
 
+{{- $fcitx5        := get $cfg "fcitx5" | default dict -}}
+{{- $fcitx5Enabled := get $fcitx5 "enabled" | default false -}}
+
 {{- $browsers := get $cfg "browsers" | default dict -}}
 
 {{- $terminals := get $cfg "terminals" | default dict -}}
@@ -132,10 +136,11 @@
     enabled = {{ $aurEnabled }}
 
     [data.locale]
-    lang     = {{ $localeLang | quote }}
-    locales  = {{ toJson $localeLocales }}
-    keymap   = {{ $localeKeymap | quote }}
-    timezone = {{ $localeTimezone | quote }}
+    lang      = {{ $localeLang | quote }}
+    locales   = {{ toJson $localeLocales }}
+    keymap    = {{ $localeKeymap | quote }}
+    timezone  = {{ $localeTimezone | quote }}
+    languages = {{ toJson $localeLanguages }}
 
     [data.services]
     enabled = {{ toJson $servicesEnabled }}
@@ -191,6 +196,9 @@
 
     [data.nvidia]
     enabled = {{ $nvidiaEnabled }}
+
+    [data.fcitx5]
+    enabled = {{ $fcitx5Enabled }}
 
     [data.browsers]
     {{- range $name, $browser := $browsers }}

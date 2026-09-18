@@ -35,3 +35,8 @@ Adding a second desktop environment means teaching this script a new `{{ if
 eq .desktop.environment "..." }}` branch (and, if it has its own shell/bar
 options, a new `desktop.<environment>.*` sub-table next to `desktop.niri.*`
 — see [`.hosts.toml`](../../.hosts.toml)'s comment block for the pattern).
+
+## Per-environment docs
+
+- [niri](desktop/niri.md) — `dot_config/niri/*`, the compositor config
+  itself (this page only covers installing the package)

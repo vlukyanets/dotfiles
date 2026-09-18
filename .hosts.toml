@@ -83,6 +83,18 @@
 #                    exist under /usr/share/zoneinfo/ (default: "UTC").
 #                    Symlinked to /etc/localtime; hwclock --systohc then
 #                    syncs the hardware clock to match.
+#     languages  list of strings  which keyboard layouts a graphical session
+#                    should offer, one of "english", "russian", "ukrainian",
+#                    "chinese" (default: ["english"]). Unrelated to keymap
+#                    above (that's the *console* keymap, TTY-only) — this
+#                    instead drives dot_config/niri/config.kdl.tmpl's xkb
+#                    layout list and, on a host with fcitx5.enabled = true,
+#                    dot_config/niri/switch-layout.sh.tmpl's fcitx5 input
+#                    method switching (see docs/host-config/desktop/niri.md).
+#                    An unrecognized entry is silently skipped, not an
+#                    error. "chinese" needs fcitx5.enabled = true to be
+#                    useful — without it, niri just offers a "cn" xkb
+#                    layout with no IME behind it.
 #   [<host>.services]
 #     enabled  list of strings  systemd unit names to `systemctl enable --now`,
 #                    e.g. ["NetworkManager", "bluetooth", "sshd"] (default: []
@@ -219,6 +231,12 @@
 #                    (and meaningful) only when desktop.environment = "niri"
 #                    — ignored otherwise. Default: "" — niri is installed
 #                    bare, with no shell/bar layer.
+#     dot_config/niri/config.kdl.tmpl (and its switch-layout.sh.tmpl /
+#                    lock-screen.sh helpers) is written whenever
+#                    desktop.enabled = true and desktop.environment =
+#                    "niri" — see docs/host-config/desktop/niri.md. It
+#                    reads locale.languages for its keyboard layout list
+#                    and fcitx5.enabled for input-method integration.
 #   [<host>.greeter]
 #     type  string  which greetd greeter to install and write into
 #                    /etc/greetd/config.toml. A separate, top-level concern
@@ -264,6 +282,18 @@
 #                    current generation comes from the AUR, requiring
 #                    pkg-mgmt.aur.enabled = true; its lib32 counterpart
 #                    additionally requires pkg-mgmt.pacman.multilib = true.
+#   [<host>.fcitx5]
+#     enabled  bool  reserved for the upcoming fcitx5 input-method feature
+#                    (default: false). No script installs fcitx5 itself
+#                    yet — today this flag only changes what
+#                    dot_config/niri/config.kdl.tmpl and
+#                    dot_config/niri/switch-layout.sh.tmpl render (IM
+#                    environment variables, spawning fcitx5 at startup, and
+#                    syncing its active input method on layout switch).
+#                    Leave this false until fcitx5's own install script
+#                    lands — turning it on before that just points
+#                    GTK_IM_MODULE/QT_IM_MODULE at a daemon that isn't
+#                    installed.
 #   [<host>.browsers.<name>]
 #     <name> is an arbitrary label, not read anywhere except log output —
 #                    pick one per browser you want installed (e.g. "firefox",
@@ -334,6 +364,12 @@
 user.name = "Valentin Lukyanets"
 user.email = "valikluks95@gmail.com"
 
+# "chinese" deliberately left out for now: it needs fcitx5.enabled = true
+# to be useful, which isn't turned on for this host yet (see
+# [<host>.fcitx5] above).
+[hyper-lin.locale]
+languages = ["english", "russian", "ukrainian"]
+
 [hyper-lin.pkg-mgmt.pacman]
 parallel-downloads = 2
 multilib = true
@@ -365,8 +401,13 @@ enabled = true
 # /usr/lib/systemd/user/), auto-enabled by the package's own systemd
 # preset — nothing here needs an explicit `systemctl enable`, just the
 # packages themselves. pipewire itself comes along as their dependency.
+#
+# jq, playerctl, and brightnessctl are niri-adjacent (see
+# docs/host-config/desktop.md): config.kdl.tmpl's media/brightness key
+# binds spawn playerctl/brightnessctl directly, and switch-layout.sh.tmpl
+# shells out to jq to parse `niri msg -j keyboard-layouts`.
 [hyper-lin.cli_tools]
-enabled = ["pipewire-pulse", "wireplumber"]
+enabled = ["pipewire-pulse", "wireplumber", "jq", "playerctl", "brightnessctl"]
 
 [hyper-lin.desktop]
 enabled = true
