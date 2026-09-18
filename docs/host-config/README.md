@@ -70,6 +70,8 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.browsers.<name>.package`           | pacman package to install for this browser entry |
 | `.browsers.<name>.settings`          | about:config preference name → value, written into that browser's `policies.json` |
 | `.terminals.<name>.enabled`          | whether to install this terminal emulator (`<name>` is the pacman package) and write its own dotfile, e.g. `~/.config/kitty/kitty.conf` for `terminals.kitty` |
+| `.password_managers.<name>.enabled`  | whether to install this password manager and write its own dotfile, e.g. `~/.config/rbw/config.json` for `password_managers.rbw` |
+| `.password_managers.<name>.packages` | pacman packages to install for this entry |
 | `.tailscale.operator`                | whether to set the applying user as tailscale's operator, so `tailscale` works without sudo (independent of installing/enabling tailscale itself — see [services](#scripts)) |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
@@ -107,6 +109,7 @@ variables above; see its own page for what it does with them:
 18. [Tailscale](tailscale.md)
 19. [Terminals](terminals.md)
 20. [fcitx5](fcitx5.md)
+21. [Password managers](password-managers.md)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

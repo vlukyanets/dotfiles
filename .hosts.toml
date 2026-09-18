@@ -379,6 +379,25 @@
 #                    a browser's shared policies.json write doesn't. kitty
 #                    doesn't have any yet: dot_config/kitty/kitty.conf is
 #                    still a plain, non-templated file.
+#   [<host>.password_managers.<name>]
+#     Same "labeled map, one entry per program" shape as
+#                    [<host>.terminals.<name>] above — <name> is an
+#                    arbitrary label, not read anywhere except log output
+#                    and .chezmoiignore.tmpl's dotfile gating, e.g. "rbw".
+#     enabled  bool  whether
+#                    run_once_before_20-configure-password-managers.sh.tmpl
+#                    installs this entry (default: false). Each manager's
+#                    own dotfile (e.g. dot_config/rbw/config.json.tmpl) is
+#                    gated on this same flag in .chezmoiignore.tmpl, the
+#                    same "one flag controls both the install and the
+#                    dotfile" shape as terminals.<name>.enabled.
+#     packages  list of strings  pacman packages to install for this entry
+#                    (default: [] — same "no targets specified" pacman
+#                    error as an empty terminals.<name>.packages if left
+#                    empty while enabled).
+#     Anything else under [<host>.password_managers.<name>] is that
+#                    manager's own config knobs — see
+#                    docs/host-config/password-managers.md.
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -456,6 +475,10 @@ enabled = ["ttf-firacode-nerd", "ttf-nerd-fonts-symbols-mono", "noto-fonts-emoji
 [hyper-lin.terminals.kitty]
 enabled = true
 packages = ["kitty"]
+
+[hyper-lin.password_managers.rbw]
+enabled = true
+packages = ["rbw", "pinentry"]
 
 [hyper-lin.nvidia]
 enabled = true

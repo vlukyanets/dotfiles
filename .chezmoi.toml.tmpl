@@ -102,6 +102,8 @@
 
 {{- $terminals := get $cfg "terminals" | default dict -}}
 
+{{- $passwordManagers := get $cfg "password_managers" | default dict -}}
+
 {{- $tailscale         := get $cfg "tailscale" | default dict -}}
 {{- $tailscaleOperator := get $tailscale "operator" | default false -}}
 
@@ -223,6 +225,14 @@
     [data.terminals.{{ $name | quote }}]
     enabled  = {{ get $terminal "enabled" | default false }}
     packages = {{ toJson (get $terminal "packages" | default (list)) }}
+    {{- end }}
+
+    [data.password_managers]
+    {{- range $name, $manager := $passwordManagers }}
+
+    [data.password_managers.{{ $name | quote }}]
+    enabled  = {{ get $manager "enabled" | default false }}
+    packages = {{ toJson (get $manager "packages" | default (list)) }}
     {{- end }}
 
     [data.tailscale]
