@@ -1,6 +1,6 @@
 # Fonts
 
-[`.chezmoiscripts/run_once_before_08-configure-fonts.sh.tmpl`](../../.chezmoiscripts/run_once_before_08-configure-fonts.sh.tmpl)
+[`.chezmoiscripts/run_once_before_09-configure-fonts.sh.tmpl`](../../.chezmoiscripts/run_once_before_09-configure-fonts.sh.tmpl)
 installs every package listed in `fonts.enabled` (default `[]` — the script
 exits immediately on hosts that don't set it) in one `pacman -S --needed`
 call, the same shape as [CLI tools](cli-tools.md). It exists because nothing

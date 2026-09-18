@@ -1,6 +1,6 @@
 # Desktop
 
-[`.chezmoiscripts/run_once_before_13-configure-desktop.sh.tmpl`](../../.chezmoiscripts/run_once_before_13-configure-desktop.sh.tmpl)
+[`.chezmoiscripts/run_once_before_14-configure-desktop.sh.tmpl`](../../.chezmoiscripts/run_once_before_14-configure-desktop.sh.tmpl)
 is gated behind `desktop.enabled` (default `false`) — hosts that leave it
 unset skip it entirely and no desktop packages are touched.
 

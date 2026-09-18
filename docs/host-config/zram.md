@@ -1,6 +1,6 @@
 # zram
 
-[`.chezmoiscripts/run_once_before_11-configure-zram.sh.tmpl`](../../.chezmoiscripts/run_once_before_11-configure-zram.sh.tmpl)
+[`.chezmoiscripts/run_once_before_12-configure-zram.sh.tmpl`](../../.chezmoiscripts/run_once_before_12-configure-zram.sh.tmpl)
 is gated behind `zram.enabled` (default `false`) the same way the
 [containers script](containers.md) is gated behind
 `containers.docker.enabled` — hosts that leave it unset skip it entirely.

@@ -1,0 +1,29 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .networking.systemd_resolved.enabled }}
+
+echo "==> Skipping networking config (networking.systemd_resolved.enabled is false for this host)"
+exit 0
+{{- end }}
+
+echo "==> Enabling systemd-resolved.service"
+$SUDO_CMD systemctl enable --now systemd-resolved.service
+
+echo "==> Pointing /etc/resolv.conf at systemd-resolved's stub listener"
+$SUDO_CMD ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+
+echo "==> Telling NetworkManager to hand DNS off to systemd-resolved"
+$SUDO_CMD mkdir -p /etc/NetworkManager/conf.d
+$SUDO_CMD tee /etc/NetworkManager/conf.d/dns.conf > /dev/null <<'EOF'
+[main]
+dns=systemd-resolved
+EOF
+
+if systemctl is-active --quiet NetworkManager.service; then
+    echo "==> Restarting NetworkManager to pick up the dns.conf change"
+    $SUDO_CMD systemctl restart NetworkManager.service
+fi

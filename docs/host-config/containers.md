@@ -1,6 +1,6 @@
 # Containers
 
-[`.chezmoiscripts/run_once_before_09-configure-containers.sh.tmpl`](../../.chezmoiscripts/run_once_before_09-configure-containers.sh.tmpl)
+[`.chezmoiscripts/run_once_before_10-configure-containers.sh.tmpl`](../../.chezmoiscripts/run_once_before_10-configure-containers.sh.tmpl)
 is gated behind `containers.docker.enabled` (default `false`) the same way
 the [AUR script](aur.md) is gated behind `pkg_mgmt.aur.enabled` — hosts that
 leave it unset skip it entirely. When enabled, it installs `docker`, runs

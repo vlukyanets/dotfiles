@@ -112,8 +112,18 @@
 #                    no entry here gets nothing installed for it (e.g. sshd
 #                    ships in `openssh`, which may already be present) — it's
 #                    just enabled as-is.
+#   [<host>.networking.systemd_resolved]
+#     enabled  bool  whether run_once_before_05-configure-networking.sh.tmpl
+#                    enables systemd-resolved.service, points /etc/resolv.conf
+#                    at its stub listener, and sets NetworkManager's
+#                    dns=systemd-resolved so it hands per-connection DNS
+#                    config off to resolved instead of writing
+#                    /etc/resolv.conf directly (default: false — opt in per
+#                    host). Assumes NetworkManager is already the network
+#                    manager in use; see docs/host-config/networking.md for
+#                    why systemd-resolved was picked over dnsmasq.
 #   [<host>.shell.zsh]
-#     enabled  bool  whether run_once_before_06-configure-shell.sh.tmpl
+#     enabled  bool  whether run_once_before_07-configure-shell.sh.tmpl
 #                    installs zsh and makes it the login shell (default:
 #                    false — opt in per host). Also controls whether
 #                    dot_zshrc.tmpl is written at all: .chezmoiignore.tmpl
@@ -130,7 +140,7 @@
 #                    Idempotent: skips anything already cloned.
 #   [<host>.cli_tools]
 #     enabled  list of strings  pacman packages to install via
-#                    run_once_before_07-configure-cli-tools.sh.tmpl, e.g.
+#                    run_once_before_08-configure-cli-tools.sh.tmpl, e.g.
 #                    ["neovim", "zoxide", "eza"] (default: [] — script exits
 #                    without installing anything). This is for standalone
 #                    CLI tools dot_zshrc.tmpl already checks for with
@@ -140,7 +150,7 @@
 #                    `pacman -S --needed` call.
 #   [<host>.fonts]
 #     enabled  list of strings  pacman packages to install via
-#                    run_once_before_08-configure-fonts.sh.tmpl, e.g.
+#                    run_once_before_09-configure-fonts.sh.tmpl, e.g.
 #                    ["ttf-meslo-nerd"] (default: [] — script exits without
 #                    installing anything). A Nerd Font is what
 #                    dot_zshrc.tmpl's powerlevel10k prompt (glyphs) and its
@@ -150,7 +160,7 @@
 #                    a font here just gets broken/missing glyphs, not an
 #                    error.
 #   [<host>.containers.docker]
-#     enabled  bool  whether run_once_before_09-configure-containers.sh.tmpl
+#     enabled  bool  whether run_once_before_10-configure-containers.sh.tmpl
 #                    installs docker, runs `systemctl enable --now
 #                    docker.service`, and adds the applying user to the
 #                    `docker` group (default: false). Idempotent: the group
@@ -160,7 +170,7 @@
 #                    trying to fix that itself.
 #   [<host>.ssh]
 #     enabled  bool  whether
-#                    run_once_before_10-configure-ssh-hardening.sh.tmpl
+#                    run_once_before_11-configure-ssh-hardening.sh.tmpl
 #                    writes anything at all (default: false — sshd's own
 #                    config is left untouched). Independent of whether
 #                    "sshd" appears in services.enabled: the drop-in below
@@ -180,7 +190,7 @@
 #                    drop-in, e.g. "no" or "prohibit-password" (default:
 #                    "prohibit-password", sshd's own compiled-in default).
 #   [<host>.zram]
-#     enabled  bool  whether run_once_before_11-configure-zram.sh.tmpl
+#     enabled  bool  whether run_once_before_12-configure-zram.sh.tmpl
 #                    installs zram-generator and writes a zram0 config
 #                    (default: false — opt in per host, e.g. skip it on a
 #                    host that already has real swap or plenty of RAM).
@@ -198,7 +208,7 @@
 #                    100, zram-generator's own default — high enough that
 #                    the kernel prefers zram over any disk-backed swap).
 #   [<host>.thp]
-#     enabled  bool  whether run_once_before_12-configure-thp.sh.tmpl
+#     enabled  bool  whether run_once_before_13-configure-thp.sh.tmpl
 #                    touches transparent hugepage config at all (default:
 #                    false — left unset, the kernel's own compiled-in mode
 #                    stands, usually "madvise").
@@ -216,7 +226,7 @@
 #                    reboots the same way, since sysfs itself resets to the
 #                    kernel default on every boot.
 #   [<host>.desktop]
-#     enabled      bool    whether run_once_before_13-configure-desktop.sh.tmpl
+#     enabled      bool    whether run_once_before_14-configure-desktop.sh.tmpl
 #                    installs a desktop environment at all (default: false —
 #                    opt in per host; leave unset on a headless/server host).
 #     environment  string  which desktop environment to install. The only
@@ -245,7 +255,7 @@
 #                    doesn't care; it just needs something under
 #                    /usr/share/*sessions to hand the user afterward. One of:
 #                      - "" (default) — no greeter is installed; run
-#                        run_once_before_14-configure-greeter.sh.tmpl exits
+#                        run_once_before_15-configure-greeter.sh.tmpl exits
 #                        immediately.
 #                      - "tuigreet" — installs greetd-tuigreet from the
 #                        configured pacman repositories (which depends on
@@ -271,7 +281,7 @@
 #                    password prompt for this login (default: "" — full
 #                    user list shown).
 #   [<host>.nvidia]
-#     enabled  bool  whether run_once_before_05-configure-nvidia.sh.tmpl
+#     enabled  bool  whether run_once_before_06-configure-nvidia.sh.tmpl
 #                    detects and installs an NVIDIA driver at all (default:
 #                    false — opt in per host; leave unset on a host with no
 #                    NVIDIA GPU, or an Intel/AMD one — enabling this on such
@@ -283,7 +293,7 @@
 #                    pkg-mgmt.aur.enabled = true; its lib32 counterpart
 #                    additionally requires pkg-mgmt.pacman.multilib = true.
 #   [<host>.fcitx5]
-#     enabled      bool  whether run_once_before_19-configure-fcitx5.sh.tmpl
+#     enabled      bool  whether run_once_before_20-configure-fcitx5.sh.tmpl
 #                    installs fcitx5 (plus fcitx5-gtk, fcitx5-qt, and
 #                    fcitx5-chinese-addons when "chinese" is in
 #                    locale.languages) at all (default: false). Also
@@ -308,7 +318,7 @@
 #                    "librewolf"; two channels of the same browser, e.g.
 #                    "firefox" and "firefox-nightly", both work too, each
 #                    with its own package).
-#     enabled  bool  whether run_once_before_16-configure-browsers.sh.tmpl
+#     enabled  bool  whether run_once_before_17-configure-browsers.sh.tmpl
 #                    installs this entry at all (default: true — an entry
 #                    just being present installs it, same as before this
 #                    field existed). Set false to keep an entry (and its
@@ -322,7 +332,7 @@
 #                    as [<host>.office.<name>].source below — the script
 #                    exits with an error if it isn't).
 #     packages  list of strings  packages to install via
-#                    run_once_before_16-configure-browsers.sh.tmpl in one
+#                    run_once_before_17-configure-browsers.sh.tmpl in one
 #                    call (default: [] — enabling an entry with none listed
 #                    just errors out on pacman/paru's own "no targets
 #                    specified"). The *first* entry is what `settings`
@@ -347,7 +357,7 @@
 #                    docs/host-config/browsers.md for why "default" was
 #                    chosen over "locked".
 #   [<host>.tailscale]
-#     operator  bool  whether run_once_before_17-configure-tailscale.sh.tmpl
+#     operator  bool  whether run_once_before_18-configure-tailscale.sh.tmpl
 #                    sets the applying user as tailscale's operator
 #                    (`tailscale set --operator=<user>`), so `tailscale`
 #                    works without sudo afterward (default: false).
@@ -361,7 +371,7 @@
 #                    .chezmoiignore.tmpl's dotfile gating (see `enabled`
 #                    below) — pick one per terminal you want installed,
 #                    e.g. "kitty".
-#     enabled  bool  whether run_once_before_18-configure-terminals.sh.tmpl
+#     enabled  bool  whether run_once_before_19-configure-terminals.sh.tmpl
 #                    installs this terminal (default: false — an entry can
 #                    be present but turned off, e.g. while trying out a
 #                    replacement without uninstalling the current one).
@@ -393,7 +403,7 @@
 #                    arbitrary label, not read anywhere except log output
 #                    and .chezmoiignore.tmpl's dotfile gating, e.g. "rbw".
 #     enabled  bool  whether
-#                    run_once_before_20-configure-password-managers.sh.tmpl
+#                    run_once_before_21-configure-password-managers.sh.tmpl
 #                    installs this entry (default: false). Each manager's
 #                    own dotfile (e.g. dot_config/rbw/config.json.tmpl) is
 #                    gated on this same flag in .chezmoiignore.tmpl, the
@@ -414,7 +424,7 @@
 #                    [<host>.terminals.<name>] above — <name> is an
 #                    arbitrary label, not read anywhere except log output,
 #                    e.g. "onlyoffice", "libreoffice".
-#     enabled  bool  whether run_once_before_21-configure-office.sh.tmpl
+#     enabled  bool  whether run_once_before_22-configure-office.sh.tmpl
 #                    installs this entry (default: false).
 #     source   string  where `packages` comes from, one of "pacman"
 #                    (default) or "aur". "aur" requires
@@ -460,6 +470,9 @@ enabled = ["sshd", "tailscaled"]
 [hyper-lin.services.packages]
 sshd = ["openssh"]
 tailscaled = ["tailscale"]
+
+[hyper-lin.networking.systemd_resolved]
+enabled = true
 
 [hyper-lin.tailscale]
 operator = true

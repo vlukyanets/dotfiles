@@ -15,7 +15,7 @@ $SUDO_CMD pacman -S --needed --noconfirm zram-generator
 
 echo "==> Writing /etc/systemd/zram-generator.conf"
 $SUDO_CMD tee /etc/systemd/zram-generator.conf >/dev/null <<CONF
-# Managed by chezmoi (.chezmoiscripts/run_once_before_11-configure-zram.sh.tmpl)
+# Managed by chezmoi (.chezmoiscripts/run_once_before_12-configure-zram.sh.tmpl)
 [zram0]
 zram-size = {{ .zram.size }}
 compression-algorithm = {{ .zram.compression_algorithm }}
