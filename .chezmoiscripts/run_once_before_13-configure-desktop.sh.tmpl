@@ -12,7 +12,8 @@ exit 0
 
 echo "==> Installing niri desktop environment"
 $SUDO_CMD pacman -S --needed --noconfirm \
-    niri xwayland-satellite xdg-desktop-portal-gtk xdg-utils wl-clipboard
+    niri xwayland-satellite xdg-desktop-portal-gtk xdg-utils wl-clipboard \
+    gnome-themes-extra
 
 {{-   if eq .desktop.niri.shell "noctalia" }}
 
@@ -23,6 +24,10 @@ $SUDO_CMD pacman -S --needed --noconfirm noctalia
 echo "==> Unknown desktop.niri.shell '{{ .desktop.niri.shell }}' — supported values: \"noctalia\"" >&2
 exit 1
 {{-   end }}
+
+echo "==> Configuring GTK dark theme"
+gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"
+gsettings set org.gnome.desktop.interface gtk-theme    "Adwaita-dark"
 {{- else }}
 
 echo "==> Unknown desktop.environment '{{ .desktop.environment }}' (desktop.enabled is true) — supported values: \"niri\"" >&2

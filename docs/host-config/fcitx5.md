@@ -1,10 +1,12 @@
 # fcitx5
 
 [`.chezmoiscripts/run_once_before_19-configure-fcitx5.sh.tmpl`](../../.chezmoiscripts/run_once_before_19-configure-fcitx5.sh.tmpl)
-installs `fcitx5`, `fcitx5-gtk`, and `fcitx5-qt` when `fcitx5.enabled` is
-true (default `false` — the script exits immediately otherwise), plus
-`fcitx5-pinyin` when `"chinese"` is also in
-[`locale.languages`](locale.md#languages). The same flag gates
+installs `fcitx5`, `fcitx5-gtk`, `fcitx5-qt`, and `fcitx5-configtool` when
+`fcitx5.enabled` is true (default `false` — the script exits immediately
+otherwise), plus `fcitx5-chinese-addons` (pinyin and the other Chinese
+input methods — there's no standalone `fcitx5-pinyin` package on Arch)
+when `"chinese"` is also in [`locale.languages`](locale.md#languages). The
+same flag gates
 `dot_config/fcitx5/*` in `.chezmoiignore.tmpl` — the same "one flag
 controls both the install and the dotfile" shape as
 [`shell.zsh.enabled`](shell.md) — and, in
@@ -52,10 +54,16 @@ restarted (next login, or manually), the same caveat
 [Firefox](browsers/firefox.md) already has for `browsers.<name>.settings`
 changes not reaching an already-open profile.
 
-## Not yet ported
+## Theme
 
-`dot_config/fcitx5/conf/classicui.conf` (theme/font) and the
-`FluentDark-solid` theme it points at, from the old `__dotfiles` repo,
-aren't included — fcitx5 runs with its own built-in default UI theme
-instead. Cosmetic only; doesn't affect anything `switch-layout.sh.tmpl`
-depends on.
+[`dot_config/fcitx5/conf/classicui.conf`](../../dot_config/fcitx5/conf/classicui.conf)
+points fcitx5's classic UI (the candidate-selection popup) at
+`FluentDark-solid`, a dark theme ported as-is (including its PNG assets)
+from the old `__dotfiles` repo to
+[`dot_local/share/fcitx5/themes/FluentDark-solid/`](../../dot_local/share/fcitx5/themes/FluentDark-solid).
+Both paths — `~/.config/fcitx5` and `~/.local/share/fcitx5` — are gated
+on `fcitx5.enabled` in `.chezmoiignore.tmpl`, the theme living under the
+latter since that's where fcitx5 itself looks for
+`<XDG_DATA_HOME>/fcitx5/themes/<name>/theme.conf`. Cosmetic only — it
+doesn't affect anything `switch-layout.sh.tmpl` depends on, unlike
+`dot_config/fcitx5/config` above.

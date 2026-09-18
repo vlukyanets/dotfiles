@@ -10,9 +10,9 @@ echo "==> Skipping fcitx5 install (fcitx5.enabled is false for this host)"
 exit 0
 {{- end }}
 
-{{- $packages := list "fcitx5" "fcitx5-gtk" "fcitx5-qt" -}}
+{{- $packages := list "fcitx5" "fcitx5-gtk" "fcitx5-qt" "fcitx5-configtool" -}}
 {{- if has "chinese" .locale.languages -}}
-{{-   $packages = append $packages "fcitx5-pinyin" -}}
+{{-   $packages = append $packages "fcitx5-chinese-addons" -}}
 {{- end }}
 
 echo "==> Installing fcitx5"

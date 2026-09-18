@@ -11,11 +11,22 @@ for a host that asked for a desktop, so the script exits with an error
 instead of silently installing nothing when it's left unset or set to a
 value it doesn't recognize. The only value currently implemented is
 `"niri"` — a Wayland compositor. Enabling it installs `niri`,
-`xwayland-satellite`, `xdg-desktop-portal-gtk`, `xdg-utils`, and
-`wl-clipboard` — the minimum to get niri itself running under Wayland.
-Anything else niri-adjacent (a brightness key binding via `brightnessctl`,
-a notification daemon, etc.) goes in [`cli_tools.enabled`](cli-tools.md)
-per host, not hardcoded here.
+`xwayland-satellite`, `xdg-desktop-portal-gtk`, `xdg-utils`,
+`wl-clipboard`, and `gnome-themes-extra` — the minimum to get niri itself
+running under Wayland with a working dark GTK theme (see below). Anything
+else niri-adjacent (a brightness key binding via `brightnessctl`, a
+notification daemon, etc.) goes in [`cli_tools.enabled`](cli-tools.md) per
+host, not hardcoded here.
+
+`gnome-themes-extra` provides the `Adwaita-dark` GTK3 theme variant, which
+the script then sets as the session default via `gsettings set
+org.gnome.desktop.interface color-scheme/gtk-theme` — the *persistent*
+half of dark theming (read by GTK apps through the dconf-backed
+`org.gnome.desktop.interface` schema, including ones that don't look at
+[niri's `GTK_THEME` environment variable](desktop/niri.md) directly, e.g.
+via `xdg-desktop-portal-gtk`'s file picker). This needs a running user
+D-Bus/dconf session to actually persist — true whenever this script runs
+from an already-logged-in terminal, the normal case for `chezmoi apply`.
 
 This script only installs the compositor itself — it has no opinion on how
 you log into it. See [Greeter](greeter.md) for `greetd`/`tuigreet` (or
