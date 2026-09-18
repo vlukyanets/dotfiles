@@ -95,9 +95,7 @@
 
 {{- $browsers := get $cfg "browsers" | default dict -}}
 
-{{- $terminal        := get $cfg "terminal" | default dict -}}
-{{- $terminalKitty    := get $terminal "kitty" | default dict -}}
-{{- $terminalKittyEnabled := get $terminalKitty "enabled" | default false -}}
+{{- $terminals := get $cfg "terminals" | default dict -}}
 
 {{- $tailscale         := get $cfg "tailscale" | default dict -}}
 {{- $tailscaleOperator := get $tailscale "operator" | default false -}}
@@ -206,8 +204,12 @@
     {{- end }}
     {{- end }}
 
-    [data.terminal.kitty]
-    enabled = {{ $terminalKittyEnabled }}
+    [data.terminals]
+    {{- range $name, $terminal := $terminals }}
+
+    [data.terminals.{{ $name | quote }}]
+    enabled = {{ get $terminal "enabled" | default false }}
+    {{- end }}
 
     [data.tailscale]
     operator = {{ $tailscaleOperator }}

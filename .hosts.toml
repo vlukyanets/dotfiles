@@ -299,16 +299,29 @@
 #                    above). The script errors if tailscaled.service isn't
 #                    active yet, rather than silently no-op'ing, so add
 #                    "tailscaled" to services.enabled first.
-#   [<host>.terminal.kitty]
-#     enabled  bool  whether run_once_before_18-configure-terminal.sh.tmpl
-#                    installs kitty (default: false). Also controls whether
-#                    dot_config/kitty/kitty.conf is written at all:
-#                    .chezmoiignore.tmpl skips ~/.config/kitty entirely on a
-#                    host that leaves this unset. kitty.conf expects a Nerd
-#                    Font plus a symbols/emoji fallback — list matching
-#                    packages in fonts.enabled, e.g. ["ttf-firacode-nerd",
-#                    "ttf-nerd-fonts-symbols-mono", "noto-fonts-emoji"], or
-#                    glyphs render broken/missing (not an error).
+#   [<host>.terminals.<name>]
+#     <name> is both the label used in log output *and* the pacman package
+#                    name installed for it (unlike browsers.<name>, there's
+#                    no separate `package` field — a terminal emulator's
+#                    label and its Arch package share the same name, e.g.
+#                    "kitty", "alacritty", "wezterm").
+#     enabled  bool  whether run_once_before_18-configure-terminals.sh.tmpl
+#                    installs this terminal (default: false — an entry can
+#                    be present but turned off, e.g. while trying out a
+#                    replacement without uninstalling the current one).
+#                    Each terminal's own dotfile (e.g.
+#                    dot_config/kitty/kitty.conf) is gated on this same flag
+#                    in .chezmoiignore.tmpl, the same "one flag controls
+#                    both the install and the dotfile" shape as
+#                    shell.zsh.enabled.
+#     Anything else under [<host>.terminals.<name>] is that terminal's own
+#                    config knobs, added as named fields on demand (e.g. a
+#                    future font_size) — there's no shared, generic
+#                    "settings" blob the way browsers.<name>.settings is,
+#                    since every terminal's config file has its own format
+#                    a browser's shared policies.json write doesn't. kitty
+#                    doesn't have any yet: dot_config/kitty/kitty.conf is
+#                    still a plain, non-templated file.
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -365,7 +378,7 @@ type = "noctalia-greeter"
 [hyper-lin.fonts]
 enabled = ["ttf-firacode-nerd", "ttf-nerd-fonts-symbols-mono", "noto-fonts-emoji"]
 
-[hyper-lin.terminal.kitty]
+[hyper-lin.terminals.kitty]
 enabled = true
 
 [hyper-lin.nvidia]
@@ -379,7 +392,7 @@ enabled = true
 # the pref's *default* — nothing is locked, and about:config remains fully
 # editable afterward. Skipped: Windows/macOS-only prefs (this host is
 # Linux), and the "Clear Data"-dialog checkbox defaults (cosmetic, not
-# enforced). See docs/host-config/browsers.md#hyper-lin-firefox for what
+# enforced). See docs/host-config/browsers/firefox.md for what
 # this changes in practice (blank new tab, no disk cache, HTTPS-Only mode,
 # ETP strict, cookies/cache/form-data wiped on every shutdown).
 [hyper-lin.browsers.firefox]
