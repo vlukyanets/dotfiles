@@ -1,0 +1,37 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+AUR_ENABLED="{{ .pkg_mgmt.aur.enabled }}"
+
+if [ "$AUR_ENABLED" != "true" ]; then
+    echo "==> Skipping paru install (pkg_mgmt.aur.enabled is false for this host)"
+    exit 0
+fi
+
+if command -v paru >/dev/null 2>&1; then
+    echo "==> paru already installed, skipping"
+    exit 0
+fi
+
+echo "==> Installing paru build dependencies"
+$SUDO_CMD pacman -S --needed --noconfirm base-devel git
+
+BUILD_DIR=$(mktemp -d)
+trap 'rm -rf "$BUILD_DIR"' EXIT
+
+echo "==> Cloning paru from the AUR"
+git clone --depth 1 https://aur.archlinux.org/paru.git "$BUILD_DIR/paru"
+
+# makepkg refuses to run as root, so this stays unprefixed (unlike every
+# other privileged command in this repo) and shells out to plain `sudo`
+# on its own for the pacman -U it does internally — SUDO_CMD's doas
+# escape hatch (see README.md) doesn't reach that install step unless
+# makepkg.conf's PACMAN_AUTH is also set to match.
+echo "==> Building and installing paru"
+(
+    cd "$BUILD_DIR/paru"
+    makepkg -si --noconfirm
+)

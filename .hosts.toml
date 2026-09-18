@@ -1,0 +1,542 @@
+# Per-host configuration. Hostname is the top-level table key. Every field
+# is optional — anything omitted falls back to the default hardcoded in
+# .chezmoi.toml.tmpl (there's no shared [default] table here; that's where
+# defaults live instead).
+#
+# Recognized fields:
+#   [<host>.git.user]
+#     name   string  git user.name (default: "Valentin Lukyanets")
+#     email  string  git user.email (no default — omitted means an empty
+#                     value, not a shared fallback address)
+#   [<host>.pkg-mgmt.pacman]
+#     parallel-downloads  int     pacman.conf ParallelDownloads (default: 5)
+#                                 — a fixed integer only; pacman.conf isn't
+#                                 shell, so it can't take the percentage or
+#                                 shell-expression forms makepkg.jobs does
+#                                 below (chezmoi init fails loudly if given
+#                                 e.g. "20%")
+#     multilib  bool  whether to enable the [multilib] repo (default: false
+#                    — opt in per host). Needed for any 32-bit package, e.g.
+#                    the lib32-nvidia*-utils packages below.
+#   [<host>.pkg-mgmt.makepkg]
+#     jobs   int or string  makepkg.conf MAKEFLAGS="-j<value>" (default: "$(nproc)"),
+#                    any of:
+#                      - a plain integer (4, not quoted)  — used as-is
+#                      - a percentage of CPU count ("20%", a string) —
+#                        resolved to floor(cpus * pct/100), clamped up to a
+#                        minimum of 1 whenever the percentage is > 0%
+#                      - a raw shell expression ("$(nproc)", a string, the
+#                        default) — written through unresolved and evaluated
+#                        fresh at every build instead of once at apply time,
+#                        since makepkg.conf (unlike pacman.conf) is sourced
+#                        as shell
+#     options  list of strings  entries for makepkg.conf's OPTIONS array,
+#                    e.g. ["ccache", "!debug"] (a leading "!" negates one of
+#                    makepkg's built-in defaults, same as in OPTIONS=(...)
+#                    itself). Joined into one OPTIONS+=(...) line. Default:
+#                    [] — no line at all, makepkg's own OPTIONS stand as-is.
+#   [<host>.pkg-mgmt.reflector]
+#     save     string  reflector --save, the mirrorlist path (default:
+#                    "/etc/pacman.d/mirrorlist"). Shared with
+#                    run_once_before_00-configure-pacman.sh.tmpl's multilib
+#                    Include= line, so the two stay pointed at the same file
+#                    — override here, not in that script.
+#                    CAUTION: the reflector package's own reflector.service
+#                    is systemd-sandboxed with a hardcoded
+#                    ReadWritePaths=/etc/pacman.d/mirrorlist (ProtectSystem=
+#                    strict). Our own run_once script writes here fine
+#                    regardless (plain sudo, no sandbox), but every later
+#                    *timer*-triggered run would silently fail to write
+#                    anywhere else — don't set this to a non-default path
+#                    without also shipping a drop-in that widens
+#                    reflector.service's ReadWritePaths to match.
+#     country  list of strings  reflector --country, e.g. ["Germany", "France"]
+#                    (default: [] — flag omitted, reflector considers every
+#                    country)
+#     protocol           string  reflector --protocol (default: "https")
+#     latest             int     reflector --latest (default: 20)
+#     sort               string  reflector --sort (default: "rate")
+#     age                int     reflector --age, hours (default: 12)
+#     download-timeout   int     reflector --download-timeout, seconds
+#                    (default: 5)
+#   [<host>.pkg-mgmt.reflector.timer]
+#     on-calendar  string  reflector.timer OnCalendar= override (default:
+#                    "weekly", the package's own default)
+#     on-boot-sec  string  reflector.timer OnBootSec= override (default:
+#                    "15min", the package's own default)
+#   [<host>.pkg-mgmt.aur]
+#     enabled  bool  whether run_once_before_02-configure-aur.sh.tmpl builds
+#                    and installs paru from the AUR (default: false — opt in
+#                    per host). Skips outright, without contacting the AUR,
+#                    when unset or false; also skips (but still exits 0) if
+#                    paru is already on PATH.
+#   [<host>.locale]
+#     lang      string        /etc/locale.conf LANG= (default: "en_US.UTF-8")
+#     locales   list of strings  lines to uncomment/append in /etc/locale.gen
+#                    before running locale-gen, e.g. ["en_US.UTF-8 UTF-8",
+#                    "uk_UA.UTF-8 UTF-8"] (default: ["en_US.UTF-8 UTF-8"]).
+#                    Must include whichever locale `lang` above names, or
+#                    locale-gen will generate it fine but LANG will point at
+#                    a locale libc doesn't actually have compiled.
+#     keymap    string        /etc/vconsole.conf KEYMAP= (default: "us")
+#     timezone  string        tzdata zone name, e.g. "Europe/Kyiv" — must
+#                    exist under /usr/share/zoneinfo/ (default: "UTC").
+#                    Symlinked to /etc/localtime; hwclock --systohc then
+#                    syncs the hardware clock to match.
+#   [<host>.services]
+#     enabled  list of strings  systemd unit names to `systemctl enable --now`,
+#                    e.g. ["NetworkManager", "bluetooth", "sshd"] (default: []
+#                    — no units, script exits without touching systemd).
+#                    Idempotent: already-enabled/running units are left as-is.
+#   [<host>.services.packages]
+#     <unit> = list of strings  pacman packages that provide that unit, e.g.
+#                    NetworkManager = ["networkmanager"], bluetooth =
+#                    ["bluez", "bluez-utils"]. Quote the key if the unit name
+#                    itself contains a "." (e.g. "systemd-timesyncd.service")
+#                    — TOML would otherwise read it as a nested table path.
+#                    Every package across every entry in `enabled` is
+#                    installed together in one deduplicated `pacman -S
+#                    --needed` call before any unit is enabled. A unit with
+#                    no entry here gets nothing installed for it (e.g. sshd
+#                    ships in `openssh`, which may already be present) — it's
+#                    just enabled as-is.
+#   [<host>.shell.zsh]
+#     enabled  bool  whether run_once_before_06-configure-shell.sh.tmpl
+#                    installs zsh and makes it the login shell (default:
+#                    false — opt in per host). Also controls whether
+#                    dot_zshrc.tmpl is written at all: .chezmoiignore.tmpl
+#                    skips ~/.zshrc entirely on hosts that leave this unset.
+#                    Idempotent: a no-op if zsh is already the login shell.
+#   [<host>.shell.zsh.oh-my-zsh]
+#     enabled  bool  whether the same script also installs oh-my-zsh, the
+#                    powerlevel10k theme, and the zsh-autosuggestions /
+#                    zsh-syntax-highlighting plugins dot_zshrc.tmpl expects
+#                    (default: false). Meaningless unless shell.zsh.enabled
+#                    is also true — dot_zshrc.tmpl itself only renders that
+#                    block in when this is set, so a host with zsh enabled
+#                    but not this gets a plain, theme-free ~/.zshrc.
+#                    Idempotent: skips anything already cloned.
+#   [<host>.cli_tools]
+#     enabled  list of strings  pacman packages to install via
+#                    run_once_before_07-configure-cli-tools.sh.tmpl, e.g.
+#                    ["neovim", "zoxide", "eza"] (default: [] — script exits
+#                    without installing anything). This is for standalone
+#                    CLI tools dot_zshrc.tmpl already checks for with
+#                    `command -v` before wiring up EDITOR, `zoxide init`,
+#                    and the eza aliases — unlike services.packages, there's
+#                    no unit to enable afterward, just a single deduplicated
+#                    `pacman -S --needed` call.
+#   [<host>.fonts]
+#     enabled  list of strings  pacman packages to install via
+#                    run_once_before_08-configure-fonts.sh.tmpl, e.g.
+#                    ["ttf-meslo-nerd"] (default: [] — script exits without
+#                    installing anything). A Nerd Font is what
+#                    dot_zshrc.tmpl's powerlevel10k prompt (glyphs) and its
+#                    `eza --icons` aliases both need on the terminal side to
+#                    render correctly — enabling shell.zsh.oh_my_zsh or
+#                    putting "eza" in cli_tools.enabled without also listing
+#                    a font here just gets broken/missing glyphs, not an
+#                    error.
+#   [<host>.containers.docker]
+#     enabled  bool  whether run_once_before_09-configure-containers.sh.tmpl
+#                    installs docker, runs `systemctl enable --now
+#                    docker.service`, and adds the applying user to the
+#                    `docker` group (default: false). Idempotent: the group
+#                    add is skipped if the user's already a member. New
+#                    group membership only takes effect in a fresh login
+#                    session — the script prints a reminder rather than
+#                    trying to fix that itself.
+#   [<host>.ssh]
+#     enabled  bool  whether
+#                    run_once_before_10-configure-ssh-hardening.sh.tmpl
+#                    writes anything at all (default: false — sshd's own
+#                    config is left untouched). Independent of whether
+#                    "sshd" appears in services.enabled: the drop-in below
+#                    is written either way, but only reloaded through a unit
+#                    that's actually active — on a host that doesn't run
+#                    sshd yet, it just sits there ready for whenever sshd is
+#                    installed and started.
+#     disable_password_auth  bool  writes PasswordAuthentication no into
+#                    the generated drop-in when true (default: false —
+#                    PasswordAuthentication is left at sshd's own
+#                    compiled-in default of yes). CAUTION: only set true
+#                    once key-based login is confirmed working from a
+#                    session you already have open — this can lock out
+#                    password-only access, and there's no automatic
+#                    rollback.
+#     permit_root_login  string  PermitRootLogin value in the generated
+#                    drop-in, e.g. "no" or "prohibit-password" (default:
+#                    "prohibit-password", sshd's own compiled-in default).
+#   [<host>.zram]
+#     enabled  bool  whether run_once_before_11-configure-zram.sh.tmpl
+#                    installs zram-generator and writes a zram0 config
+#                    (default: false — opt in per host, e.g. skip it on a
+#                    host that already has real swap or plenty of RAM).
+#     size     string  zram-size= expression written into
+#                    /etc/systemd/zram-generator.conf's [zram0] section,
+#                    e.g. "4096" (a fixed MiB size) or "ram / 4" (a formula
+#                    referencing total RAM, per zram-generator.conf(5))
+#                    (default: "min(ram / 2, 4096)", zram-generator's own
+#                    default).
+#     compression-algorithm  string  compression-algorithm= in that same
+#                    section (default: "zstd" — this repo's own choice; the
+#                    package itself defaults to whatever the running kernel
+#                    picks when this is left unset upstream).
+#     swap-priority  int  swap-priority= in that same section (default:
+#                    100, zram-generator's own default — high enough that
+#                    the kernel prefers zram over any disk-backed swap).
+#   [<host>.thp]
+#     enabled  bool  whether run_once_before_12-configure-thp.sh.tmpl
+#                    touches transparent hugepage config at all (default:
+#                    false — left unset, the kernel's own compiled-in mode
+#                    stands, usually "madvise").
+#     mode     string  value written to
+#                    /sys/kernel/mm/transparent_hugepage/enabled, one of
+#                    "always", "madvise", or "never" (default: "always" —
+#                    this repo's own choice for when this is turned on at
+#                    all, not upstream's default; "always" can help with
+#                    frame-time stability in memory-hungry games/engines
+#                    that never explicitly ask for hugepages themselves,
+#                    at the cost of some extra kernel-side compaction work
+#                    under memory pressure — measure before assuming it
+#                    helps on any given workload). Applied immediately via
+#                    `systemd-tmpfiles --create` and persisted across
+#                    reboots the same way, since sysfs itself resets to the
+#                    kernel default on every boot.
+#   [<host>.desktop]
+#     enabled      bool    whether run_once_before_13-configure-desktop.sh.tmpl
+#                    installs a desktop environment at all (default: false —
+#                    opt in per host; leave unset on a headless/server host).
+#     environment  string  which desktop environment to install. The only
+#                    value currently implemented is "niri" (a Wayland
+#                    compositor). Required whenever enabled = true — the
+#                    script exits with an error if this is left unset or set
+#                    to anything unrecognized, rather than silently installing
+#                    nothing.
+#   [<host>.desktop.niri]
+#     shell    string  which shell/bar layer to install on top of niri. The
+#                    only value currently implemented is "noctalia". Read
+#                    (and meaningful) only when desktop.environment = "niri"
+#                    — ignored otherwise. Default: "" — niri is installed
+#                    bare, with no shell/bar layer.
+#   [<host>.greeter]
+#     type  string  which greetd greeter to install and write into
+#                    /etc/greetd/config.toml. A separate, top-level concern
+#                    from desktop.* — nothing here checks which desktop
+#                    environment (if any) is enabled, since greetd itself
+#                    doesn't care; it just needs something under
+#                    /usr/share/*sessions to hand the user afterward. One of:
+#                      - "" (default) — no greeter is installed; run
+#                        run_once_before_14-configure-greeter.sh.tmpl exits
+#                        immediately.
+#                      - "tuigreet" — installs greetd-tuigreet from the
+#                        configured pacman repositories (which depends on
+#                        greetd itself, so that comes along too).
+#                      - "noctalia-greeter" — installs noctalia-greeter
+#                        from the AUR via paru (same story: its AUR
+#                        Depends= lists greetd). Requires
+#                        pkg-mgmt.aur.enabled = true on this host (see
+#                        AUR/paru above) — the script exits with an error if
+#                        it isn't, rather than silently falling back to
+#                        tuigreet.
+#                    Any other value is an error, not a silent no-op.
+#   [<host>.greeter.noctalia-greeter]
+#     Per-greeter options, read only when greeter.type = "noctalia-greeter"
+#     (a "tuigreet" host has nothing to configure yet — add a matching
+#     [<host>.greeter.tuigreet] table here if/when that changes). Both
+#     fields end up on noctalia-greeter-session's own command line, after
+#     a "--" separator greetd itself never sees.
+#     session  string  forces a specific Wayland session (e.g. "niri")
+#                    instead of showing noctalia-greeter's session picker
+#                    (default: "" — picker shown).
+#     user     string  skips the user list and goes straight to the
+#                    password prompt for this login (default: "" — full
+#                    user list shown).
+#   [<host>.nvidia]
+#     enabled  bool  whether run_once_before_05-configure-nvidia.sh.tmpl
+#                    detects and installs an NVIDIA driver at all (default:
+#                    false — opt in per host; leave unset on a host with no
+#                    NVIDIA GPU, or an Intel/AMD one — enabling this on such
+#                    a host is a harmless no-op, but there's no reason to).
+#                    The driver package itself is picked by GPU generation
+#                    and kernel flavor at apply time, not configurable here
+#                    — see docs/host-config/nvidia.md. Anything but the
+#                    current generation comes from the AUR, requiring
+#                    pkg-mgmt.aur.enabled = true; its lib32 counterpart
+#                    additionally requires pkg-mgmt.pacman.multilib = true.
+#   [<host>.browsers.<name>]
+#     <name> is an arbitrary label, not read anywhere except log output —
+#                    pick one per browser you want installed (e.g. "firefox",
+#                    "librewolf"; two channels of the same browser, e.g.
+#                    "firefox" and "firefox-nightly", both work too, each
+#                    with its own package).
+#     package  string  pacman package to install via
+#                    run_once_before_16-configure-browsers.sh.tmpl (required
+#                    — the script errors on an empty value). Must be a
+#                    Firefox-based package whose install layout matches
+#                    Arch's own firefox package (binary and policies.json
+#                    both under /usr/lib/<package>/) for `settings` below to
+#                    land anywhere; a non-Firefox-based browser can still be
+#                    listed with no `settings` table, for the install alone.
+#   [<host>.browsers.<name>.settings]
+#     <pref> = value  about:config preferences to set as this browser's new
+#                    *defaults* (bool, int, or string — whatever type the
+#                    pref itself takes), e.g. "browser.tabs.warnOnClose" =
+#                    false. Default: {} (no settings table at all — the
+#                    script installs the package and skips writing
+#                    policies.json entirely). Written as Firefox distribution
+#                    policy ("Status": "default"), not locked — the user can
+#                    still change it by hand in about:config afterward; see
+#                    docs/host-config/browsers.md for why "default" was
+#                    chosen over "locked".
+#   [<host>.tailscale]
+#     operator  bool  whether run_once_before_17-configure-tailscale.sh.tmpl
+#                    sets the applying user as tailscale's operator
+#                    (`tailscale set --operator=<user>`), so `tailscale`
+#                    works without sudo afterward (default: false).
+#                    Independent of installing tailscale itself — that's
+#                    services.enabled/services.packages, same as sshd (see
+#                    above). The script errors if tailscaled.service isn't
+#                    active yet, rather than silently no-op'ing, so add
+#                    "tailscaled" to services.enabled first.
+#
+# To register a new machine, add a [<hostname>] table below (it can be
+# empty — its presence is what marks the host as known). `chezmoi init`
+# fails outright on any hostname not listed here — it does not prompt and
+# does not fall back to the defaults above.
+
+[hyper-lin]
+
+[hyper-lin.git]
+user.name = "Valentin Lukyanets"
+user.email = "valikluks95@gmail.com"
+
+[hyper-lin.pkg-mgmt.pacman]
+parallel-downloads = 2
+multilib = true
+
+[hyper-lin.pkg-mgmt.makepkg]
+jobs = "20%"
+
+[hyper-lin.pkg-mgmt.reflector]
+country = ["Ukraine", "Poland", "Slovakia"]
+
+[hyper-lin.services]
+enabled = ["sshd", "tailscaled"]
+
+[hyper-lin.services.packages]
+sshd = ["openssh"]
+tailscaled = ["tailscale"]
+
+[hyper-lin.tailscale]
+operator = true
+
+[hyper-lin.zram]
+enabled = true
+
+[hyper-lin.pkg-mgmt.aur]
+enabled = true
+
+# pipewire-pulse and wireplumber, not services.enabled: their units are
+# systemd --user units (pipewire.service etc. live under
+# /usr/lib/systemd/user/), auto-enabled by the package's own systemd
+# preset — nothing here needs an explicit `systemctl enable`, just the
+# packages themselves. pipewire itself comes along as their dependency.
+[hyper-lin.cli_tools]
+enabled = ["pipewire-pulse", "wireplumber"]
+
+[hyper-lin.desktop]
+enabled = true
+environment = "niri"
+
+[hyper-lin.greeter]
+type = "noctalia-greeter"
+
+[hyper-lin.nvidia]
+enabled = true
+
+# Sourced from arkenfox/user.js (https://github.com/arkenfox/user.js), its
+# non-"OPTIONAL" sections only — the ones its own maintainers consider safe
+# enough to ship as defaults rather than opt-in tweaks. Ported from user.js
+# syntax to policies.json's "Preferences" policy (see
+# docs/host-config/browsers.md), so every value here still just replaces
+# the pref's *default* — nothing is locked, and about:config remains fully
+# editable afterward. Skipped: Windows/macOS-only prefs (this host is
+# Linux), and the "Clear Data"-dialog checkbox defaults (cosmetic, not
+# enforced). See docs/host-config/browsers.md#hyper-lin-firefox for what
+# this changes in practice (blank new tab, no disk cache, HTTPS-Only mode,
+# ETP strict, cookies/cache/form-data wiped on every shutdown).
+[hyper-lin.browsers.firefox]
+package = "firefox"
+[hyper-lin.browsers.firefox.settings]
+# 0100: startup / new tab
+"browser.startup.page"                                        = 0
+"browser.startup.homepage"                                     = "chrome://browser/content/blanktab.html"
+"browser.newtabpage.enabled"                                   = false
+"browser.newtabpage.activity-stream.showSponsored"             = false
+"browser.newtabpage.activity-stream.showSponsoredTopSites"     = false
+"browser.newtabpage.activity-stream.showSponsoredCheckboxes"   = false
+"browser.newtabpage.activity-stream.default.sites"             = ""
+# 0200: geolocation (geoclue is the Linux provider; Windows/macOS ones dropped)
+"geo.provider.use_geoclue"                                     = false
+# 0300: quieter fox — recommendations, studies, crash/captive-portal pings
+"extensions.getAddons.showPane"                                = false
+"extensions.htmlaboutaddons.recommendations.enabled"           = false
+"browser.discovery.enabled"                                    = false
+"browser.newtabpage.activity-stream.feeds.telemetry"           = false
+"browser.newtabpage.activity-stream.telemetry"                 = false
+"app.shield.optoutstudies.enabled"                              = false
+"app.normandy.enabled"                                         = false
+"app.normandy.api_url"                                         = ""
+"breakpad.reportURL"                                            = ""
+"browser.tabs.crashReporting.sendReport"                       = false
+"browser.crashReports.unsubmittedCheck.autoSubmit2"            = false
+"captivedetect.canonicalURL"                                    = ""
+"network.captive-portal-service.enabled"                       = false
+"network.connectivity-service.enabled"                         = false
+# 0400: safe browsing — keep malware/phish list checks, drop remote download checks
+"browser.safebrowsing.downloads.remote.enabled"                = false
+# 0600: block implicit outbound (prefetch/preconnect/speculative loads)
+"network.prefetch-next"                                        = false
+"network.dns.disablePrefetch"                                  = true
+"network.dns.disablePrefetchFromHTTPS"                         = true
+"network.http.speculative-parallel-limit"                      = 0
+"browser.places.speculativeConnect.enabled"                    = false
+# 0700: DNS / proxy
+"network.proxy.socks_remote_dns"                                = true
+"network.gio.supported-protocols"                               = ""
+# 0800: location bar / search suggestions / Firefox Suggest
+"browser.urlbar.speculativeConnect.enabled"                    = false
+"browser.urlbar.quicksuggest.enabled"                           = false
+"browser.urlbar.suggest.quicksuggest.nonsponsored"              = false
+"browser.urlbar.suggest.quicksuggest.sponsored"                 = false
+"browser.search.suggest.enabled"                                = false
+"browser.urlbar.suggest.searches"                                = false
+"browser.urlbar.trending.featureGate"                           = false
+"browser.urlbar.addons.featureGate"                              = false
+"browser.urlbar.amp.featureGate"                                 = false
+"browser.urlbar.importantDates.featureGate"                     = false
+"browser.urlbar.market.featureGate"                              = false
+"browser.urlbar.mdn.featureGate"                                 = false
+"browser.urlbar.weather.featureGate"                             = false
+"browser.urlbar.wikipedia.featureGate"                           = false
+"browser.urlbar.yelp.featureGate"                                = false
+"browser.urlbar.yelpRealtime.featureGate"                        = false
+"browser.formfill.enable"                                        = false
+"browser.search.separatePrivateDefault"                          = true
+"browser.search.separatePrivateDefault.ui.enabled"               = true
+# 0900: passwords / passkeys
+"signon.autofillForms"                                           = false
+"signon.formlessCapture.enabled"                                 = false
+"network.auth.subresource-http-auth-allow"                       = 1
+"security.webauthn.always_allow_direct_attestation"              = false
+# 1000: disk avoidance — nothing browsing-related touches disk
+"browser.cache.disk.enable"                                      = false
+"browser.privatebrowsing.forceMediaMemoryCache"                  = true
+"media.memory_cache_max_size"                                    = 65536
+"browser.sessionstore.privacy_level"                             = 2
+"browser.shell.shortcutFavicons"                                 = false
+# 1200: HTTPS / TLS / certs
+"security.ssl.require_safe_negotiation"                          = true
+"security.tls.enable_0rtt_data"                                  = false
+"security.cert_pinning.enforcement_level"                        = 2
+"security.remote_settings.crlite_filters.enabled"                = true
+"security.pki.crlite_mode"                                        = 2
+"dom.security.https_only_mode"                                    = true
+"dom.security.https_only_mode_send_http_background_request"      = false
+"security.ssl.treat_unsafe_negotiation_as_broken"                 = true
+"browser.xul.error_pages.expert_bad_cert"                        = true
+# 1600: strip path/query from cross-origin referers
+"network.http.referer.XOriginTrimmingPolicy"                     = 2
+# 1700: containers (Firefox Multi-Account Containers UI)
+"privacy.userContext.enabled"                                    = true
+"privacy.userContext.ui.enabled"                                 = true
+# 2000: WebRTC — no local/VPN IP leaked via ICE candidates
+"media.peerconnection.ice.proxy_only_if_behind_proxy"            = true
+"media.peerconnection.ice.default_address_only"                  = true
+# 2400: DOM
+"dom.disable_window_move_resize"                                 = true
+# 2600: misc — downloads, devtools remote debugging, download prompts
+"browser.download.start_downloads_in_tmp_dir"                    = true
+"browser.helperApps.deleteTempFileOnExit"                        = true
+"browser.uitour.enabled"                                          = false
+"devtools.debugger.remote-enabled"                                = false
+"permissions.manager.defaultsUrl"                                 = ""
+"network.IDN_show_punycode"                                       = true
+"pdfjs.enableScripting"                                            = false
+"browser.tabs.searchclipboardfor.middleclick"                    = false
+"browser.contentanalysis.enabled"                                 = false
+"privacy.antitracking.isolateContentScriptResources"             = true
+"security.csp.reporting.enabled"                                  = false
+"browser.download.useDownloadDir"                                 = false
+"browser.download.alwaysOpenPanel"                                = false
+"browser.download.manager.addToRecentDocs"                       = false
+"browser.download.always_ask_before_handling_new_types"          = true
+"extensions.enabledScopes"                                        = 5
+"extensions.postDownloadThirdPartyPrompt"                         = false
+# 2700: Enhanced Tracking Protection, forced to strict
+"browser.contentblocking.category"                               = "strict"
+"privacy.trackingprotection.allow_list.baseline.enabled"          = true
+"privacy.trackingprotection.allow_list.convenience.enabled"       = true
+# 2800: sanitize cache/cookies/form-data on every shutdown (history and
+# downloads are deliberately left alone — arkenfox's own default split)
+"privacy.sanitize.sanitizeOnShutdown"                             = true
+"privacy.clearOnShutdown_v2.cache"                                = true
+"privacy.clearOnShutdown_v2.historyFormDataAndDownloads"          = false
+"privacy.clearOnShutdown_v2.browsingHistoryAndDownloads"          = false
+"privacy.clearOnShutdown_v2.downloads"                             = false
+"privacy.clearOnShutdown_v2.formdata"                              = true
+"privacy.clearOnShutdown_v2.cookiesAndStorage"                    = true
+"privacy.sanitize.timeSpan"                                        = 0
+# 8500: telemetry, off end to end
+"datareporting.policy.dataSubmissionEnabled"                     = false
+"datareporting.healthreport.uploadEnabled"                       = false
+"toolkit.telemetry.unified"                                       = false
+"toolkit.telemetry.enabled"                                       = false
+"toolkit.telemetry.server"                                        = "data:,"
+"toolkit.telemetry.archive.enabled"                               = false
+"toolkit.telemetry.newProfilePing.enabled"                        = false
+"toolkit.telemetry.shutdownPingSender.enabled"                   = false
+"toolkit.telemetry.updatePing.enabled"                            = false
+"toolkit.telemetry.bhrPing.enabled"                                = false
+"toolkit.telemetry.firstShutdownPing.enabled"                     = false
+"toolkit.telemetry.coverage.opt-out"                              = true
+"toolkit.coverage.opt-out"                                        = true
+"toolkit.coverage.endpoint.base"                                  = ""
+# 9000: non-project-specific cleanup (update-notice mstone, CFR recommendations)
+"browser.startup.homepage_override.mstone"                       = "ignore"
+"browser.newtabpage.activity-stream.asrouter.userprefs.cfr.addons"   = false
+"browser.newtabpage.activity-stream.asrouter.userprefs.cfr.features" = false
+"browser.urlbar.showSearchTerms.enabled"                          = false
+
+# --- examples for future machines (uncomment and adjust) -------------------
+#
+# [homelab]
+# [homelab.pkg-mgmt.makepkg]
+# jobs    = 2     # low-memory box: cap build parallelism instead of using every core
+# options = ["ccache", "!debug"]
+#
+# [homelab.desktop]
+# enabled     = true
+# environment = "niri"
+# [homelab.desktop.niri]
+# shell = "noctalia"
+#
+# [homelab.greeter]
+# type = "noctalia-greeter"    # or "tuigreet"; the AUR one needs pkg-mgmt.aur.enabled = true
+# [homelab.greeter.noctalia-greeter]
+# session = "niri"    # skip the session picker, always launch niri
+# user    = "homelab"    # skip the user list too
+#
+# [homelab.nvidia]
+# enabled = true    # no-op if the host turns out to have no NVIDIA GPU
+#
+# [homelab.browsers.firefox]
+# package = "firefox"
+# [homelab.browsers.firefox.settings]
+# "browser.aboutConfig.showWarning" = false
+# "browser.tabs.warnOnClose"        = false
+# "browser.startup.homepage"        = "about:blank"
+#
+# [homelab.browsers.librewolf]
+# package = "librewolf"    # no settings table — installed with its own defaults as-is

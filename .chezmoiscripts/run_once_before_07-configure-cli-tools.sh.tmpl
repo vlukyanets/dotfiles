@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .cli_tools.enabled }}
+
+echo "==> Skipping CLI tool install (cli_tools.enabled is empty for this host)"
+exit 0
+{{- end }}
+
+echo "==> Installing CLI tools"
+$SUDO_CMD pacman -S --needed --noconfirm {{ join " " .cli_tools.enabled }}

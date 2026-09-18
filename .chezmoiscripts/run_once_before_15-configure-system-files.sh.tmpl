@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+# Copies static files from system/ (relative to this repo's source dir) onto
+# the real filesystem, root-owned. Unlike the heredocs the rest of this repo
+# writes inline (ssh-hardening, zram, thp, greeter), these files have no
+# per-host templating to do — they're identical on every host — so they live
+# as plain files instead. To deploy a new one: drop it under system/<path>,
+# add one install_system_file call below, and add a matching
+# "chezmoi:tracking" comment (its sha256sum) so an edit to the file's
+# contents makes chezmoi re-run this script instead of silently going stale.
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+install_system_file() {
+    src=$1
+    dest=$2
+    owner=$3
+    mode=$4
+    $SUDO_CMD mkdir -p "$(dirname "$dest")"
+    $SUDO_CMD cp "{{ .chezmoi.sourceDir }}/system/$src" "$dest"
+    $SUDO_CMD chown "$owner" "$dest"
+    $SUDO_CMD chmod "$mode" "$dest"
+    echo "==> Deployed $dest"
+}
+
+install_system_file etc/modprobe.d/nobeep.conf /etc/modprobe.d/nobeep.conf root:root 644
+
+# chezmoi:tracking etc/modprobe.d/nobeep.conf={{ include "system/etc/modprobe.d/nobeep.conf" | sha256sum }}

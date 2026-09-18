@@ -1,0 +1,26 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .containers.docker.enabled }}
+
+echo "==> Skipping docker install (containers.docker.enabled is false for this host)"
+exit 0
+{{- end }}
+
+echo "==> Installing docker"
+$SUDO_CMD pacman -S --needed --noconfirm docker
+
+echo "==> Enabling and starting docker.service"
+$SUDO_CMD systemctl enable --now docker.service
+
+USER_NAME=$(whoami)
+if id -nG "$USER_NAME" | grep -qw docker; then
+    echo "==> $USER_NAME already in the docker group, skipping"
+else
+    echo "==> Adding $USER_NAME to the docker group"
+    $SUDO_CMD gpasswd -a "$USER_NAME" docker
+    echo "    NOTE: log out and back in for the new group membership to take effect"
+fi

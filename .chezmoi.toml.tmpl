@@ -1,0 +1,206 @@
+{{- $hostname := .chezmoi.hostname -}}
+{{- $allHosts := fromToml (include ".hosts.toml") -}}
+{{- if not (hasKey $allHosts $hostname) -}}
+{{-   fail (printf "\nchezmoi init aborted: this machine's hostname, %q, has no entry in .hosts.toml.\n\nEvery machine has to be registered before chezmoi init will touch it — add a table for it (it can be empty) in the source directory's .hosts.toml, e.g.:\n\n    [%s]\n\nIf you added it on a different machine, commit and push it there first:\n\n    chezmoi cd && git add .hosts.toml && git commit -m \"add host %s\" && git push\n\n...then re-run chezmoi init here, once the clone it pulls from has that entry. See README.md's \"Adding a new machine\" section for the full workflow.\n" $hostname $hostname $hostname) -}}
+{{- end -}}
+{{- $cfg := get $allHosts $hostname -}}
+
+{{- $git     := get $cfg "git" | default dict -}}
+{{- $gitUser := get $git "user" | default dict -}}
+{{- $name    := get $gitUser "name" -}}
+{{- $email   := get $gitUser "email" -}}
+
+{{- $pkgMgmt                  := get $cfg "pkg-mgmt" | default dict -}}
+{{- $pacman                   := get $pkgMgmt "pacman" | default dict -}}
+{{- $pkgMgmtParallelDownloads := get $pacman "parallel-downloads" | default 4 -}}
+{{- $pacmanMultilib           := get $pacman "multilib" | default false -}}
+
+{{- $makepkg        := get $pkgMgmt "makepkg" | default dict -}}
+{{- $makepkgJobs    := get $makepkg "jobs" | default 1 -}}
+{{- $makepkgOptions := get $makepkg "options" | default (list) -}}
+
+{{- $reflector          := get $pkgMgmt "reflector" | default dict -}}
+{{- $reflectorSave      := get $reflector "save" | default "/etc/pacman.d/mirrorlist" -}}
+{{- $reflectorCountry   := get $reflector "country" | default (list) -}}
+{{- $reflectorProtocol  := get $reflector "protocol" | default "https" -}}
+{{- $reflectorLatest    := get $reflector "latest" | default 20 -}}
+{{- $reflectorSort      := get $reflector "sort" | default "rate" -}}
+{{- $reflectorAge       := get $reflector "age" | default 12 -}}
+{{- $reflectorTimeout   := get $reflector "download-timeout" | default 5 -}}
+
+{{- $reflectorTimer      := get $reflector "timer" | default dict -}}
+{{- $reflectorOnCalendar := get $reflectorTimer "on-calendar" | default "weekly" -}}
+{{- $reflectorOnBootSec  := get $reflectorTimer "on-boot-sec" | default "15min" -}}
+
+{{- $aur        := get $pkgMgmt "aur" | default dict -}}
+{{- $aurEnabled := get $aur "enabled" | default false -}}
+
+{{- $locale         := get $cfg "locale" | default dict -}}
+{{- $localeLang     := get $locale "lang" | default "en_US.UTF-8" -}}
+{{- $localeLocales  := get $locale "locales" | default (list "en_US.UTF-8 UTF-8") -}}
+{{- $localeKeymap   := get $locale "keymap" | default "us" -}}
+{{- $localeTimezone := get $locale "timezone" | default "UTC" -}}
+
+{{- $services         := get $cfg "services" | default dict -}}
+{{- $servicesEnabled  := get $services "enabled" | default (list) -}}
+{{- $servicesPackages := get $services "packages" | default dict -}}
+
+{{- $shell             := get $cfg "shell" | default dict -}}
+{{- $shellZsh          := get $shell "zsh" | default dict -}}
+{{- $shellZshEnabled   := get $shellZsh "enabled" | default false -}}
+{{- $shellOhMyZsh      := get $shellZsh "oh-my-zsh" | default dict -}}
+{{- $shellOhMyZshEnabled := get $shellOhMyZsh "enabled" | default false -}}
+
+{{- $cliTools        := get $cfg "cli_tools" | default dict -}}
+{{- $cliToolsEnabled := get $cliTools "enabled" | default (list) -}}
+
+{{- $fonts        := get $cfg "fonts" | default dict -}}
+{{- $fontsEnabled := get $fonts "enabled" | default (list) -}}
+
+{{- $containers              := get $cfg "containers" | default dict -}}
+{{- $containersDocker        := get $containers "docker" | default dict -}}
+{{- $containersDockerEnabled := get $containersDocker "enabled" | default false -}}
+
+{{- $ssh                       := get $cfg "ssh" | default dict -}}
+{{- $sshEnabled                := get $ssh "enabled" | default false -}}
+{{- $sshDisablePasswordAuth    := get $ssh "disable_password_auth" | default false -}}
+{{- $sshPermitRootLogin        := get $ssh "permit_root_login" | default "prohibit-password" -}}
+
+{{- $zram                      := get $cfg "zram" | default dict -}}
+{{- $zramEnabled               := get $zram "enabled" | default false -}}
+{{- $zramSize                  := get $zram "size" | default "min(ram / 2, 4096)" -}}
+{{- $zramCompressionAlgorithm  := get $zram "compression-algorithm" | default "zstd" -}}
+{{- $zramSwapPriority          := get $zram "swap-priority" | default 100 -}}
+
+{{- $thp        := get $cfg "thp" | default dict -}}
+{{- $thpEnabled := get $thp "enabled" | default false -}}
+{{- $thpMode    := get $thp "mode" | default "always" -}}
+
+{{- $desktop            := get $cfg "desktop" | default dict -}}
+{{- $desktopEnabled     := get $desktop "enabled" | default false -}}
+{{- $desktopEnvironment := get $desktop "environment" | default "" -}}
+
+{{- $desktopNiri      := get $desktop "niri" | default dict -}}
+{{- $desktopNiriShell := get $desktopNiri "shell" | default "" -}}
+
+{{- $greeter     := get $cfg "greeter" | default dict -}}
+{{- $greeterType := get $greeter "type" | default "" -}}
+
+{{- $greeterNoctalia        := get $greeter "noctalia-greeter" | default dict -}}
+{{- $greeterNoctaliaSession := get $greeterNoctalia "session" | default "" -}}
+{{- $greeterNoctaliaUser    := get $greeterNoctalia "user" | default "" -}}
+
+{{- $nvidia        := get $cfg "nvidia" | default dict -}}
+{{- $nvidiaEnabled := get $nvidia "enabled" | default false -}}
+
+{{- $browsers := get $cfg "browsers" | default dict -}}
+
+{{- $tailscale         := get $cfg "tailscale" | default dict -}}
+{{- $tailscaleOperator := get $tailscale "operator" | default false -}}
+
+[data]
+    hostname = {{ $hostname | quote }}
+
+    [data.git.user]
+    name  = {{ $name | quote }}
+    email = {{ $email | quote }}
+
+    [data.pkg_mgmt.pacman]
+    parallel_downloads = {{ $pkgMgmtParallelDownloads }}
+    multilib            = {{ $pacmanMultilib }}
+
+    [data.pkg_mgmt.makepkg]
+    jobs    = {{ if kindIs "string" $makepkgJobs }}{{ $makepkgJobs | quote }}{{ else }}{{ $makepkgJobs }}{{ end }}
+    options = {{ toJson $makepkgOptions }}
+
+    [data.pkg_mgmt.reflector]
+    save             = {{ $reflectorSave | quote }}
+    country          = {{ toJson $reflectorCountry }}
+    protocol         = {{ $reflectorProtocol | quote }}
+    latest           = {{ $reflectorLatest }}
+    sort             = {{ $reflectorSort | quote }}
+    age              = {{ $reflectorAge }}
+    download_timeout = {{ $reflectorTimeout }}
+
+    [data.pkg_mgmt.reflector.timer]
+    on_calendar = {{ $reflectorOnCalendar | quote }}
+    on_boot_sec = {{ $reflectorOnBootSec | quote }}
+
+    [data.pkg_mgmt.aur]
+    enabled = {{ $aurEnabled }}
+
+    [data.locale]
+    lang     = {{ $localeLang | quote }}
+    locales  = {{ toJson $localeLocales }}
+    keymap   = {{ $localeKeymap | quote }}
+    timezone = {{ $localeTimezone | quote }}
+
+    [data.services]
+    enabled = {{ toJson $servicesEnabled }}
+
+    [data.services.packages]
+    {{- range $unit, $pkgs := $servicesPackages }}
+    {{ $unit | quote }} = {{ toJson $pkgs }}
+    {{- end }}
+
+    [data.shell.zsh]
+    enabled = {{ $shellZshEnabled }}
+
+    [data.shell.zsh.oh_my_zsh]
+    enabled = {{ $shellOhMyZshEnabled }}
+
+    [data.cli_tools]
+    enabled = {{ toJson $cliToolsEnabled }}
+
+    [data.fonts]
+    enabled = {{ toJson $fontsEnabled }}
+
+    [data.containers.docker]
+    enabled = {{ $containersDockerEnabled }}
+
+    [data.ssh]
+    enabled                = {{ $sshEnabled }}
+    disable_password_auth  = {{ $sshDisablePasswordAuth }}
+    permit_root_login      = {{ $sshPermitRootLogin | quote }}
+
+    [data.zram]
+    enabled                = {{ $zramEnabled }}
+    size                   = {{ $zramSize | quote }}
+    compression_algorithm  = {{ $zramCompressionAlgorithm | quote }}
+    swap_priority          = {{ $zramSwapPriority }}
+
+    [data.thp]
+    enabled = {{ $thpEnabled }}
+    mode    = {{ $thpMode | quote }}
+
+    [data.desktop]
+    enabled     = {{ $desktopEnabled }}
+    environment = {{ $desktopEnvironment | quote }}
+
+    [data.desktop.niri]
+    shell = {{ $desktopNiriShell | quote }}
+
+    [data.greeter]
+    type = {{ $greeterType | quote }}
+
+    [data.greeter.noctalia_greeter]
+    session = {{ $greeterNoctaliaSession | quote }}
+    user    = {{ $greeterNoctaliaUser | quote }}
+
+    [data.nvidia]
+    enabled = {{ $nvidiaEnabled }}
+
+    [data.browsers]
+    {{- range $name, $browser := $browsers }}
+
+    [data.browsers.{{ $name | quote }}]
+    package = {{ (get $browser "package" | default "") | quote }}
+
+    [data.browsers.{{ $name | quote }}.settings]
+    {{- range $pref, $value := (get $browser "settings" | default dict) }}
+    {{ $pref | quote }} = {{ $value | toJson }}
+    {{- end }}
+    {{- end }}
+
+    [data.tailscale]
+    operator = {{ $tailscaleOperator }}

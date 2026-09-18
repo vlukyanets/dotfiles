@@ -1,0 +1,31 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .services.enabled }}
+
+echo "==> Skipping service setup (services.enabled is empty for this host)"
+exit 0
+{{- end }}
+
+{{- $allPackages := list -}}
+{{- range .services.enabled -}}
+{{-   $pkgs := index $.services.packages . | default (list) -}}
+{{-   range $pkgs -}}
+{{-     $allPackages = append $allPackages . -}}
+{{-   end -}}
+{{- end -}}
+{{- $allPackages = $allPackages | uniq -}}
+
+{{- if $allPackages }}
+
+echo "==> Installing service packages"
+$SUDO_CMD pacman -S --needed --noconfirm {{ join " " $allPackages }}
+{{- end }}
+
+{{- range .services.enabled }}
+echo "==> Enabling and starting {{ . }}"
+$SUDO_CMD systemctl enable --now {{ . | quote }}
+{{- end }}

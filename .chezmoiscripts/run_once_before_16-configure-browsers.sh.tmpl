@@ -1,0 +1,40 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .browsers }}
+
+echo "==> Skipping browser install (browsers is empty for this host)"
+exit 0
+{{- end }}
+
+{{- range $name, $browser := .browsers }}
+
+echo "==> Installing {{ $name }} ({{ $browser.package }})"
+$SUDO_CMD pacman -S --needed --noconfirm {{ $browser.package }}
+
+{{- if $browser.settings }}
+{{-   $prefLines := list }}
+{{-   range $pref, $value := $browser.settings }}
+{{-     $prefLines = append $prefLines (printf "      %s: { \"Value\": %s, \"Status\": \"default\" }" ($pref | toJson) ($value | toJson)) }}
+{{-   end }}
+
+echo "==> Writing {{ $name }} about:config defaults"
+POLICIES_DIR="/usr/lib/{{ $browser.package }}/distribution"
+$SUDO_CMD mkdir -p "$POLICIES_DIR"
+$SUDO_CMD tee "$POLICIES_DIR/policies.json" >/dev/null <<JSON
+{
+  "policies": {
+    "Preferences": {
+{{ join ",\n" $prefLines }}
+    }
+  }
+}
+JSON
+{{- else }}
+
+echo "==> No settings configured for {{ $name }}, skipping policies.json"
+{{- end }}
+{{- end }}

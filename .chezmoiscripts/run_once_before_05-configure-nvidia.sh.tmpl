@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# NVIDIA driver selection. The right package depends on the GPU generation
+# and the running kernel flavor, so neither can be hardcoded per host —
+# both are detected here at apply time.
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .nvidia.enabled }}
+
+echo "==> Skipping NVIDIA driver install (nvidia.enabled is false for this host)"
+exit 0
+{{- end }}
+
+if ! command -v lspci >/dev/null 2>&1; then
+    echo "==> Installing pciutils (for GPU detection)"
+    $SUDO_CMD pacman -S --needed --noconfirm pciutils
+fi
+
+GPU=$(lspci 2>/dev/null | grep -iE 'vga|3d controller|display controller' | grep -i nvidia | head -1 || true)
+
+if [ -z "$GPU" ]; then
+    echo "==> No NVIDIA GPU detected, skipping"
+    exit 0
+fi
+
+echo "==> Detected GPU: $GPU"
+
+# Generation -> driver package, mirrors nvidia-utils' own support matrix.
+# Only the current generation (nvidia-dkms) ships in the official
+# repositories; every legacy branch is AUR-only.
+if echo "$GPU" | grep -qiE 'RTX [2-9][0-9]{3}|GTX 16[0-9]{2}|MX[3-9][0-9]{2}'; then
+    DRIVER_PACKAGE=nvidia-dkms
+    DRIVER_SOURCE=repo
+    NVIDIA_LIB32=lib32-nvidia-utils
+elif echo "$GPU" | grep -qiE 'GTX 10[0-9]{2}|GTX 9[0-9]{2}|MX[12][0-9]{2}|[0-9]{3}MX'; then
+    DRIVER_PACKAGE=nvidia-580xx-dkms
+    DRIVER_SOURCE=aur
+    NVIDIA_LIB32=lib32-nvidia-580xx-utils
+elif echo "$GPU" | grep -qiE 'GTX [67][0-9]{2}'; then
+    DRIVER_PACKAGE=nvidia-470xx-dkms
+    DRIVER_SOURCE=aur
+    NVIDIA_LIB32=lib32-nvidia-470xx-utils
+elif echo "$GPU" | grep -qiE 'GTX [45][0-9]{2}'; then
+    DRIVER_PACKAGE=nvidia-390xx-dkms
+    DRIVER_SOURCE=aur
+    NVIDIA_LIB32=lib32-nvidia-390xx-utils
+elif echo "$GPU" | grep -qiE 'GeForce [89][0-9]{2}|GeForce [123][0-9]{2}'; then
+    DRIVER_PACKAGE=nvidia-340xx-dkms
+    DRIVER_SOURCE=aur
+    NVIDIA_LIB32=
+else
+    echo "==> WARNING: unrecognized NVIDIA GPU generation, falling back to nvidia-dkms" >&2
+    DRIVER_PACKAGE=nvidia-dkms
+    DRIVER_SOURCE=repo
+    NVIDIA_LIB32=lib32-nvidia-utils
+fi
+
+# DKMS needs headers matching the *running* kernel, not just "linux".
+KERNEL_RELEASE=$(uname -r)
+case "$KERNEL_RELEASE" in
+    *-zen*)      HEADERS_PACKAGE=linux-zen-headers ;;
+    *-lts*)      HEADERS_PACKAGE=linux-lts-headers ;;
+    *-hardened*) HEADERS_PACKAGE=linux-hardened-headers ;;
+    *)           HEADERS_PACKAGE=linux-headers ;;
+esac
+
+if [ -n "$NVIDIA_LIB32" ] && [ "{{ .pkg_mgmt.pacman.multilib }}" != "true" ]; then
+    echo "==> WARNING: skipping $NVIDIA_LIB32 — pkg_mgmt.pacman.multilib is false for this host (32-bit apps, e.g. via Wine/Steam, won't get GPU acceleration)" >&2
+    NVIDIA_LIB32=
+fi
+
+if [ "$DRIVER_SOURCE" = aur ] && [ "{{ .pkg_mgmt.aur.enabled }}" != "true" ]; then
+    echo "==> $DRIVER_PACKAGE is an AUR package, but pkg_mgmt.aur.enabled is false for this host — enable it first" >&2
+    exit 1
+fi
+
+echo "==> Installing $DRIVER_PACKAGE $HEADERS_PACKAGE $NVIDIA_LIB32"
+if [ "$DRIVER_SOURCE" = aur ]; then
+    paru -S --needed --noconfirm $DRIVER_PACKAGE $HEADERS_PACKAGE $NVIDIA_LIB32
+else
+    $SUDO_CMD pacman -S --needed --noconfirm $DRIVER_PACKAGE $HEADERS_PACKAGE $NVIDIA_LIB32
+fi
+
+echo "==> NVIDIA driver installed. A reboot is required for it to take effect."
