@@ -398,6 +398,22 @@
 #     Anything else under [<host>.password_managers.<name>] is that
 #                    manager's own config knobs — see
 #                    docs/host-config/password-managers.md.
+#   [<host>.office.<name>]
+#     Same "labeled map, one entry per program" shape as
+#                    [<host>.terminals.<name>] above — <name> is an
+#                    arbitrary label, not read anywhere except log output,
+#                    e.g. "onlyoffice", "libreoffice".
+#     enabled  bool  whether run_once_before_21-configure-office.sh.tmpl
+#                    installs this entry (default: false).
+#     source   string  where `packages` comes from, one of "pacman"
+#                    (default) or "aur". "aur" requires
+#                    pkg-mgmt.aur.enabled = true on this host — the script
+#                    exits with an error if it isn't, rather than silently
+#                    falling back to pacman.
+#     packages  list of strings  packages to install for this entry
+#                    (default: [] — same "no targets specified" pacman/paru
+#                    error as an empty terminals.<name>.packages if left
+#                    empty while enabled).
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -479,6 +495,11 @@ packages = ["kitty"]
 [hyper-lin.password_managers.rbw]
 enabled = true
 packages = ["rbw", "pinentry"]
+
+[hyper-lin.office.onlyoffice]
+enabled = true
+source = "aur"
+packages = ["onlyoffice-bin"]
 
 [hyper-lin.nvidia]
 enabled = true

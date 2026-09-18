@@ -104,6 +104,8 @@
 
 {{- $passwordManagers := get $cfg "password_managers" | default dict -}}
 
+{{- $office := get $cfg "office" | default dict -}}
+
 {{- $tailscale         := get $cfg "tailscale" | default dict -}}
 {{- $tailscaleOperator := get $tailscale "operator" | default false -}}
 
@@ -233,6 +235,15 @@
     [data.password_managers.{{ $name | quote }}]
     enabled  = {{ get $manager "enabled" | default false }}
     packages = {{ toJson (get $manager "packages" | default (list)) }}
+    {{- end }}
+
+    [data.office]
+    {{- range $name, $app := $office }}
+
+    [data.office.{{ $name | quote }}]
+    enabled  = {{ get $app "enabled" | default false }}
+    source   = {{ get $app "source" | default "pacman" | quote }}
+    packages = {{ toJson (get $app "packages" | default (list)) }}
     {{- end }}
 
     [data.tailscale]
