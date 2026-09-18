@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+#
+# Cycle (or jump to) a niri keyboard layout, then sync fcitx5's active input
+# method to match. Usage: switch-layout.sh [next|<index>]
+
+set -eu
+
+{{- $codes := fromJson (includeTemplate "language-codes" .) -}}
+{{- $fcitx5Ims := list -}}
+{{- if .fcitx5.enabled -}}
+{{-   range .locale.languages -}}
+{{-     $c := get $codes . -}}
+{{-     if $c -}}{{- $fcitx5Ims = append $fcitx5Ims (get $c "fcitx5") -}}{{- end -}}
+{{-   end -}}
+{{- end }}
+
+PARAM="${1:-next}"
+
+if [[ "$PARAM" == "next" ]]; then
+    niri msg action switch-layout next
+elif [[ "$PARAM" =~ ^[0-9]+$ ]]; then
+    niri msg action switch-layout "$PARAM"
+else
+    echo "Usage: switch-layout.sh [next|<index>]" >&2
+    exit 1
+fi
+
+current_idx=$(niri msg -j keyboard-layouts | jq -r '.current_idx')
+echo "Active layout index: $current_idx"
+
+{{- if .fcitx5.enabled }}
+
+FCITX5_IMS=({{ range $fcitx5Ims }}{{ . | quote }} {{ end }})
+fcitx5_im="${FCITX5_IMS[$current_idx]:-}"
+
+if [ -z "$fcitx5_im" ]; then
+    echo "Warning: no fcitx5 IM configured for layout index $current_idx" >&2
+    fcitx5-remote -s keyboard-us
+    fcitx5-remote -c
+else
+    fcitx5-remote -s "$fcitx5_im"
+    if [[ "$fcitx5_im" == "pinyin" ]]; then
+        fcitx5-remote -o
+    else
+        fcitx5-remote -c
+    fi
+fi
+{{- end }}

@@ -42,6 +42,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.pkg_mgmt.reflector.timer.*`      | reflector.timer override (on_calendar, on_boot_sec)         |
 | `.pkg_mgmt.aur.enabled`            | whether to build and install paru from the AUR              |
 | `.locale.*`                        | locale.conf LANG, locale.gen entries, vconsole KEYMAP, timezone |
+| `.locale.languages`                 | which keyboard layouts a graphical session should offer (niri's xkb layout list, fcitx5 input methods) |
 | `.services.enabled`                | systemd units to `enable --now`                             |
 | `.services.packages`                | unit → pacman packages that provide it                      |
 | `.shell.zsh.enabled`                | whether to install zsh and make it the login shell           |
@@ -65,8 +66,18 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.greeter.noctalia_greeter.session`   | forces a specific Wayland session for noctalia-greeter instead of showing its session picker (only read when `.greeter.type` is `"noctalia-greeter"`) |
 | `.greeter.noctalia_greeter.user`      | skips noctalia-greeter's user list, straight to the password prompt for this login (only read when `.greeter.type` is `"noctalia-greeter"`) |
 | `.nvidia.enabled`                    | whether to detect and install an NVIDIA driver at all |
+| `.fcitx5.enabled`                    | whether to install fcitx5 and write its config/profile — see [fcitx5](fcitx5.md) |
 | `.browsers.<name>.package`           | pacman package to install for this browser entry |
+| `.browsers.<name>.source`            | where `.browsers.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.browsers.<name>.settings`          | about:config preference name → value, written into that browser's `policies.json` |
+| `.terminals.<name>.enabled`          | whether to install this terminal emulator (`<name>` is the pacman package) and write its own dotfile, e.g. `~/.config/kitty/kitty.conf` for `terminals.kitty` |
+| `.terminals.<name>.source`           | where `.terminals.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
+| `.password_managers.<name>.enabled`  | whether to install this password manager and write its own dotfile, e.g. `~/.config/rbw/config.json` for `password_managers.rbw` |
+| `.password_managers.<name>.source`   | where `.password_managers.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
+| `.password_managers.<name>.packages` | pacman packages to install for this entry |
+| `.office.<name>.enabled`             | whether to install this office entry — see [Office](office.md) |
+| `.office.<name>.source`              | where `.office.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
+| `.office.<name>.packages`            | packages to install for this entry |
 | `.tailscale.operator`                | whether to set the applying user as tailscale's operator, so `tailscale` works without sudo (independent of installing/enabling tailscale itself — see [services](#scripts)) |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
@@ -102,6 +113,10 @@ variables above; see its own page for what it does with them:
 16. [System files](system-files.md)
 17. [Browsers](browsers.md)
 18. [Tailscale](tailscale.md)
+19. [Terminals](terminals.md)
+20. [fcitx5](fcitx5.md)
+21. [Password managers](password-managers.md)
+22. [Office](office.md)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

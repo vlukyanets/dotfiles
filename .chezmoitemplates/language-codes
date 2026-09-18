@@ -1,0 +1,17 @@
+{{- /*
+Single source of truth for locale.languages entries, shared between
+dot_config/niri/config.kdl.tmpl (xkb layout codes) and
+dot_config/niri/executable_switch-layout.sh.tmpl (fcitx5 input method
+names), so the two stay index-aligned without hand-syncing two separate
+lists. Include with `fromJson (includeTemplate "language-codes" .)` and
+look up each locale.languages entry with `get $codes <language>` — an
+unrecognized language returns nil, which both consumers skip rather than
+error on.
+*/ -}}
+{{- $codes := dict
+    "english"   (dict "xkb" "us" "fcitx5" "keyboard-us")
+    "russian"   (dict "xkb" "ru" "fcitx5" "keyboard-ru")
+    "ukrainian" (dict "xkb" "ua" "fcitx5" "keyboard-ua")
+    "chinese"   (dict "xkb" "cn" "fcitx5" "pinyin")
+-}}
+{{- $codes | toJson -}}

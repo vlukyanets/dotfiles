@@ -10,3 +10,17 @@ if it's already there commented out, appending it otherwise) and runs
 independent fields — `locales` only controls what `locale-gen` compiles, so
 if it doesn't already include whatever `lang` names, `LANG` ends up pointing
 at a locale that was never generated.
+
+## `languages`
+
+`locale.languages` (default `["english"]`) isn't read by this script at
+all — it's a graphical-session concern, not a console one; `locale.keymap`
+above is the *console* (`vconsole.conf`) keymap and stays independent. It
+names which keyboard layouts a desktop session should offer, one of
+`"english"`, `"russian"`, `"ukrainian"`, `"chinese"`, and is consumed by
+[niri's config](desktop/niri.md) for its xkb layout list and, on a host
+with `fcitx5.enabled = true`, by [fcitx5](fcitx5.md)'s input-method
+profile and niri's input-method switching. An unrecognized
+entry is silently skipped rather than an error — see
+[`.chezmoitemplates/language-codes`](../../.chezmoitemplates/language-codes)
+for the full language → xkb/fcitx5 mapping.

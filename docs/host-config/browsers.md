@@ -2,12 +2,27 @@
 
 [`.chezmoiscripts/run_once_before_16-configure-browsers.sh.tmpl`](../../.chezmoiscripts/run_once_before_16-configure-browsers.sh.tmpl)
 installs whatever's listed under `browsers.<name>` (default `{}` — no
-entries, script exits immediately). Each entry is independent: its own
-pacman package, installed with its own `pacman -S --needed` call, so one
-host can list several browsers (or several channels of the same one, e.g.
-`firefox` and `firefox-nightly`) side by side. `<name>` itself is just a
-label for log output — pick anything; it doesn't have to match the package
-name.
+entries, script exits immediately) with `enabled` not explicitly set to
+`false`. Each entry is independent: its own `packages` list, installed
+with its own call, so one host can list several browsers (or several
+channels of the same one, e.g. `firefox` and `firefox-nightly`) side by
+side. `<name>` itself is just a label for log output — pick anything; it
+doesn't have to match a package name.
+
+`enabled` defaults to `true` — an entry just being present installs it,
+same as before this field existed. Setting it `false` keeps the entry (and
+its `settings`) declared without installing or configuring it, e.g. while
+trying out a replacement browser without tearing down the current one's
+config yet.
+
+`source` (default `"pacman"`) picks which package manager installs
+`packages`: `"pacman"` runs `pacman -S --needed`, `"aur"` runs
+`paru -S --needed` instead — for a browser (or channel) that only ships to
+the AUR, not the official repositories. `"aur"` requires
+`pkg-mgmt.aur.enabled = true` on this host (see [AUR/paru](aur.md)) — the
+script exits with an error if it isn't, rather than silently falling back
+to pacman. Same field, same shape, on [Terminals](terminals.md),
+[Password managers](password-managers.md), and [Office](office.md).
 
 ## Settings
 
@@ -16,17 +31,19 @@ about:config preference name to the value it should default to, e.g.:
 
 ```toml
 [hyper-lin.browsers.firefox]
-package = "firefox"
+packages = ["firefox"]
 [hyper-lin.browsers.firefox.settings]
 "browser.aboutConfig.showWarning" = false
 "browser.tabs.warnOnClose"        = false
 ```
 
 These are written into
-`/usr/lib/<package>/distribution/policies.json` (root-owned, `pacman
--S`-installed browser layout — see [System files](system-files.md) for the
-repo's other, unrelated use of a similar "drop a file next to the package"
-approach) as a Firefox [distribution policy][enterprise-policies]:
+`/usr/lib/<first-package>/distribution/policies.json` — the *first* entry
+in `packages`, since that's the one expected to actually be the browser
+(root-owned, `pacman -S`-installed browser layout — see
+[System files](system-files.md) for the repo's other, unrelated use of a
+similar "drop a file next to the package" approach) — as a Firefox
+[distribution policy][enterprise-policies]:
 
 ```json
 {
@@ -52,75 +69,26 @@ this stays overridable rather than adding a second policy shape
 
 A browser entry with no `settings` table at all (like `librewolf` in
 `.hosts.toml`'s example block) just gets installed — no
-`/usr/lib/<package>/distribution/` directory is touched.
+`/usr/lib/<first-package>/distribution/` directory is touched.
 
 ## Caveat: package layout
 
-`/usr/lib/<package>/distribution/policies.json` assumes the installed
-package's directory under `/usr/lib/` matches `package` exactly — true for
-Arch's own `firefox` and for Firefox-based AUR packages that follow the
-same convention (e.g. `librewolf`, `floorp`). The script doesn't check this
-before writing: with a `settings` table given, it always creates
-`/usr/lib/<package>/distribution/` and writes `policies.json` into it,
-regardless of where the package actually put its binary. For a browser
-that installs somewhere else, or isn't Firefox-based and doesn't read
-`policies.json` at all, that write just lands somewhere the browser never
-looks — harmless, but no different from not having set `settings`. Such a
-browser can still be listed, just without a `settings` table, for the
-install alone.
+`/usr/lib/<first-package>/distribution/policies.json` assumes that first
+`packages` entry's directory under `/usr/lib/` matches its own package
+name exactly — true for Arch's own `firefox` and for Firefox-based AUR
+packages that follow the same convention (e.g. `librewolf`, `floorp`). The
+script doesn't check this before writing: with a `settings` table given,
+it always creates `/usr/lib/<first-package>/distribution/` and writes
+`policies.json` into it, regardless of where the package actually put its
+binary. For a browser that installs somewhere else, or isn't Firefox-based
+and doesn't read `policies.json` at all, that write just lands somewhere
+the browser never looks — harmless, but no different from not having set
+`settings`. Such a browser can still be listed, just without a `settings`
+table, for the install alone.
 
-## hyper-lin: Firefox
+## Per-browser docs
 
-`hyper-lin`'s `browsers.firefox.settings` (in `.hosts.toml`) carries ~120
-preferences ported from [arkenfox/user.js][arkenfox], a widely used,
-actively maintained Firefox privacy/hardening template. Only its
-non-`OPTIONAL` sections are used — the ones arkenfox's own maintainers
-consider safe enough to ship as defaults rather than opt-in tweaks — so
-this is arkenfox's baseline, not its more aggressive optional layers (full
-`resistFingerprinting`, window-size rounding, spoofed `Accept-Language`,
-etc., all skipped as too breakage-prone for a daily-driver profile).
-Windows/macOS-only prefs (e.g. `geo.provider.ms-windows-location`) and the
-"Clear Data" dialog's checkbox defaults (cosmetic only, not enforced) were
-dropped as inapplicable on this Linux host.
+- [Firefox](browsers/firefox.md) — `hyper-lin`'s arkenfox-based
+  `browsers.firefox.settings`
 
-Translating arkenfox's `user_pref(...)` lines to this repo's
-`policies.json`-based `settings` table is mechanical (same pref name and
-value, `"Status": "default"` throughout — see above), with one caveat:
-arkenfox is a `user.js`, reapplied fresh into a Firefox *profile* on every
-launch, while `settings` here is a one-time root-owned write at package
-install time. A profile-level override (about:config, an extension, sync)
-sticks around across restarts instead of being overwritten back on the
-next launch the way arkenfox's own `user.js` would. Re-running
-`run_once_before_16-configure-browsers.sh.tmpl` (e.g. via `chezmoi init
---apply`, since `run_once_` scripts only re-run when their rendered
-content changes) rewrites `policies.json`, but doesn't touch prefs a
-profile has since changed by hand.
-
-Practical effects worth knowing about, since none of these are hidden
-behind an opt-in flag the way [SSH hardening](ssh-hardening.md)'s
-password-auth lockout risk is:
-
-- **New tab is blank**, sponsored tiles and Firefox Suggest are off.
-- **No disk cache** (`browser.cache.disk.enable`) — pages re-fetch assets
-  every load instead of reading them back from disk.
-- **HTTPS-Only mode** is on — plain HTTP sites get an interstitial
-  click-through instead of loading directly.
-- **Enhanced Tracking Protection is forced to `strict`** — occasionally
-  breaks an embed (comments widgets, some video players) that relies on a
-  cross-site cookie ETP strict blocks.
-- **Cache, cookies, and form data are wiped on every browser close**
-  (`privacy.sanitize.sanitizeOnShutdown`) — every site needs a fresh login
-  each session. Browsing history and downloads are deliberately *not*
-  wiped — that's arkenfox's own default split, not an oversight.
-- **DNS prefetching, link preconnect, and search suggestions are all
-  off** — the trade is a small amount of perceived latency (no
-  head-start network connections) for not leaking every hovered link and
-  keystroke to a resolver or search provider ahead of an actual navigation.
-
-None of this is locked (see above) — a setting that's too disruptive for
-daily use can be flipped back by hand in `about:config`, or removed from
-`hyper-lin.browsers.firefox.settings` in `.hosts.toml` so the next
-`chezmoi init --apply` stops re-asserting it.
-
-[arkenfox]: https://github.com/arkenfox/user.js
 [enterprise-policies]: https://mozilla.github.io/policy-templates/

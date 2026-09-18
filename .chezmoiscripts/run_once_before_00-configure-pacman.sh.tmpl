@@ -63,6 +63,7 @@ MAKEFLAGS="-j$MAKEPKG_JOBS"
 {{- if .pkg_mgmt.makepkg.options }}
 OPTIONS+=({{ join " " .pkg_mgmt.makepkg.options }})
 {{- end }}
+PACKAGER="{{ .git.user.name }} <{{ .git.user.email }}>"
 CONF
 
 echo "==> Syncing package databases"

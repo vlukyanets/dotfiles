@@ -5,6 +5,10 @@ installs every package listed in `fonts.enabled` (default `[]` — the script
 exits immediately on hosts that don't set it) in one `pacman -S --needed`
 call, the same shape as [CLI tools](cli-tools.md). It exists because nothing
 else installs a terminal font: `shell.zsh.oh_my_zsh.enabled` renders the
-`powerlevel10k` prompt and `cli_tools.enabled` can include `eza`, but both
-just render broken or missing glyphs — not an error — on a host with no
-Nerd Font available, e.g. `fonts.enabled = ["ttf-meslo-nerd"]`.
+`powerlevel10k` prompt, `cli_tools.enabled` can include `eza`, and
+[`terminals.kitty.enabled`](terminals.md) writes a `kitty.conf` expecting a
+Nerd Font plus a symbols/emoji fallback — all three just render broken or
+missing glyphs, not an error, on a host with no matching font available,
+e.g. `fonts.enabled = ["ttf-meslo-nerd"]` for powerlevel10k/eza, or
+`["ttf-firacode-nerd", "ttf-nerd-fonts-symbols-mono", "noto-fonts-emoji"]`
+for kitty.

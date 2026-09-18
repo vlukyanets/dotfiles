@@ -4,3 +4,30 @@ system
 {{- if not .shell.zsh.enabled }}
 .zshrc
 {{- end }}
+
+{{- if not .shell.zsh.oh_my_zsh.enabled }}
+.p10k.zsh
+{{- end }}
+
+{{- $kittyTerminal := get .terminals "kitty" | default dict }}
+{{- if not (get $kittyTerminal "enabled" | default false) }}
+.config/kitty
+{{- end }}
+
+{{- $rbwManager := get .password_managers "rbw" | default dict }}
+{{- if not (get $rbwManager "enabled" | default false) }}
+.config/rbw
+{{- end }}
+
+{{- if not (and .desktop.enabled (eq .desktop.environment "niri")) }}
+.config/niri
+{{- end }}
+
+{{- if not .fcitx5.enabled }}
+.config/fcitx5
+.local/share/fcitx5
+{{- end }}
+
+{{- if not (eq .desktop.niri.shell "noctalia") }}
+.local/state/noctalia
+{{- end }}

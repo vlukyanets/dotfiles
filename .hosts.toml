@@ -83,6 +83,18 @@
 #                    exist under /usr/share/zoneinfo/ (default: "UTC").
 #                    Symlinked to /etc/localtime; hwclock --systohc then
 #                    syncs the hardware clock to match.
+#     languages  list of strings  which keyboard layouts a graphical session
+#                    should offer, one of "english", "russian", "ukrainian",
+#                    "chinese" (default: ["english"]). Unrelated to keymap
+#                    above (that's the *console* keymap, TTY-only) — this
+#                    instead drives dot_config/niri/config.kdl.tmpl's xkb
+#                    layout list and, on a host with fcitx5.enabled = true,
+#                    dot_config/niri/switch-layout.sh.tmpl's fcitx5 input
+#                    method switching (see docs/host-config/desktop/niri.md).
+#                    An unrecognized entry is silently skipped, not an
+#                    error. "chinese" needs fcitx5.enabled = true to be
+#                    useful — without it, niri just offers a "cn" xkb
+#                    layout with no IME behind it.
 #   [<host>.services]
 #     enabled  list of strings  systemd unit names to `systemctl enable --now`,
 #                    e.g. ["NetworkManager", "bluetooth", "sshd"] (default: []
@@ -219,6 +231,12 @@
 #                    (and meaningful) only when desktop.environment = "niri"
 #                    — ignored otherwise. Default: "" — niri is installed
 #                    bare, with no shell/bar layer.
+#     dot_config/niri/config.kdl.tmpl (and its switch-layout.sh.tmpl /
+#                    lock-screen.sh helpers) is written whenever
+#                    desktop.enabled = true and desktop.environment =
+#                    "niri" — see docs/host-config/desktop/niri.md. It
+#                    reads locale.languages for its keyboard layout list
+#                    and fcitx5.enabled for input-method integration.
 #   [<host>.greeter]
 #     type  string  which greetd greeter to install and write into
 #                    /etc/greetd/config.toml. A separate, top-level concern
@@ -264,20 +282,59 @@
 #                    current generation comes from the AUR, requiring
 #                    pkg-mgmt.aur.enabled = true; its lib32 counterpart
 #                    additionally requires pkg-mgmt.pacman.multilib = true.
+#   [<host>.fcitx5]
+#     enabled      bool  whether run_once_before_19-configure-fcitx5.sh.tmpl
+#                    installs fcitx5 (plus fcitx5-gtk, fcitx5-qt, and
+#                    fcitx5-chinese-addons when "chinese" is in
+#                    locale.languages) at all (default: false). Also
+#                    controls whether dot_config/fcitx5/* is written
+#                    (config, profile.tmpl) and, in
+#                    dot_config/niri/config.kdl.tmpl and
+#                    dot_config/niri/switch-layout.sh.tmpl, the IM
+#                    environment variables, spawning fcitx5 at startup, and
+#                    syncing its active input method on layout switch —
+#                    see docs/host-config/fcitx5.md.
+#     cloudpinyin  bool  whether pinyin candidates also query an online
+#                    backend (Baidu by default) for better coverage of
+#                    rare words/names/slang (default: false). No extra
+#                    package — the cloudpinyin module ships inside
+#                    fcitx5-chinese-addons already, just dormant until
+#                    this turns it on. Every pinyin syllable typed while
+#                    it's on leaves the machine, so it's opt-in and
+#                    separate from enabled — see docs/host-config/fcitx5.md.
 #   [<host>.browsers.<name>]
 #     <name> is an arbitrary label, not read anywhere except log output —
 #                    pick one per browser you want installed (e.g. "firefox",
 #                    "librewolf"; two channels of the same browser, e.g.
 #                    "firefox" and "firefox-nightly", both work too, each
 #                    with its own package).
-#     package  string  pacman package to install via
-#                    run_once_before_16-configure-browsers.sh.tmpl (required
-#                    — the script errors on an empty value). Must be a
-#                    Firefox-based package whose install layout matches
-#                    Arch's own firefox package (binary and policies.json
-#                    both under /usr/lib/<package>/) for `settings` below to
-#                    land anywhere; a non-Firefox-based browser can still be
-#                    listed with no `settings` table, for the install alone.
+#     enabled  bool  whether run_once_before_16-configure-browsers.sh.tmpl
+#                    installs this entry at all (default: true — an entry
+#                    just being present installs it, same as before this
+#                    field existed). Set false to keep an entry (and its
+#                    settings) declared in .hosts.toml without actually
+#                    installing or configuring it, e.g. while trying out a
+#                    replacement browser without tearing down the current
+#                    one's config yet.
+#     source   string  where `packages` comes from, one of "pacman"
+#                    (default) or "aur" (installed with `paru -S` instead —
+#                    requires pkg-mgmt.aur.enabled = true on this host, same
+#                    as [<host>.office.<name>].source below — the script
+#                    exits with an error if it isn't).
+#     packages  list of strings  packages to install via
+#                    run_once_before_16-configure-browsers.sh.tmpl in one
+#                    call (default: [] — enabling an entry with none listed
+#                    just errors out on pacman/paru's own "no targets
+#                    specified"). The *first* entry is what `settings`
+#                    below writes policies.json under
+#                    (/usr/lib/<first-package>/distribution/) — it has to
+#                    be the actual browser package, one whose install
+#                    layout matches Arch's own firefox package, for
+#                    `settings` to land anywhere. Any further entries are
+#                    just installed alongside it (e.g. a native messaging
+#                    host or extension package) — a non-Firefox-based
+#                    browser can still be listed with no `settings` table,
+#                    for the install alone.
 #   [<host>.browsers.<name>.settings]
 #     <pref> = value  about:config preferences to set as this browser's new
 #                    *defaults* (bool, int, or string — whatever type the
@@ -299,6 +356,75 @@
 #                    above). The script errors if tailscaled.service isn't
 #                    active yet, rather than silently no-op'ing, so add
 #                    "tailscaled" to services.enabled first.
+#   [<host>.terminals.<name>]
+#     <name> is an arbitrary label, not read anywhere except log output and
+#                    .chezmoiignore.tmpl's dotfile gating (see `enabled`
+#                    below) — pick one per terminal you want installed,
+#                    e.g. "kitty".
+#     enabled  bool  whether run_once_before_18-configure-terminals.sh.tmpl
+#                    installs this terminal (default: false — an entry can
+#                    be present but turned off, e.g. while trying out a
+#                    replacement without uninstalling the current one).
+#                    Each terminal's own dotfile (e.g.
+#                    dot_config/kitty/kitty.conf) is gated on this same flag
+#                    in .chezmoiignore.tmpl, the same "one flag controls
+#                    both the install and the dotfile" shape as
+#                    shell.zsh.enabled.
+#     source   string  where `packages` comes from, one of "pacman"
+#                    (default) or "aur" — same shape as
+#                    [<host>.browsers.<name>].source above.
+#     packages  list of strings  packages to install for this entry
+#                    (default: [] — enabling a terminal with no packages
+#                    listed just errors out on pacman/paru's own "no targets
+#                    specified"). Usually a single package, e.g. ["kitty"],
+#                    but can list companions too (e.g. a shell-integration
+#                    or theme package).
+#     Anything else under [<host>.terminals.<name>] is that terminal's own
+#                    config knobs, added as named fields on demand (e.g. a
+#                    future font_size) — there's no shared, generic
+#                    "settings" blob the way browsers.<name>.settings is,
+#                    since every terminal's config file has its own format
+#                    a browser's shared policies.json write doesn't. kitty
+#                    doesn't have any yet: dot_config/kitty/kitty.conf is
+#                    still a plain, non-templated file.
+#   [<host>.password_managers.<name>]
+#     Same "labeled map, one entry per program" shape as
+#                    [<host>.terminals.<name>] above — <name> is an
+#                    arbitrary label, not read anywhere except log output
+#                    and .chezmoiignore.tmpl's dotfile gating, e.g. "rbw".
+#     enabled  bool  whether
+#                    run_once_before_20-configure-password-managers.sh.tmpl
+#                    installs this entry (default: false). Each manager's
+#                    own dotfile (e.g. dot_config/rbw/config.json.tmpl) is
+#                    gated on this same flag in .chezmoiignore.tmpl, the
+#                    same "one flag controls both the install and the
+#                    dotfile" shape as terminals.<name>.enabled.
+#     source   string  where `packages` comes from, one of "pacman"
+#                    (default) or "aur" — same shape as
+#                    [<host>.browsers.<name>].source above.
+#     packages  list of strings  packages to install for this entry
+#                    (default: [] — same "no targets specified" pacman/paru
+#                    error as an empty terminals.<name>.packages if left
+#                    empty while enabled).
+#     Anything else under [<host>.password_managers.<name>] is that
+#                    manager's own config knobs — see
+#                    docs/host-config/password-managers.md.
+#   [<host>.office.<name>]
+#     Same "labeled map, one entry per program" shape as
+#                    [<host>.terminals.<name>] above — <name> is an
+#                    arbitrary label, not read anywhere except log output,
+#                    e.g. "onlyoffice", "libreoffice".
+#     enabled  bool  whether run_once_before_21-configure-office.sh.tmpl
+#                    installs this entry (default: false).
+#     source   string  where `packages` comes from, one of "pacman"
+#                    (default) or "aur". "aur" requires
+#                    pkg-mgmt.aur.enabled = true on this host — the script
+#                    exits with an error if it isn't, rather than silently
+#                    falling back to pacman.
+#     packages  list of strings  packages to install for this entry
+#                    (default: [] — same "no targets specified" pacman/paru
+#                    error as an empty terminals.<name>.packages if left
+#                    empty while enabled).
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -310,6 +436,13 @@
 [hyper-lin.git]
 user.name = "Valentin Lukyanets"
 user.email = "valikluks95@gmail.com"
+
+[hyper-lin.locale]
+locales = ["en_US.UTF-8 UTF-8", "ru_RU.UTF-8 UTF-8"]
+languages = ["english", "russian", "ukrainian", "chinese"]
+
+[hyper-lin.fcitx5]
+enabled = true
 
 [hyper-lin.pkg-mgmt.pacman]
 parallel-downloads = 2
@@ -337,20 +470,47 @@ enabled = true
 [hyper-lin.pkg-mgmt.aur]
 enabled = true
 
-# pipewire-pulse and wireplumber, not services.enabled: their units are
-# systemd --user units (pipewire.service etc. live under
+# pipewire-pulse, pipewire-alsa, and wireplumber, not services.enabled:
+# their units are systemd --user units (pipewire.service etc. live under
 # /usr/lib/systemd/user/), auto-enabled by the package's own systemd
 # preset — nothing here needs an explicit `systemctl enable`, just the
 # packages themselves. pipewire itself comes along as their dependency.
+# pipewire-alsa routes plain ALSA clients through pipewire instead of
+# ALSA's own dmix — without it, an ALSA-only app can grab the device
+# exclusively and silence everything else.
+#
+# jq, playerctl, and brightnessctl are niri-adjacent (see
+# docs/host-config/desktop.md): config.kdl.tmpl's media/brightness key
+# binds spawn playerctl/brightnessctl directly, and switch-layout.sh.tmpl
+# shells out to jq to parse `niri msg -j keyboard-layouts`.
 [hyper-lin.cli_tools]
-enabled = ["pipewire-pulse", "wireplumber"]
+enabled = ["pipewire-pulse", "pipewire-alsa", "wireplumber", "jq", "playerctl", "brightnessctl"]
 
 [hyper-lin.desktop]
 enabled = true
 environment = "niri"
 
+[hyper-lin.desktop.niri]
+shell = "noctalia"
+
 [hyper-lin.greeter]
 type = "noctalia-greeter"
+
+[hyper-lin.fonts]
+enabled = ["ttf-firacode-nerd", "ttf-nerd-fonts-symbols-mono", "noto-fonts-emoji"]
+
+[hyper-lin.terminals.kitty]
+enabled = true
+packages = ["kitty"]
+
+[hyper-lin.password_managers.rbw]
+enabled = true
+packages = ["rbw", "pinentry"]
+
+[hyper-lin.office.onlyoffice]
+enabled = true
+source = "aur"
+packages = ["onlyoffice-bin"]
 
 [hyper-lin.nvidia]
 enabled = true
@@ -363,11 +523,11 @@ enabled = true
 # the pref's *default* — nothing is locked, and about:config remains fully
 # editable afterward. Skipped: Windows/macOS-only prefs (this host is
 # Linux), and the "Clear Data"-dialog checkbox defaults (cosmetic, not
-# enforced). See docs/host-config/browsers.md#hyper-lin-firefox for what
+# enforced). See docs/host-config/browsers/firefox.md for what
 # this changes in practice (blank new tab, no disk cache, HTTPS-Only mode,
 # ETP strict, cookies/cache/form-data wiped on every shutdown).
 [hyper-lin.browsers.firefox]
-package = "firefox"
+packages = ["firefox"]
 [hyper-lin.browsers.firefox.settings]
 # 0100: startup / new tab
 "browser.startup.page"                                        = 0
@@ -532,11 +692,11 @@ package = "firefox"
 # enabled = true    # no-op if the host turns out to have no NVIDIA GPU
 #
 # [homelab.browsers.firefox]
-# package = "firefox"
+# packages = ["firefox"]
 # [homelab.browsers.firefox.settings]
 # "browser.aboutConfig.showWarning" = false
 # "browser.tabs.warnOnClose"        = false
 # "browser.startup.homepage"        = "about:blank"
 #
 # [homelab.browsers.librewolf]
-# package = "librewolf"    # no settings table — installed with its own defaults as-is
+# packages = ["librewolf"]    # no settings table — installed with its own defaults as-is

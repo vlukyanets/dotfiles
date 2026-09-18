@@ -1,0 +1,13 @@
+[Behavior]
+# Start with IME inactive; switch-layout.sh activates/deactivates explicitly
+ActiveByDefault=False
+# Share IME active/inactive state across all windows so fcitx5-remote -o/-c
+# takes effect globally when the layout is switched
+ShareInputState=All
+# Disable the tooltip popup that appears when switching input methods
+ShowInputMethodInformation=False
+ShowFirstInputMethodInformation=False
+# Disable the "Notification Item" addon (StatusNotifierItem/SNI) — the
+# only thing that puts a fcitx5 icon in the tray on Wayland, since niri
+# has no XEmbed tray for classicui's own XCB tray window to fall back to
+DisabledAddons=notificationitem

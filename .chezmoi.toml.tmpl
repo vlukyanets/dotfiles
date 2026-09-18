@@ -40,6 +40,7 @@
 {{- $localeLocales  := get $locale "locales" | default (list "en_US.UTF-8 UTF-8") -}}
 {{- $localeKeymap   := get $locale "keymap" | default "us" -}}
 {{- $localeTimezone := get $locale "timezone" | default "UTC" -}}
+{{- $localeLanguages := get $locale "languages" | default (list "english") -}}
 
 {{- $services         := get $cfg "services" | default dict -}}
 {{- $servicesEnabled  := get $services "enabled" | default (list) -}}
@@ -93,7 +94,17 @@
 {{- $nvidia        := get $cfg "nvidia" | default dict -}}
 {{- $nvidiaEnabled := get $nvidia "enabled" | default false -}}
 
+{{- $fcitx5            := get $cfg "fcitx5" | default dict -}}
+{{- $fcitx5Enabled     := get $fcitx5 "enabled" | default false -}}
+{{- $fcitx5Cloudpinyin := get $fcitx5 "cloudpinyin" | default false -}}
+
 {{- $browsers := get $cfg "browsers" | default dict -}}
+
+{{- $terminals := get $cfg "terminals" | default dict -}}
+
+{{- $passwordManagers := get $cfg "password_managers" | default dict -}}
+
+{{- $office := get $cfg "office" | default dict -}}
 
 {{- $tailscale         := get $cfg "tailscale" | default dict -}}
 {{- $tailscaleOperator := get $tailscale "operator" | default false -}}
@@ -130,10 +141,11 @@
     enabled = {{ $aurEnabled }}
 
     [data.locale]
-    lang     = {{ $localeLang | quote }}
-    locales  = {{ toJson $localeLocales }}
-    keymap   = {{ $localeKeymap | quote }}
-    timezone = {{ $localeTimezone | quote }}
+    lang      = {{ $localeLang | quote }}
+    locales   = {{ toJson $localeLocales }}
+    keymap    = {{ $localeKeymap | quote }}
+    timezone  = {{ $localeTimezone | quote }}
+    languages = {{ toJson $localeLanguages }}
 
     [data.services]
     enabled = {{ toJson $servicesEnabled }}
@@ -190,16 +202,51 @@
     [data.nvidia]
     enabled = {{ $nvidiaEnabled }}
 
+    [data.fcitx5]
+    enabled     = {{ $fcitx5Enabled }}
+    cloudpinyin = {{ $fcitx5Cloudpinyin }}
+
     [data.browsers]
     {{- range $name, $browser := $browsers }}
+    {{- $browserEnabled := true -}}
+    {{- if hasKey $browser "enabled" -}}{{- $browserEnabled = get $browser "enabled" -}}{{- end }}
 
     [data.browsers.{{ $name | quote }}]
-    package = {{ (get $browser "package" | default "") | quote }}
+    enabled  = {{ $browserEnabled }}
+    source   = {{ get $browser "source" | default "pacman" | quote }}
+    packages = {{ toJson (get $browser "packages" | default (list)) }}
 
     [data.browsers.{{ $name | quote }}.settings]
     {{- range $pref, $value := (get $browser "settings" | default dict) }}
     {{ $pref | quote }} = {{ $value | toJson }}
     {{- end }}
+    {{- end }}
+
+    [data.terminals]
+    {{- range $name, $terminal := $terminals }}
+
+    [data.terminals.{{ $name | quote }}]
+    enabled  = {{ get $terminal "enabled" | default false }}
+    source   = {{ get $terminal "source" | default "pacman" | quote }}
+    packages = {{ toJson (get $terminal "packages" | default (list)) }}
+    {{- end }}
+
+    [data.password_managers]
+    {{- range $name, $manager := $passwordManagers }}
+
+    [data.password_managers.{{ $name | quote }}]
+    enabled  = {{ get $manager "enabled" | default false }}
+    source   = {{ get $manager "source" | default "pacman" | quote }}
+    packages = {{ toJson (get $manager "packages" | default (list)) }}
+    {{- end }}
+
+    [data.office]
+    {{- range $name, $app := $office }}
+
+    [data.office.{{ $name | quote }}]
+    enabled  = {{ get $app "enabled" | default false }}
+    source   = {{ get $app "source" | default "pacman" | quote }}
+    packages = {{ toJson (get $app "packages" | default (list)) }}
     {{- end }}
 
     [data.tailscale]
