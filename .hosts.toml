@@ -450,6 +450,7 @@ user.email = "valikluks95@gmail.com"
 [hyper-lin.locale]
 locales = ["en_US.UTF-8 UTF-8", "ru_RU.UTF-8 UTF-8"]
 languages = ["english", "russian", "ukrainian", "chinese"]
+timezone = "Europe/Kyiv"
 
 [hyper-lin.fcitx5]
 enabled = true
