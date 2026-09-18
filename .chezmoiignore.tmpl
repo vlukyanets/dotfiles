@@ -5,6 +5,10 @@ system
 .zshrc
 {{- end }}
 
+{{- if not .shell.zsh.oh_my_zsh.enabled }}
+.p10k.zsh
+{{- end }}
+
 {{- $kittyTerminal := get .terminals "kitty" | default dict }}
 {{- if not (get $kittyTerminal "enabled" | default false) }}
 .config/kitty
