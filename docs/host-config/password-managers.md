@@ -5,11 +5,15 @@ installs whatever's listed under `password_managers.<name>` with
 `enabled = true` (default `{}` — no entries, script exits immediately),
 the same shape as [Terminals](terminals.md). Each entry's own `packages`
 list (default `[]` — enabling an entry with none listed just errors out
-on pacman's own "no targets specified") is installed with its own
-`pacman -S --needed` call. `<name>` itself is just a label, same as
-`terminals.<name>` — pick anything, e.g. `"rbw"`. An entry can be present
-with `enabled = false` — e.g. while trying out a replacement without
-uninstalling the current one.
+on pacman/paru's own "no targets specified") is installed with its own
+call. `<name>` itself is just a label, same as `terminals.<name>` — pick
+anything, e.g. `"rbw"`. An entry can be present with `enabled = false` —
+e.g. while trying out a replacement without uninstalling the current one.
+
+`source` (default `"pacman"`) picks `pacman -S --needed` or, with `"aur"`,
+`paru -S --needed` instead — same field, same shape, as
+[`terminals.<name>.source`](terminals.md), including the
+`pkg-mgmt.aur.enabled = true` requirement.
 
 ## Per-manager config
 

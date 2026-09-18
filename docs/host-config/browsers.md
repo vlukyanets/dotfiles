@@ -4,16 +4,25 @@
 installs whatever's listed under `browsers.<name>` (default `{}` — no
 entries, script exits immediately) with `enabled` not explicitly set to
 `false`. Each entry is independent: its own `packages` list, installed
-with its own `pacman -S --needed` call, so one host can list several
-browsers (or several channels of the same one, e.g. `firefox` and
-`firefox-nightly`) side by side. `<name>` itself is just a label for log
-output — pick anything; it doesn't have to match a package name.
+with its own call, so one host can list several browsers (or several
+channels of the same one, e.g. `firefox` and `firefox-nightly`) side by
+side. `<name>` itself is just a label for log output — pick anything; it
+doesn't have to match a package name.
 
 `enabled` defaults to `true` — an entry just being present installs it,
 same as before this field existed. Setting it `false` keeps the entry (and
 its `settings`) declared without installing or configuring it, e.g. while
 trying out a replacement browser without tearing down the current one's
 config yet.
+
+`source` (default `"pacman"`) picks which package manager installs
+`packages`: `"pacman"` runs `pacman -S --needed`, `"aur"` runs
+`paru -S --needed` instead — for a browser (or channel) that only ships to
+the AUR, not the official repositories. `"aur"` requires
+`pkg-mgmt.aur.enabled = true` on this host (see [AUR/paru](aur.md)) — the
+script exits with an error if it isn't, rather than silently falling back
+to pacman. Same field, same shape, on [Terminals](terminals.md),
+[Password managers](password-managers.md), and [Office](office.md).
 
 ## Settings
 

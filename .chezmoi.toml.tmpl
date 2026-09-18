@@ -213,6 +213,7 @@
 
     [data.browsers.{{ $name | quote }}]
     enabled  = {{ $browserEnabled }}
+    source   = {{ get $browser "source" | default "pacman" | quote }}
     packages = {{ toJson (get $browser "packages" | default (list)) }}
 
     [data.browsers.{{ $name | quote }}.settings]
@@ -226,6 +227,7 @@
 
     [data.terminals.{{ $name | quote }}]
     enabled  = {{ get $terminal "enabled" | default false }}
+    source   = {{ get $terminal "source" | default "pacman" | quote }}
     packages = {{ toJson (get $terminal "packages" | default (list)) }}
     {{- end }}
 
@@ -234,6 +236,7 @@
 
     [data.password_managers.{{ $name | quote }}]
     enabled  = {{ get $manager "enabled" | default false }}
+    source   = {{ get $manager "source" | default "pacman" | quote }}
     packages = {{ toJson (get $manager "packages" | default (list)) }}
     {{- end }}
 

@@ -68,9 +68,12 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.nvidia.enabled`                    | whether to detect and install an NVIDIA driver at all |
 | `.fcitx5.enabled`                    | whether to install fcitx5 and write its config/profile — see [fcitx5](fcitx5.md) |
 | `.browsers.<name>.package`           | pacman package to install for this browser entry |
+| `.browsers.<name>.source`            | where `.browsers.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.browsers.<name>.settings`          | about:config preference name → value, written into that browser's `policies.json` |
 | `.terminals.<name>.enabled`          | whether to install this terminal emulator (`<name>` is the pacman package) and write its own dotfile, e.g. `~/.config/kitty/kitty.conf` for `terminals.kitty` |
+| `.terminals.<name>.source`           | where `.terminals.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.password_managers.<name>.enabled`  | whether to install this password manager and write its own dotfile, e.g. `~/.config/rbw/config.json` for `password_managers.rbw` |
+| `.password_managers.<name>.source`   | where `.password_managers.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.password_managers.<name>.packages` | pacman packages to install for this entry |
 | `.office.<name>.enabled`             | whether to install this office entry — see [Office](office.md) |
 | `.office.<name>.source`              | where `.office.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |

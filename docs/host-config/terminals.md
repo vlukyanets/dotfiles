@@ -4,11 +4,16 @@
 installs whatever's listed under `terminals.<name>` with `enabled = true`
 (default `{}` — no entries, script exits immediately), the same shape as
 [Browsers](browsers.md). Each entry's own `packages` list (default `[]` —
-enabling an entry with none listed just errors out on pacman's own "no
-targets specified") is installed with its own `pacman -S --needed` call.
-`<name>` itself is just a label, same as `browsers.<name>` — pick anything,
-e.g. `"kitty"`. An entry can be present with `enabled = false` — e.g. while
-trying out a replacement without uninstalling the current one.
+enabling an entry with none listed just errors out on pacman/paru's own "no
+targets specified") is installed with its own call. `<name>` itself is just
+a label, same as `browsers.<name>` — pick anything, e.g. `"kitty"`. An
+entry can be present with `enabled = false` — e.g. while trying out a
+replacement without uninstalling the current one.
+
+`source` (default `"pacman"`) picks `pacman -S --needed` or, with `"aur"`,
+`paru -S --needed` instead — same field, same shape, as
+[`browsers.<name>.source`](browsers.md), including the
+`pkg-mgmt.aur.enabled = true` requirement.
 
 ## Per-app config
 

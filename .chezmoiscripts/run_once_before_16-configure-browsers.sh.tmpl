@@ -15,9 +15,24 @@ exit 0
 
 echo "==> Skipping {{ $name }} (browsers.{{ $name }}.enabled is false)"
 {{- else }}
+{{-   if eq $browser.source "aur" }}
+{{-     if not $.pkg_mgmt.aur.enabled }}
+
+echo "==> browsers.{{ $name }}.source is \"aur\", but pkg_mgmt.aur.enabled is false for this host — enable it first" >&2
+exit 1
+{{-     end }}
+
+echo "==> Installing {{ $name }} via paru ({{ join " " $browser.packages }})"
+paru -S --needed --noconfirm {{ join " " $browser.packages }}
+{{-   else if eq $browser.source "pacman" }}
 
 echo "==> Installing {{ $name }} ({{ join " " $browser.packages }})"
 $SUDO_CMD pacman -S --needed --noconfirm {{ join " " $browser.packages }}
+{{-   else }}
+
+echo "==> Unknown browsers.{{ $name }}.source '{{ $browser.source }}' — supported values: \"pacman\", \"aur\"" >&2
+exit 1
+{{-   end }}
 
 {{- if $browser.settings }}
 {{-   $prefLines := list }}

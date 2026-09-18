@@ -316,10 +316,15 @@
 #                    installing or configuring it, e.g. while trying out a
 #                    replacement browser without tearing down the current
 #                    one's config yet.
-#     packages  list of strings  pacman packages to install via
+#     source   string  where `packages` comes from, one of "pacman"
+#                    (default) or "aur" (installed with `paru -S` instead —
+#                    requires pkg-mgmt.aur.enabled = true on this host, same
+#                    as [<host>.office.<name>].source below — the script
+#                    exits with an error if it isn't).
+#     packages  list of strings  packages to install via
 #                    run_once_before_16-configure-browsers.sh.tmpl in one
 #                    call (default: [] — enabling an entry with none listed
-#                    just errors out on pacman's own "no targets
+#                    just errors out on pacman/paru's own "no targets
 #                    specified"). The *first* entry is what `settings`
 #                    below writes policies.json under
 #                    (/usr/lib/<first-package>/distribution/) — it has to
@@ -365,9 +370,12 @@
 #                    in .chezmoiignore.tmpl, the same "one flag controls
 #                    both the install and the dotfile" shape as
 #                    shell.zsh.enabled.
-#     packages  list of strings  pacman packages to install for this entry
+#     source   string  where `packages` comes from, one of "pacman"
+#                    (default) or "aur" — same shape as
+#                    [<host>.browsers.<name>].source above.
+#     packages  list of strings  packages to install for this entry
 #                    (default: [] — enabling a terminal with no packages
-#                    listed just errors out on pacman's own "no targets
+#                    listed just errors out on pacman/paru's own "no targets
 #                    specified"). Usually a single package, e.g. ["kitty"],
 #                    but can list companions too (e.g. a shell-integration
 #                    or theme package).
@@ -391,8 +399,11 @@
 #                    gated on this same flag in .chezmoiignore.tmpl, the
 #                    same "one flag controls both the install and the
 #                    dotfile" shape as terminals.<name>.enabled.
-#     packages  list of strings  pacman packages to install for this entry
-#                    (default: [] — same "no targets specified" pacman
+#     source   string  where `packages` comes from, one of "pacman"
+#                    (default) or "aur" — same shape as
+#                    [<host>.browsers.<name>].source above.
+#     packages  list of strings  packages to install for this entry
+#                    (default: [] — same "no targets specified" pacman/paru
 #                    error as an empty terminals.<name>.packages if left
 #                    empty while enabled).
 #     Anything else under [<host>.password_managers.<name>] is that

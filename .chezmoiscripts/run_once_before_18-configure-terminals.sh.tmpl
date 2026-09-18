@@ -12,8 +12,23 @@ exit 0
 
 {{- range $name, $terminal := .terminals }}
 {{- if $terminal.enabled }}
+{{-   if eq $terminal.source "aur" }}
+{{-     if not $.pkg_mgmt.aur.enabled }}
+
+echo "==> terminals.{{ $name }}.source is \"aur\", but pkg_mgmt.aur.enabled is false for this host — enable it first" >&2
+exit 1
+{{-     end }}
+
+echo "==> Installing {{ $name }} via paru ({{ join " " $terminal.packages }})"
+paru -S --needed --noconfirm {{ join " " $terminal.packages }}
+{{-   else if eq $terminal.source "pacman" }}
 
 echo "==> Installing {{ $name }} ({{ join " " $terminal.packages }})"
 $SUDO_CMD pacman -S --needed --noconfirm {{ join " " $terminal.packages }}
+{{-   else }}
+
+echo "==> Unknown terminals.{{ $name }}.source '{{ $terminal.source }}' — supported values: \"pacman\", \"aur\"" >&2
+exit 1
+{{-   end }}
 {{- end }}
 {{- end }}
