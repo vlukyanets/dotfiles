@@ -67,3 +67,12 @@ latter since that's where fcitx5 itself looks for
 `<XDG_DATA_HOME>/fcitx5/themes/<name>/theme.conf`. Cosmetic only — it
 doesn't affect anything `switch-layout.sh.tmpl` depends on, unlike
 `dot_config/fcitx5/config` above.
+
+The same file also sets `PreferTextIcon=True` and
+`ShowLayoutNameInIcon=True`, plus a larger `TrayFont`, so the system-tray
+icon renders every input method — keyboard layouts and pinyin alike — as
+a short text label (`US`/`RU`/`UA`/pinyin's own label) instead of a
+generic keyboard icon that only visually changes between "inactive" and
+"pinyin active". Without this, `keyboard-us`/`keyboard-ru`/`keyboard-ua`
+have no distinct icon of their own in most icon themes, so the tray
+can't otherwise show which of them is actually active.
