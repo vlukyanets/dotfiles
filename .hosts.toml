@@ -510,6 +510,21 @@
 #                    (default: [] — same "no targets specified" pacman/paru
 #                    error as an empty office.<name>.packages if left empty
 #                    while enabled).
+#     profiles  list of strings  VS Code only (<name> = "vscode"; ignored on
+#                    any other entry): which of the profiles defined in
+#                    dot_config/Code/User/profiles.json to set up on this
+#                    host, by name, e.g. ["Python", "Rust"] (default: [] —
+#                    every profile in that file). The file, not this
+#                    table, is where a profile's extensions and settings
+#                    live — see docs/host-config/ide/vscode.md#profiles;
+#                    run_once_before_27-configure-vscode-profiles.sh.tmpl
+#                    registers each one in VS Code's storage.json (the
+#                    CLI can't create profiles) and installs its
+#                    extensions with `code --profile <profile>
+#                    --install-extension`. Registering needs VS Code
+#                    closed; adding extensions to a registered profile
+#                    doesn't. A name listed here but missing from the file
+#                    fails `chezmoi apply` at template time.
 #   [<host>.sccache]
 #     Settings written to ~/.config/sccache/config by
 #                    dot_config/sccache/config.tmpl. Written only on a host
@@ -792,6 +807,9 @@ packages = ["wireshark-qt"]
 desktop_only = true
 groups = ["wireshark"]
 
+# Which profiles from dot_config/Code/User/profiles.json to set up — left
+# unset, all of them (.NET, Python, Rust, Node.JS); the extension lists
+# and per-profile settings are in that file, not here.
 [hyper-lin.ide.vscode]
 enabled = true
 source = "aur"

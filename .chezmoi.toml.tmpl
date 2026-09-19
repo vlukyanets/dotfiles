@@ -302,6 +302,7 @@
     enabled  = {{ get $app "enabled" | default false }}
     source   = {{ get $app "source" | default "pacman" | quote }}
     packages = {{ toJson (get $app "packages" | default (list)) }}
+    profiles = {{ toJson (get $app "profiles" | default (list)) }}
     {{- end }}
 
     [data.sccache]

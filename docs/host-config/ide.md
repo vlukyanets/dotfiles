@@ -26,6 +26,14 @@ both the install and the dotfile" shape as
 [`terminals.<name>.enabled`](terminals.md): this script's install, and —
 where that IDE has one — its own dotfile in `.chezmoiignore.tmpl`.
 
+`ide.vscode` additionally takes a `profiles` list — which of the VS Code
+profiles defined in `dot_config/Code/User/profiles.json` (extension sets
+and settings overrides) to set up on this host, all of them when unset.
+They're applied by a script of their own (`run_once_before_27`) since
+the CLI can't create profiles. See
+[Visual Studio Code](ide/vscode.md#profiles); any other `ide.<name>`
+ignores the field.
+
 ## Per-IDE docs
 
 - [Visual Studio Code](ide/vscode.md)

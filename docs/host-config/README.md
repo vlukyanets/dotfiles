@@ -87,6 +87,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.ide.<name>.enabled`                | whether to install this IDE entry — see [IDE](ide.md) |
 | `.ide.<name>.source`                 | where `.ide.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.ide.<name>.packages`               | packages to install for this entry |
+| `.ide.<name>.profiles`               | VS Code only: which profiles from `dot_config/Code/User/profiles.json` to set up, all when empty — see [Visual Studio Code](ide/vscode.md#profiles) |
 | `.network_tools.<name>.enabled`      | whether to install this network tool entry — see [Network tools](network-tools.md) |
 | `.network_tools.<name>.source`       | where `.network_tools.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.network_tools.<name>.packages`     | packages to install for this entry |
@@ -133,6 +134,7 @@ variables above; see its own page for what it does with them:
 24. [Development](development.md)
 25. [IDE](ide.md)
 26. [Network tools](network-tools.md)
+27. [Visual Studio Code profiles](ide/vscode.md#profiles)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.
