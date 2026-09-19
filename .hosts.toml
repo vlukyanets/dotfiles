@@ -707,7 +707,9 @@ packages = ["fnm"]
 # which a run_once script doesn't have.
 post_install = "fnm install --lts && fnm default lts-latest && fnm exec --using=lts-latest -- npm install -g pnpm"
 
-# delve is Go's debugger, and what nvim-dap/VS Code drive for Go.
+# delve is Go's debugger, and what nvim-dap/VS Code drive for Go. Enabling
+# this entry also writes ~/.config/go/env (GOPATH under ~/.local/share,
+# GOBIN = ~/.local/bin) so Go doesn't grow a ~/go directory.
 [hyper-lin.development.go]
 enabled = true
 packages = ["go", "delve"]
