@@ -35,3 +35,5 @@ interactive wizard on first oh-my-zsh shell start instead of failing.
 it adds `eval "$(fnm env --use-on-cd)"`, guarded by `command -v fnm` the
 same way the `zoxide`/`eza` aliases already are — so a directory's
 `.node-version`/`.nvmrc` switches Node versions automatically on `cd`.
+It also wires up `fzf --zsh` behind `command -v fzf`, like the other
+[`cli_tools`](cli-tools.md) hooks.

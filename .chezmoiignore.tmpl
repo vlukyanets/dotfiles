@@ -37,6 +37,18 @@ system
 .local/state/noctalia
 {{- end }}
 
+{{- if not (has "tmux" .cli_tools.enabled) }}
+.config/tmux
+{{- end }}
+
+{{- if not (has "direnv" .cli_tools.enabled) }}
+.config/direnv
+{{- end }}
+
+{{- if not (has "tealdeer" .cli_tools.enabled) }}
+.config/tealdeer
+{{- end }}
+
 {{- $ghDev := get .development "gh" | default dict }}
 {{- if not (get $ghDev "enabled" | default false) }}
 .config/gh

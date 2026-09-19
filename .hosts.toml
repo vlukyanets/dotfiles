@@ -145,9 +145,10 @@
 #                    without installing anything). This is for standalone
 #                    CLI tools dot_zshrc.tmpl already checks for with
 #                    `command -v` before wiring up EDITOR, `zoxide init`,
-#                    and the eza aliases — unlike services.packages, there's
-#                    no unit to enable afterward, just a single deduplicated
-#                    `pacman -S --needed` call.
+#                    `fzf --zsh`, and the eza aliases — unlike
+#                    services.packages, there's no unit to enable
+#                    afterward, just a single deduplicated `pacman -S
+#                    --needed` call.
 #   [<host>.fonts]
 #     enabled  list of strings  pacman packages to install via
 #                    run_once_before_10-configure-fonts.sh.tmpl, e.g.
@@ -564,7 +565,7 @@ enabled = true
 # binds spawn playerctl/brightnessctl directly, and switch-layout.sh.tmpl
 # shells out to jq to parse `niri msg -j keyboard-layouts`.
 [hyper-lin.cli_tools]
-enabled = ["pipewire-pulse", "pipewire-alsa", "wireplumber", "jq", "playerctl", "brightnessctl", "ripgrep", "fd", "unzip", "zip", "htop"]
+enabled = ["pipewire-pulse", "pipewire-alsa", "wireplumber", "jq", "yq", "playerctl", "brightnessctl", "tmux", "direnv", "zoxide", "eza", "fzf", "yazi", "bat", "tealdeer", "ripgrep", "fd", "unzip", "zip", "7zip", "rsync", "wget", "curl", "ncdu", "duf", "htop", "btop", "just"]
 
 [hyper-lin.desktop]
 enabled = true

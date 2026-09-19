@@ -51,6 +51,15 @@ if command -v zoxide &>/dev/null; then
     eval "$(zoxide init zsh)"
 fi
 
+if command -v direnv &>/dev/null; then
+    eval "$(direnv hook zsh)"
+fi
+
+# C-r history search, C-t file picker, Alt-c cd picker.
+if command -v fzf &>/dev/null; then
+    eval "$(fzf --zsh)"
+fi
+
 {{- $fnmDev := get .development "fnm" | default dict }}
 {{- if get $fnmDev "enabled" | default false }}
 
