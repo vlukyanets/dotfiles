@@ -50,6 +50,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.shell.zsh.oh_my_zsh.enabled`      | whether to also install oh-my-zsh, powerlevel10k, and the zsh plugins dot_zshrc.tmpl expects |
 | `.cli_tools.enabled`                | pacman packages to install (standalone CLI tools, e.g. neovim/zoxide/eza) |
 | `.fonts.enabled`                    | pacman packages to install (fonts, e.g. a Nerd Font for powerlevel10k/eza icons) |
+| `.fonts.nerd_font`                  | whether `.fonts.enabled` actually includes a Nerd Font (read by e.g. Neovim's `have_nerd_font`) |
 | `.containers.docker.enabled`        | whether to install docker, enable docker.service, and add the user to the docker group |
 | `.ssh.enabled`                      | whether to write an sshd_config.d hardening drop-in at all |
 | `.ssh.disable_password_auth`        | writes PasswordAuthentication no into that drop-in when true |
@@ -79,6 +80,17 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.office.<name>.enabled`             | whether to install this office entry — see [Office](office.md) |
 | `.office.<name>.source`              | where `.office.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.office.<name>.packages`            | packages to install for this entry |
+| `.development.<name>.enabled`        | whether to install this language toolchain entry — see [Development](development.md) |
+| `.development.<name>.source`         | where `.development.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
+| `.development.<name>.packages`       | packages to install for this entry |
+| `.sccache.cache_size` / `.cache_dir` / `.preprocessor_cache_mode.*` | `~/.config/sccache/config` settings — see [Development](development.md#sccache-config) |
+| `.ide.<name>.enabled`                | whether to install this IDE entry — see [IDE](ide.md) |
+| `.ide.<name>.source`                 | where `.ide.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
+| `.ide.<name>.packages`               | packages to install for this entry |
+| `.ide.<name>.profiles`               | VS Code only: which profiles from `dot_config/Code/User/profiles.json` to set up, all when empty — see [Visual Studio Code](ide/vscode.md#profiles) |
+| `.network_tools.<name>.enabled`      | whether to install this network tool entry — see [Network tools](network-tools.md) |
+| `.network_tools.<name>.source`       | where `.network_tools.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
+| `.network_tools.<name>.packages`     | packages to install for this entry |
 | `.tailscale.operator`                | whether to set the applying user as tailscale's operator, so `tailscale` works without sudo (independent of installing/enabling tailscale itself — see [services](#scripts)) |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
@@ -119,6 +131,10 @@ variables above; see its own page for what it does with them:
 21. [fcitx5](fcitx5.md)
 22. [Password managers](password-managers.md)
 23. [Office](office.md)
+24. [Development](development.md)
+25. [IDE](ide.md)
+26. [Network tools](network-tools.md)
+27. [Visual Studio Code profiles](ide/vscode.md#profiles)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

@@ -2,7 +2,7 @@
 
 [`dot_local/state/noctalia/settings.toml`](../../../dot_local/state/noctalia/settings.toml)
 is written whenever `desktop.niri.shell = "noctalia"` — see
-[Desktop](../desktop.md#desktopnirishell). `.chezmoiignore.tmpl` skips
+[Desktop](../desktop.md). `.chezmoiignore.tmpl` skips
 `~/.local/state/noctalia` entirely otherwise, the same "one flag controls
 both the install and the dotfile" shape as [`fcitx5.enabled`](../fcitx5.md).
 

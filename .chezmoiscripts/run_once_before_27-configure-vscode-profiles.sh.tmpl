@@ -1,0 +1,254 @@
+#!/bin/sh
+#
+# VS Code profiles from dot_config/Code/User/profiles.json (which ones, per
+# host, from ide.vscode.profiles). `code --profile <name>` on the CLI only
+# *uses* a profile ("Profile 'X' not found." otherwise) — creating one is
+# UI-only — so this registers each profile in VS Code's own storage.json
+# first, then installs its extensions through the CLI. The shared list is
+# installed once, into the Default profile, and marked the way the UI's
+# "Apply Extension to all Profiles" does it.
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- $vscode := get .ide "vscode" | default dict }}
+{{- if not (get $vscode "enabled" | default false) }}
+
+echo "==> Skipping VS Code profiles (ide.vscode.enabled is false for this host)"
+exit 0
+{{- end }}
+
+{{- /* The catalog: `extensions` are installed into the Default profile
+     and applied to all profiles; `profiles.<name>` has that profile's own
+     extensions and optional settings overrides. ide.vscode.profiles picks
+     names out of it; empty means all. Ids are lowercased: that's how VS
+     Code stores them, and the shell below compares them as strings. */}}
+{{- $catalog := include "dot_config/Code/User/profiles.json" | fromJson }}
+{{- $common := list }}
+{{- range get $catalog "extensions" | default (list) }}{{ $common = append $common (lower .) }}{{ end }}
+{{- $all := get $catalog "profiles" | default dict }}
+{{- $wanted := get $vscode "profiles" | default (list) }}
+{{- $profiles := dict }}
+{{- if $wanted }}
+{{-   range $name := $wanted }}
+{{-     if not (hasKey $all $name) }}{{ fail (printf "ide.vscode.profiles lists %q, but dot_config/Code/User/profiles.json defines no such profile" $name) }}{{ end }}
+{{-     $_ := set $profiles $name (get $all $name) }}
+{{-   end }}
+{{- else }}
+{{-   $profiles = $all }}
+{{- end }}
+
+{{- /* The Default profile's settings.json is the base every profile with
+     overrides builds on. Read from the source, not the target: this is a
+     `before` script, the target may not be applied yet on a fresh host. */}}
+{{- $base := include "dot_config/Code/User/settings.json" | fromJson }}
+
+{{- /* What storage.json should list. `location` is the directory name
+     under User/profiles/ — VS Code itself uses a random hex id there, but
+     any path segment works, and a slug of the name is easier to find. A
+     profile without overrides points its settings at the Default
+     profile's file instead of getting an empty one of its own; keybindings,
+     snippets and tasks are always shared that way. Extensions never are —
+     that's the point of the profile. */}}
+{{- $want := list }}
+{{- range $name, $profile := $profiles }}
+{{-   $flags := dict "keybindings" true "snippets" true "tasks" true }}
+{{-   if not (get $profile "settings" | default dict) }}{{ $_ := set $flags "settings" true }}{{ end }}
+{{-   $location := regexReplaceAll "[^a-z0-9]+" (lower $name) "-" | trimAll "-" }}
+{{-   $want = append $want (dict "name" $name "location" $location "useDefaultFlags" $flags) }}
+{{- end }}
+
+CODE_DIR="$HOME/.config/Code"
+USER_DIR="$CODE_DIR/User"
+STORAGE="$USER_DIR/globalStorage/storage.json"
+EXT_DIR="$HOME/.vscode/extensions"
+WANT='{{ toJson $want }}'
+COMMON="{{ join " " $common }}"
+
+if ! command -v code >/dev/null 2>&1; then
+    echo "==> code is not on PATH — is ide.vscode.packages installed? (run_once_before_25-configure-ide.sh.tmpl)" >&2
+    exit 1
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo "==> Installing jq (for storage.json edits)"
+    $SUDO_CMD pacman -S --needed --noconfirm jq
+fi
+
+mkdir -p "$USER_DIR/globalStorage" "$USER_DIR/profiles"
+[ -f "$STORAGE" ] || printf '{}\n' > "$STORAGE"
+
+# storage.json is VS Code's in-memory state flushed to disk: anything
+# written here while it runs is overwritten on its next flush. Chromium's
+# SingletonLock symlink (-> "<host>-<pid>") is the running marker; a stale
+# one from a crash points at a dead pid and is ignored.
+VSCODE_RUNNING=0
+if [ -L "$CODE_DIR/SingletonLock" ]; then
+    lock_pid=$(readlink "$CODE_DIR/SingletonLock" | sed 's/.*-//')
+    if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+        VSCODE_RUNNING=1
+    fi
+fi
+
+MISSING=$(jq -r --argjson want "$WANT" \
+    '[$want[].name] - [(.userDataProfiles // [])[].name] | .[]' "$STORAGE")
+
+if [ -n "$MISSING" ]; then
+    if [ "$VSCODE_RUNNING" = 1 ]; then
+        echo "==> VS Code is running, and these profiles aren't registered yet:" >&2
+        echo "$MISSING" | sed 's/^/      /' >&2
+        echo "    Close VS Code and re-run \`chezmoi apply\` — storage.json can't be edited under it." >&2
+        exit 1
+    fi
+
+    echo "==> Registering VS Code profiles in storage.json"
+    echo "$MISSING" | sed 's/^/    /'
+    # Profiles already there under the same name keep their entry (and
+    # so their location — a UI-created one has a random id, and moving it
+    # would orphan its data); only useDefaultFlags is set from here.
+    # Everything else in the file, and any profile not listed in
+    # ide.vscode.profiles, is left alone.
+    jq --argjson want "$WANT" '
+        (.userDataProfiles // []) as $have
+        | .userDataProfiles = (
+            ($have | map(select(.name as $n | any($want[]; .name == $n) | not)))
+            + ($want | map(
+                . as $w
+                | ($have | map(select(.name == $w.name)) | first) as $h
+                | if $h then $h + {useDefaultFlags: $w.useDefaultFlags} else $w end))
+        )' "$STORAGE" > "$STORAGE.tmp"
+    mv "$STORAGE.tmp" "$STORAGE"
+fi
+
+# Resolve where each profile actually lives — the slug for ones registered
+# above, whatever VS Code picked for ones adopted from the UI. Old installs
+# stored location as a URI object rather than a bare directory name.
+profile_dir() {
+    location=$(jq -r --arg n "$1" '
+        .userDataProfiles[] | select(.name == $n) | .location
+        | if type == "string" then . else (.path | split("/") | last) end' "$STORAGE")
+    if [ -z "$location" ]; then
+        echo "==> Profile '$1' is missing from $STORAGE after registration" >&2
+        exit 1
+    fi
+    printf '%s/profiles/%s' "$USER_DIR" "$location"
+}
+
+# The marketplace answers 5xx now and then, and `code` has no download
+# timeout to raise; one bad response shouldn't fail the whole apply. Five
+# attempts with a growing pause (30s, 60s, ... — up to 5 minutes of waiting
+# in total), and a profile that still fails is collected rather than
+# aborting the ones after it — the script exits 1 at the end so run_once
+# retries it on the next apply (already-installed extensions are skipped,
+# so that's cheap). An empty profile name means the Default profile (no
+# --profile flag).
+ATTEMPTS=5
+install_extensions() {
+    profile=$1
+    shift
+    if [ -n "$profile" ]; then
+        set -- --profile "$profile" "$@"
+    fi
+    attempt=1
+    while :; do
+        if code "$@"; then
+            return 0
+        fi
+        if [ "$attempt" -ge "$ATTEMPTS" ]; then
+            return 1
+        fi
+        echo "==> Installing ${profile:-Default} profile extensions failed (attempt $attempt/$ATTEMPTS), retrying in $((attempt * 30))s"
+        sleep $((attempt * 30))
+        attempt=$((attempt + 1))
+    done
+}
+FAILED=""
+{{- if $common }}
+
+echo "==> Installing Default profile extensions ($COMMON)"
+install_extensions "" {{ range $common }}--install-extension {{ . }} {{ end }}|| FAILED="$FAILED Default"
+
+# "Apply Extension to all Profiles" in the UI is a flag on the Default
+# profile's entry in ~/.vscode/extensions/extensions.json:
+# metadata.isApplicationScoped. Every profile then sees the extension
+# without carrying its own entry (and `--profile X --install-extension`
+# reports it as already installed). The UI leaves an extension pack's
+# members alone; here they get the flag too, so a profile doesn't end up
+# with the pack but not its parts — the closure is walked through each
+# package.json's extensionPack. Entries the CLI didn't manage to install
+# (a failed attempt above) just aren't there to flag; the next apply
+# gets them.
+SCOPED_JSON='[]'
+if [ -f "$EXT_DIR/extensions.json" ]; then
+    SCOPED=""
+    queue="$COMMON"
+    while [ -n "$queue" ]; do
+        next=""
+        for id in $queue; do
+            case " $SCOPED " in *" $id "*) continue ;; esac
+            SCOPED="$SCOPED $id"
+            dir=$(jq -r --arg id "$id" '
+                [.[] | select((.identifier.id | ascii_downcase) == $id)
+                     | .relativeLocation // (.location.path | split("/") | last)] | first // ""' \
+                "$EXT_DIR/extensions.json")
+            if [ -z "$dir" ] || [ ! -f "$EXT_DIR/$dir/package.json" ]; then
+                continue
+            fi
+            next="$next $(jq -r '[.extensionPack[]? | ascii_downcase] | join(" ")' "$EXT_DIR/$dir/package.json")"
+        done
+        queue=$next
+    done
+    # shellcheck disable=SC2086 # one id per line is the point
+    SCOPED_JSON=$(printf '%s\n' $SCOPED | jq -R . | jq -sc .)
+
+    echo "==> Applying to all profiles:$SCOPED"
+    jq --argjson ids "$SCOPED_JSON" '
+        map(if ((.identifier.id | ascii_downcase) as $i | any($ids[]; . == $i))
+            then .metadata.isApplicationScoped = true else . end)' \
+        "$EXT_DIR/extensions.json" > "$EXT_DIR/extensions.json.tmp"
+    mv "$EXT_DIR/extensions.json.tmp" "$EXT_DIR/extensions.json"
+    if [ "$VSCODE_RUNNING" = 1 ]; then
+        echo "    (VS Code is running — it picks this up on its next start)"
+    fi
+fi
+{{- end }}
+{{- range $name, $profile := $profiles }}
+{{-   $settings := get $profile "settings" | default dict }}
+{{-   $extensions := list }}
+{{-   range get $profile "extensions" | default (list) }}{{ $extensions = append $extensions (lower .) }}{{ end }}
+
+PROFILE_DIR=$(profile_dir {{ $name | quote }})
+mkdir -p "$PROFILE_DIR"
+{{-   if $common }}
+# What the UI's toggle also does: an application-scoped extension has no
+# per-profile entry, so drop the ones an earlier run installed here
+# profile by profile.
+if [ -f "$PROFILE_DIR/extensions.json" ]; then
+    jq --argjson ids "$SCOPED_JSON" \
+        'map(select(((.identifier.id | ascii_downcase) as $i | any($ids[]; . == $i)) | not))' \
+        "$PROFILE_DIR/extensions.json" > "$PROFILE_DIR/extensions.json.tmp"
+    mv "$PROFILE_DIR/extensions.json.tmp" "$PROFILE_DIR/extensions.json"
+fi
+{{-   end }}
+{{-   if $settings }}
+
+echo "==> Writing {{ $name }} profile settings.json (Default settings + overrides)"
+cat > "$PROFILE_DIR/settings.json" <<'JSON'
+{{ merge $settings $base | toPrettyJson -}}
+JSON
+{{-   end }}
+{{-   if $extensions }}
+
+echo "==> Installing {{ $name }} profile extensions ({{ join " " $extensions }})"
+install_extensions {{ $name | quote }}{{ range $extensions }} --install-extension {{ . }}{{ end }} || FAILED="$FAILED {{ $name }}"
+{{-   else }}
+
+echo "==> No extensions listed for the {{ $name }} profile, skipping install"
+{{-   end }}
+{{- end }}
+
+if [ -n "$FAILED" ]; then
+    echo "==> Extension install failed for:$FAILED — profiles and settings are in place; re-run \`chezmoi apply\` to retry the extensions" >&2
+    exit 1
+fi

@@ -1,0 +1,18 @@
+# Managed by chezmoi — edit the source, not this file:
+#   chezmoi edit ~/.ssh/config
+#
+# Per-host entries live in ~/.ssh/config.d/ and are NOT managed by chezmoi
+# — that's the one place for machine-specific `Host` blocks (LAN boxes,
+# tailscale peers) that shouldn't be in a public repo. The Include has to
+# come first: ssh applies the first matching value for each option, so
+# anything under `Host *` below is only a fallback for hosts that don't
+# set it themselves.
+Include config.d/*
+
+Host *
+    # Add a key to the running ssh-agent on first use, so a passphrase is
+    # asked for once per session rather than once per connection.
+    AddKeysToAgent yes
+    # Keepalive through NAT/idle timeouts; give up after ~3 minutes silent.
+    ServerAliveInterval 60
+    ServerAliveCountMax 3

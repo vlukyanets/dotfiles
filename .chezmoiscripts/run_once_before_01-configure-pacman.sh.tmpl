@@ -30,7 +30,7 @@ if ! grep -qF 'Include = /etc/pacman.conf.d/options.conf' /etc/pacman.conf; then
 fi
 $SUDO_CMD mkdir -p /etc/pacman.conf.d
 $SUDO_CMD tee /etc/pacman.conf.d/options.conf >/dev/null <<CONF
-# Managed by chezmoi (.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl)
+# Managed by chezmoi (.chezmoiscripts/run_once_before_01-configure-pacman.sh.tmpl)
 ParallelDownloads = {{ .pkg_mgmt.pacman.parallel_downloads }}
 CONF
 
@@ -45,7 +45,7 @@ else
     fi
     $SUDO_CMD mkdir -p /etc/pacman.conf.d
     $SUDO_CMD tee /etc/pacman.conf.d/multilib.conf >/dev/null <<CONF
-# Managed by chezmoi (.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl)
+# Managed by chezmoi (.chezmoiscripts/run_once_before_01-configure-pacman.sh.tmpl)
 [multilib]
 Include = {{ .pkg_mgmt.reflector.save }}
 CONF
@@ -58,7 +58,7 @@ echo "==> Skipping multilib repo (pkg_mgmt.pacman.multilib is false for this hos
 echo "==> Writing /etc/makepkg.conf.d/dotfiles.conf"
 $SUDO_CMD mkdir -p /etc/makepkg.conf.d
 $SUDO_CMD tee /etc/makepkg.conf.d/dotfiles.conf >/dev/null <<CONF
-# Managed by chezmoi (.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl)
+# Managed by chezmoi (.chezmoiscripts/run_once_before_01-configure-pacman.sh.tmpl)
 MAKEFLAGS="-j$MAKEPKG_JOBS"
 {{- if .pkg_mgmt.makepkg.options }}
 OPTIONS+=({{ join " " .pkg_mgmt.makepkg.options }})

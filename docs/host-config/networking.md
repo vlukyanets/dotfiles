@@ -1,6 +1,6 @@
 # Networking
 
-[`.chezmoiscripts/run_once_before_05-configure-networking.sh.tmpl`](../../.chezmoiscripts/run_once_before_05-configure-networking.sh.tmpl)
+[`.chezmoiscripts/run_once_before_06-configure-networking.sh.tmpl`](../../.chezmoiscripts/run_once_before_06-configure-networking.sh.tmpl)
 is gated behind `networking.systemd_resolved.enabled` (default `false`) —
 hosts that leave it unset skip it entirely. It sits right after
 [Services](services.md) since it assumes NetworkManager (installed via

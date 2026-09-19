@@ -1,0 +1,7 @@
+# Managed by chezmoi — edit the template, not this file:
+#   chezmoi edit ~/.cargo/config.toml
+# Only written on a host whose development.* installs sccache — a wrapper
+# that isn't there would break every cargo build.
+
+[build]
+rustc-wrapper = "sccache"

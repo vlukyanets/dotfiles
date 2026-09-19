@@ -1,6 +1,6 @@
 # Services
 
-[`.chezmoiscripts/run_once_before_04-configure-services.sh.tmpl`](../../.chezmoiscripts/run_once_before_04-configure-services.sh.tmpl)
+[`.chezmoiscripts/run_once_before_05-configure-services.sh.tmpl`](../../.chezmoiscripts/run_once_before_05-configure-services.sh.tmpl)
 runs `systemctl enable --now` for each unit listed in `services.enabled`
 (default `[]` — the script exits immediately without touching systemd on
 hosts that don't set it). Before enabling anything, it looks up each unit

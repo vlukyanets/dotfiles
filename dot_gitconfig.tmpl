@@ -6,7 +6,7 @@
     email = {{ .git.user.email }}
 
 [init]
-    defaultBranch = main
+    defaultBranch = master
 [core]
     # core.editor intentionally unset: git already falls back to
     # $GIT_EDITOR, then $VISUAL, then $EDITOR (set in dot_zshrc.tmpl), then vi.
@@ -14,3 +14,32 @@
     rebase = true
 [color]
     ui = auto
+{{- if has "git-delta" .cli_tools.enabled }}
+
+# Gated on "git-delta" being in cli_tools.enabled rather than set
+# unconditionally: git has no `command -v` fallback for core.pager, so on a
+# host without delta installed every `git diff`/`git log` would just fail.
+[core]
+    pager = delta
+[interactive]
+    diffFilter = delta --color-only
+[delta]
+    navigate = true
+    line-numbers = true
+[merge]
+    # Three-way conflict hunks with the common ancestor's lines diffed out;
+    # delta's own recommended setting, and it renders them with color.
+    conflictStyle = zdiff3
+[diff]
+    colorMoved = default
+{{- end }}
+{{- if has "git-lfs" .cli_tools.enabled }}
+
+# Exactly what `git lfs install` writes into ~/.gitconfig — kept here so a
+# fresh host gets it from apply rather than from remembering to run that.
+[filter "lfs"]
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
+{{- end }}

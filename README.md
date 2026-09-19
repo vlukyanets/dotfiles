@@ -15,3 +15,5 @@ Personal dotfiles for multiple machines, managed with [chezmoi](https://www.chez
 - [Adding a new machine](docs/adding-a-machine.md)
 - [Everyday commands](docs/commands.md)
 - [Layout reference](docs/layout.md)
+- [CI](docs/ci.md) — what the GitHub workflow checks, and how to run the
+  same checks locally

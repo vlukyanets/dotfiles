@@ -1,6 +1,6 @@
 # Terminals
 
-[`.chezmoiscripts/run_once_before_19-configure-terminals.sh.tmpl`](../../.chezmoiscripts/run_once_before_19-configure-terminals.sh.tmpl)
+[`.chezmoiscripts/run_once_before_20-configure-terminals.sh.tmpl`](../../.chezmoiscripts/run_once_before_20-configure-terminals.sh.tmpl)
 installs whatever's listed under `terminals.<name>` with `enabled = true`
 (default `{}` — no entries, script exits immediately), the same shape as
 [Browsers](browsers.md). Each entry's own `packages` list (default `[]` —

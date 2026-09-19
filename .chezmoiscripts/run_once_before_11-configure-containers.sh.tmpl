@@ -10,8 +10,8 @@ echo "==> Skipping docker install (containers.docker.enabled is false for this h
 exit 0
 {{- end }}
 
-echo "==> Installing docker"
-$SUDO_CMD pacman -S --needed --noconfirm docker
+echo "==> Installing docker ({{ join " " .containers.docker.packages }})"
+$SUDO_CMD pacman -S --needed --noconfirm {{ join " " .containers.docker.packages }}
 
 echo "==> Enabling and starting docker.service"
 $SUDO_CMD systemctl enable --now docker.service

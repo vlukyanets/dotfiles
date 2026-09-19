@@ -38,7 +38,7 @@
 #   [<host>.pkg-mgmt.reflector]
 #     save     string  reflector --save, the mirrorlist path (default:
 #                    "/etc/pacman.d/mirrorlist"). Shared with
-#                    run_once_before_00-configure-pacman.sh.tmpl's multilib
+#                    run_once_before_01-configure-pacman.sh.tmpl's multilib
 #                    Include= line, so the two stay pointed at the same file
 #                    — override here, not in that script.
 #                    CAUTION: the reflector package's own reflector.service
@@ -65,7 +65,7 @@
 #     on-boot-sec  string  reflector.timer OnBootSec= override (default:
 #                    "15min", the package's own default)
 #   [<host>.pkg-mgmt.aur]
-#     enabled  bool  whether run_once_before_02-configure-aur.sh.tmpl builds
+#     enabled  bool  whether run_once_before_03-configure-aur.sh.tmpl builds
 #                    and installs paru from the AUR (default: false — opt in
 #                    per host). Skips outright, without contacting the AUR,
 #                    when unset or false; also skips (but still exits 0) if
@@ -113,7 +113,7 @@
 #                    ships in `openssh`, which may already be present) — it's
 #                    just enabled as-is.
 #   [<host>.networking.systemd_resolved]
-#     enabled  bool  whether run_once_before_05-configure-networking.sh.tmpl
+#     enabled  bool  whether run_once_before_06-configure-networking.sh.tmpl
 #                    enables systemd-resolved.service, points /etc/resolv.conf
 #                    at its stub listener, and sets NetworkManager's
 #                    dns=systemd-resolved so it hands per-connection DNS
@@ -123,7 +123,7 @@
 #                    manager in use; see docs/host-config/networking.md for
 #                    why systemd-resolved was picked over dnsmasq.
 #   [<host>.shell.zsh]
-#     enabled  bool  whether run_once_before_07-configure-shell.sh.tmpl
+#     enabled  bool  whether run_once_before_08-configure-shell.sh.tmpl
 #                    installs zsh and makes it the login shell (default:
 #                    false — opt in per host). Also controls whether
 #                    dot_zshrc.tmpl is written at all: .chezmoiignore.tmpl
@@ -140,17 +140,18 @@
 #                    Idempotent: skips anything already cloned.
 #   [<host>.cli_tools]
 #     enabled  list of strings  pacman packages to install via
-#                    run_once_before_08-configure-cli-tools.sh.tmpl, e.g.
+#                    run_once_before_09-configure-cli-tools.sh.tmpl, e.g.
 #                    ["neovim", "zoxide", "eza"] (default: [] — script exits
 #                    without installing anything). This is for standalone
 #                    CLI tools dot_zshrc.tmpl already checks for with
 #                    `command -v` before wiring up EDITOR, `zoxide init`,
-#                    and the eza aliases — unlike services.packages, there's
-#                    no unit to enable afterward, just a single deduplicated
-#                    `pacman -S --needed` call.
+#                    `fzf --zsh`, and the eza aliases — unlike
+#                    services.packages, there's no unit to enable
+#                    afterward, just a single deduplicated `pacman -S
+#                    --needed` call.
 #   [<host>.fonts]
 #     enabled  list of strings  pacman packages to install via
-#                    run_once_before_09-configure-fonts.sh.tmpl, e.g.
+#                    run_once_before_10-configure-fonts.sh.tmpl, e.g.
 #                    ["ttf-meslo-nerd"] (default: [] — script exits without
 #                    installing anything). A Nerd Font is what
 #                    dot_zshrc.tmpl's powerlevel10k prompt (glyphs) and its
@@ -159,8 +160,14 @@
 #                    putting "eza" in cli_tools.enabled without also listing
 #                    a font here just gets broken/missing glyphs, not an
 #                    error.
+#     nerd_font  bool  whether `enabled` above actually includes a Nerd
+#                    Font (default: false) — not derived from `enabled`
+#                    itself (a package name like "ttf-firacode-nerd" isn't
+#                    something worth pattern-matching on), just a plain
+#                    flag other templates read, e.g.
+#                    dot_config/nvim/init.lua.tmpl's `vim.g.have_nerd_font`.
 #   [<host>.containers.docker]
-#     enabled  bool  whether run_once_before_10-configure-containers.sh.tmpl
+#     enabled  bool  whether run_once_before_11-configure-containers.sh.tmpl
 #                    installs docker, runs `systemctl enable --now
 #                    docker.service`, and adds the applying user to the
 #                    `docker` group (default: false). Idempotent: the group
@@ -168,9 +175,17 @@
 #                    group membership only takes effect in a fresh login
 #                    session — the script prints a reminder rather than
 #                    trying to fix that itself.
+#     packages  list of strings  pacman packages the script installs when
+#                    enabled (default: ["docker"] — just the engine). The
+#                    CLI plugins, docker-buildx (`docker build` via
+#                    BuildKit) and docker-compose (`docker compose`), are
+#                    separate Arch packages the engine doesn't pull in, so
+#                    a host that wants them lists them here explicitly.
+#                    docker.service and the docker group are handled the
+#                    same regardless of what's listed.
 #   [<host>.ssh]
 #     enabled  bool  whether
-#                    run_once_before_11-configure-ssh-hardening.sh.tmpl
+#                    run_once_before_12-configure-ssh-hardening.sh.tmpl
 #                    writes anything at all (default: false — sshd's own
 #                    config is left untouched). Independent of whether
 #                    "sshd" appears in services.enabled: the drop-in below
@@ -190,7 +205,7 @@
 #                    drop-in, e.g. "no" or "prohibit-password" (default:
 #                    "prohibit-password", sshd's own compiled-in default).
 #   [<host>.zram]
-#     enabled  bool  whether run_once_before_12-configure-zram.sh.tmpl
+#     enabled  bool  whether run_once_before_13-configure-zram.sh.tmpl
 #                    installs zram-generator and writes a zram0 config
 #                    (default: false — opt in per host, e.g. skip it on a
 #                    host that already has real swap or plenty of RAM).
@@ -208,7 +223,7 @@
 #                    100, zram-generator's own default — high enough that
 #                    the kernel prefers zram over any disk-backed swap).
 #   [<host>.thp]
-#     enabled  bool  whether run_once_before_13-configure-thp.sh.tmpl
+#     enabled  bool  whether run_once_before_14-configure-thp.sh.tmpl
 #                    touches transparent hugepage config at all (default:
 #                    false — left unset, the kernel's own compiled-in mode
 #                    stands, usually "madvise").
@@ -226,7 +241,7 @@
 #                    reboots the same way, since sysfs itself resets to the
 #                    kernel default on every boot.
 #   [<host>.desktop]
-#     enabled      bool    whether run_once_before_14-configure-desktop.sh.tmpl
+#     enabled      bool    whether run_once_before_15-configure-desktop.sh.tmpl
 #                    installs a desktop environment at all (default: false —
 #                    opt in per host; leave unset on a headless/server host).
 #     environment  string  which desktop environment to install. The only
@@ -255,7 +270,7 @@
 #                    doesn't care; it just needs something under
 #                    /usr/share/*sessions to hand the user afterward. One of:
 #                      - "" (default) — no greeter is installed; run
-#                        run_once_before_15-configure-greeter.sh.tmpl exits
+#                        run_once_before_16-configure-greeter.sh.tmpl exits
 #                        immediately.
 #                      - "tuigreet" — installs greetd-tuigreet from the
 #                        configured pacman repositories (which depends on
@@ -281,7 +296,7 @@
 #                    password prompt for this login (default: "" — full
 #                    user list shown).
 #   [<host>.nvidia]
-#     enabled  bool  whether run_once_before_06-configure-nvidia.sh.tmpl
+#     enabled  bool  whether run_once_before_07-configure-nvidia.sh.tmpl
 #                    detects and installs an NVIDIA driver at all (default:
 #                    false — opt in per host; leave unset on a host with no
 #                    NVIDIA GPU, or an Intel/AMD one — enabling this on such
@@ -293,7 +308,7 @@
 #                    pkg-mgmt.aur.enabled = true; its lib32 counterpart
 #                    additionally requires pkg-mgmt.pacman.multilib = true.
 #   [<host>.fcitx5]
-#     enabled      bool  whether run_once_before_20-configure-fcitx5.sh.tmpl
+#     enabled      bool  whether run_once_before_21-configure-fcitx5.sh.tmpl
 #                    installs fcitx5 (plus fcitx5-gtk, fcitx5-qt, and
 #                    fcitx5-chinese-addons when "chinese" is in
 #                    locale.languages) at all (default: false). Also
@@ -318,7 +333,7 @@
 #                    "librewolf"; two channels of the same browser, e.g.
 #                    "firefox" and "firefox-nightly", both work too, each
 #                    with its own package).
-#     enabled  bool  whether run_once_before_17-configure-browsers.sh.tmpl
+#     enabled  bool  whether run_once_before_18-configure-browsers.sh.tmpl
 #                    installs this entry at all (default: true — an entry
 #                    just being present installs it, same as before this
 #                    field existed). Set false to keep an entry (and its
@@ -332,7 +347,7 @@
 #                    as [<host>.office.<name>].source below — the script
 #                    exits with an error if it isn't).
 #     packages  list of strings  packages to install via
-#                    run_once_before_17-configure-browsers.sh.tmpl in one
+#                    run_once_before_18-configure-browsers.sh.tmpl in one
 #                    call (default: [] — enabling an entry with none listed
 #                    just errors out on pacman/paru's own "no targets
 #                    specified"). The *first* entry is what `settings`
@@ -357,7 +372,7 @@
 #                    docs/host-config/browsers.md for why "default" was
 #                    chosen over "locked".
 #   [<host>.tailscale]
-#     operator  bool  whether run_once_before_18-configure-tailscale.sh.tmpl
+#     operator  bool  whether run_once_before_19-configure-tailscale.sh.tmpl
 #                    sets the applying user as tailscale's operator
 #                    (`tailscale set --operator=<user>`), so `tailscale`
 #                    works without sudo afterward (default: false).
@@ -371,7 +386,7 @@
 #                    .chezmoiignore.tmpl's dotfile gating (see `enabled`
 #                    below) — pick one per terminal you want installed,
 #                    e.g. "kitty".
-#     enabled  bool  whether run_once_before_19-configure-terminals.sh.tmpl
+#     enabled  bool  whether run_once_before_20-configure-terminals.sh.tmpl
 #                    installs this terminal (default: false — an entry can
 #                    be present but turned off, e.g. while trying out a
 #                    replacement without uninstalling the current one).
@@ -403,7 +418,7 @@
 #                    arbitrary label, not read anywhere except log output
 #                    and .chezmoiignore.tmpl's dotfile gating, e.g. "rbw".
 #     enabled  bool  whether
-#                    run_once_before_21-configure-password-managers.sh.tmpl
+#                    run_once_before_22-configure-password-managers.sh.tmpl
 #                    installs this entry (default: false). Each manager's
 #                    own dotfile (e.g. dot_config/rbw/config.json.tmpl) is
 #                    gated on this same flag in .chezmoiignore.tmpl, the
@@ -424,7 +439,7 @@
 #                    [<host>.terminals.<name>] above — <name> is an
 #                    arbitrary label, not read anywhere except log output,
 #                    e.g. "onlyoffice", "libreoffice".
-#     enabled  bool  whether run_once_before_22-configure-office.sh.tmpl
+#     enabled  bool  whether run_once_before_23-configure-office.sh.tmpl
 #                    installs this entry (default: false).
 #     source   string  where `packages` comes from, one of "pacman"
 #                    (default) or "aur". "aur" requires
@@ -435,6 +450,139 @@
 #                    (default: [] — same "no targets specified" pacman/paru
 #                    error as an empty terminals.<name>.packages if left
 #                    empty while enabled).
+#   [<host>.development.<name>]
+#     Same "labeled map, one entry per program" shape as
+#                    [<host>.office.<name>] above — <name> is an
+#                    arbitrary label, e.g. "uv", "fnm", "go", "rustup".
+#     enabled  bool  whether run_once_before_24-configure-development.sh.tmpl
+#                    installs this entry (default: false).
+#     source   string  where `packages` comes from, one of "pacman"
+#                    (default) or "aur". "aur" requires
+#                    pkg-mgmt.aur.enabled = true on this host — the script
+#                    exits with an error if it isn't, rather than silently
+#                    falling back to pacman.
+#     packages  list of strings  packages to install for this entry
+#                    (default: [] — same "no targets specified" pacman/paru
+#                    error as an empty office.<name>.packages if left empty
+#                    while enabled).
+#     post_install  string  shell command run once, right after this
+#                    entry's packages install (default: "" — nothing runs).
+#                    For a package that's a toolchain manager rather than a
+#                    ready-to-use runtime, e.g. "rustup default stable" —
+#                    installing the rustup package alone doesn't select a
+#                    toolchain, so this is what actually does that.
+#     desktop_only  bool  skip this entry (with a log line, not an error)
+#                    on a host where desktop.enabled is false (default:
+#                    false — installed regardless). For GUI companions of
+#                    a CLI tool, e.g. sqlitebrowser next to sqlite: a
+#                    headless host still wants the CLI, never the Qt app.
+#     groups  list of strings  system groups to add the applying user to
+#                    after this entry installs (default: [] — none), same
+#                    idempotent gpasswd-with-membership-check as
+#                    containers.docker's `docker` group. For tools whose
+#                    package creates a group that gates unprivileged use,
+#                    e.g. "wireshark" for packet capture without sudo.
+#                    Membership only takes effect in a fresh login session.
+#     A <name> can also be a group instead of a leaf — one more level of
+#                    nesting, [<host>.development.<name>.<subname>], each
+#                    <subname> its own leaf with the same
+#                    enabled/source/packages/post_install fields. Use this
+#                    when a language has more than one competing toolchain
+#                    worth toggling independently, e.g.
+#                    development.cpp.gcc/development.cpp.clang — a plain
+#                    development.<name> leaf is for anything with just one
+#                    obvious choice.
+#   [<host>.ide.<name>]
+#     Same "labeled map, one entry per program" shape as
+#                    [<host>.office.<name>] above — <name> is an
+#                    arbitrary label, e.g. "vscode". Also gates that IDE's
+#                    own dotfiles in .chezmoiignore.tmpl (e.g.
+#                    ~/.config/Code for "vscode") — see
+#                    docs/host-config/ide/vscode.md.
+#     enabled  bool  whether run_once_before_25-configure-ide.sh.tmpl
+#                    installs this entry (default: false).
+#     source   string  where `packages` comes from, one of "pacman"
+#                    (default) or "aur". "aur" requires
+#                    pkg-mgmt.aur.enabled = true on this host — the script
+#                    exits with an error if it isn't, rather than silently
+#                    falling back to pacman.
+#     packages  list of strings  packages to install for this entry
+#                    (default: [] — same "no targets specified" pacman/paru
+#                    error as an empty office.<name>.packages if left empty
+#                    while enabled).
+#     profiles  list of strings  VS Code only (<name> = "vscode"; ignored on
+#                    any other entry): which of the profiles defined in
+#                    dot_config/Code/User/profiles.json to set up on this
+#                    host, by name, e.g. ["Python", "Rust"] (default: [] —
+#                    every profile in that file). The file, not this
+#                    table, is where a profile's extensions and settings
+#                    live — see docs/host-config/ide/vscode.md#profiles;
+#                    run_once_before_27-configure-vscode-profiles.sh.tmpl
+#                    registers each one in VS Code's storage.json (the
+#                    CLI can't create profiles) and installs its
+#                    extensions with `code --profile <profile>
+#                    --install-extension`. Registering needs VS Code
+#                    closed; adding extensions to a registered profile
+#                    doesn't. A name listed here but missing from the file
+#                    fails `chezmoi apply` at template time.
+#   [<host>.sccache]
+#     Settings written to ~/.config/sccache/config by
+#                    dot_config/sccache/config.tmpl. Written only on a host
+#                    where some enabled development entry lists "sccache"
+#                    in its packages (.chezmoiignore.tmpl checks every leaf
+#                    and group member); the same check gates
+#                    ~/.cargo/config.toml, which points cargo at sccache.
+#                    There's no separate enabled flag. Everything left
+#                    unset is omitted from the file, so sccache's own
+#                    defaults stay in charge.
+#     cache_size  string  [cache.disk] size — cache cap, with a K/M/G/T
+#                    suffix (base 1024, same as SCCACHE_CACHE_SIZE), e.g.
+#                    "20G" (default: "" → omitted → sccache's 10G).
+#     cache_dir  string  [cache.disk] dir — where the cache lives
+#                    (default: "" → omitted → sccache's ~/.cache/sccache).
+#                    A leading "~/" is expanded by the template, since
+#                    sccache itself takes the path literally.
+#   [<host>.sccache.preprocessor_cache_mode]
+#     Written verbatim as [cache.disk.preprocessor_cache_mode] — the
+#                    C/C++-only "skip the preprocessor, track the headers"
+#                    mode, gcc/clang only. Any key set here is copied
+#                    through as-is (no per-key default, so a `false` is
+#                    written as `false`); keys left out aren't written.
+#                    sccache's own defaults, and what each key relaxes:
+#     use_preprocessor_cache_mode  bool  the mode itself (default true).
+#     file_stat_matches  bool  trust size/mtime/ctime of a header instead
+#                    of hashing its contents (default false — hash them).
+#     use_ctime_for_stat  bool  include ctime in that stat check (default
+#                    true; only matters with file_stat_matches).
+#     ignore_time_macros  bool  cache a file that uses __DATE__/__TIME__/
+#                    __TIMESTAMP__ anyway (default false — such a file is
+#                    never cached in this mode).
+#     skip_system_headers  bool  don't hash /usr/include & co., only
+#                    track their paths (default false).
+#     hash_working_directory  bool  include CWD in the key (default
+#                    true; false lets builds from different directories
+#                    share entries).
+#   [<host>.network_tools.<name>]
+#     Same "labeled map, one entry per program" shape as
+#                    [<host>.development.<name>] above, leaves only (no
+#                    groups) — <name> is an arbitrary label, e.g. "nmap",
+#                    "dig", "wireshark". For network diagnostics that
+#                    aren't tied to any language toolchain: scanners,
+#                    tracers, DNS lookup, packet capture.
+#     enabled  bool  whether run_once_before_26-configure-network-tools.sh.tmpl
+#                    installs this entry (default: false).
+#     source   string  "pacman" (default) or "aur", as for development.
+#     packages  list of strings  packages to install for this entry
+#                    (default: []).
+#     post_install  string  shell command run once after this entry's
+#                    packages install (default: "" — nothing runs).
+#     desktop_only  bool  skip on a host where desktop.enabled is false
+#                    (default: false), as for development — e.g.
+#                    wireshark-qt, while tcpdump/tshark still go everywhere.
+#     groups  list of strings  system groups to add the applying user to
+#                    after install (default: []), as for development —
+#                    "wireshark" is the one that matters here: without it,
+#                    wireshark and tshark only see interfaces under sudo.
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -450,6 +598,7 @@ user.email = "valikluks95@gmail.com"
 [hyper-lin.locale]
 locales = ["en_US.UTF-8 UTF-8", "ru_RU.UTF-8 UTF-8"]
 languages = ["english", "russian", "ukrainian", "chinese"]
+timezone = "Europe/Kyiv"
 
 [hyper-lin.fcitx5]
 enabled = true
@@ -496,8 +645,22 @@ enabled = true
 # docs/host-config/desktop.md): config.kdl.tmpl's media/brightness key
 # binds spawn playerctl/brightnessctl directly, and switch-layout.sh.tmpl
 # shells out to jq to parse `niri msg -j keyboard-layouts`.
+#
+# git-delta and git-lfs are the entries dot_gitconfig.tmpl reacts to: it
+# only sets core.pager/interactive.diffFilter to delta when "git-delta" is
+# in this list (a pager that isn't installed would break every `git
+# diff`), and only writes the [filter "lfs"] block — what `git lfs
+# install` would put there — when "git-lfs" is. tealdeer likewise gets
+# its config (auto-updating cache) only when listed.
+#
+# shellcheck, luacheck and lychee are what this repo's CI runs (ci/*.sh,
+# docs/ci.md), here so the same checks run locally before a push.
 [hyper-lin.cli_tools]
-enabled = ["pipewire-pulse", "pipewire-alsa", "wireplumber", "jq", "playerctl", "brightnessctl"]
+enabled = ["pipewire-pulse", "pipewire-alsa", "wireplumber", "jq", "yq", "playerctl", "brightnessctl", "tmux", "direnv", "zoxide", "eza", "fzf", "yazi", "bat", "tealdeer", "ripgrep", "fd", "unzip", "zip", "7zip", "rsync", "wget", "curl", "ncdu", "duf", "htop", "btop", "just", "git-delta", "git-lfs", "shellcheck", "luacheck", "lychee"]
+
+[hyper-lin.containers.docker]
+enabled = true
+packages = ["docker", "docker-buildx", "docker-compose"]
 
 [hyper-lin.desktop]
 enabled = true
@@ -511,6 +674,7 @@ type = "noctalia-greeter"
 
 [hyper-lin.fonts]
 enabled = ["ttf-firacode-nerd", "ttf-nerd-fonts-symbols-mono", "noto-fonts-emoji"]
+nerd_font = true
 
 [hyper-lin.terminals.kitty]
 enabled = true
@@ -524,6 +688,149 @@ packages = ["rbw", "pinentry"]
 enabled = true
 source = "aur"
 packages = ["onlyoffice-bin"]
+
+# No version pinned: `uv python install` with no argument fetches the
+# latest stable CPython, and --default also links it as plain `python`/
+# `python3` under ~/.local/bin (already on PATH via .zshrc), so there's a
+# system-independent interpreter for ad-hoc use outside any project.
+[hyper-lin.development.uv]
+enabled = true
+packages = ["uv"]
+post_install = "uv python install --default"
+
+[hyper-lin.development.fnm]
+enabled = true
+packages = ["fnm"]
+# pnpm via npm inside fnm's own node rather than Arch's `pnpm` package,
+# which would drag in a system `nodejs` alongside fnm's. `fnm exec
+# --using` runs with that version on PATH without needing the shell hook,
+# which a run_once script doesn't have.
+post_install = "fnm install --lts && fnm default lts-latest && fnm exec --using=lts-latest -- npm install -g pnpm"
+
+# delve is Go's debugger, and what nvim-dap/VS Code drive for Go.
+[hyper-lin.development.go]
+enabled = true
+packages = ["go", "delve"]
+
+[hyper-lin.development.rustup]
+enabled = true
+packages = ["rustup"]
+post_install = "rustup default stable"
+
+# One cache for both rustc (via ~/.cargo/config.toml's rustc-wrapper) and
+# C/C++ (via CMAKE_*_COMPILER_LAUNCHER exported from .zshrc) — its own
+# entry rather than a package in rustup or cpp.*, since it serves both.
+# Settings live in [hyper-lin.sccache] below.
+[hyper-lin.development.sccache]
+enabled = true
+packages = ["sccache"]
+
+[hyper-lin.sccache]
+cache_size = "20G"
+
+[hyper-lin.development.gh]
+enabled = true
+packages = ["github-cli"]
+
+# Grouped under development.cpp instead of flat development.<name>: gcc
+# and clang are two competing C/C++ toolchains, not one tool with a
+# single obvious label — each gets its own enabled/source/packages/
+# post_install, same shape as any other entry, just one level deeper.
+# make/cmake/meson/ninja go in both, since which build-system generator a
+# given C/C++ project uses is independent of which compiler it's built
+# with. The debugger follows the compiler instead: gdb with gcc, lldb
+# (plus lld, LLVM's linker) with clang — each understands its own
+# toolchain's debug info best. cppcheck is compiler-agnostic like the
+# build tools, so it's in both too. Compilation caching is
+# development.sccache below, not a package here.
+[hyper-lin.development.cpp.gcc]
+enabled = true
+packages = ["gcc", "gdb", "make", "cmake", "meson", "ninja", "cppcheck"]
+
+[hyper-lin.development.cpp.clang]
+enabled = true
+packages = ["clang", "lldb", "lld", "llvm", "make", "cmake", "meson", "ninja", "cppcheck"]
+
+[hyper-lin.development.jdk]
+enabled = true
+packages = ["jdk-openjdk"]
+
+[hyper-lin.development.dotnet]
+enabled = true
+packages = ["dotnet-sdk"]
+
+# kotlin is just the compiler (kotlinc); gradle is the build tool every
+# non-trivial Kotlin project assumes. Both run on development.jdk above.
+[hyper-lin.development.kotlin]
+enabled = true
+packages = ["kotlin", "gradle"]
+
+# Two entries, not one: the CLI is wanted everywhere, the Qt GUI only where
+# there's a desktop to draw it on (desktop_only).
+[hyper-lin.development.sqlite]
+enabled = true
+packages = ["sqlite"]
+
+[hyper-lin.development.sqlitebrowser]
+enabled = true
+packages = ["sqlitebrowser"]
+desktop_only = true
+
+# Language-agnostic runtime inspection, so its own entry rather than
+# stuffed into cpp: strace/ltrace trace syscalls/library calls of any
+# binary, perf samples anything with symbols, valgrind instruments native
+# code whichever compiler built it.
+[hyper-lin.development.tracing]
+enabled = true
+packages = ["valgrind", "strace", "ltrace", "perf"]
+
+[hyper-lin.network_tools.nmap]
+enabled = true
+packages = ["nmap"]
+
+[hyper-lin.network_tools.mtr]
+enabled = true
+packages = ["mtr"]
+
+# bind is for dig/host/nslookup — Arch ships the resolver utilities in the
+# same package as the named server; nothing here enables named.service.
+[hyper-lin.network_tools.dig]
+enabled = true
+packages = ["bind"]
+
+[hyper-lin.network_tools.tcpdump]
+enabled = true
+packages = ["tcpdump"]
+
+# wireshark-qt pulls in wireshark-cli (tshark) and the `wireshark` group
+# that gates capture without root. GUI, so desktop_only.
+[hyper-lin.network_tools.wireshark]
+enabled = true
+packages = ["wireshark-qt"]
+desktop_only = true
+groups = ["wireshark"]
+
+# Which profiles from dot_config/Code/User/profiles.json to set up — left
+# unset, all of them (.NET, Python, Rust, Node.JS); the extension lists
+# and per-profile settings are in that file, not here.
+[hyper-lin.ide.vscode]
+enabled = true
+source = "aur"
+packages = ["visual-studio-code-bin"]
+
+# The editor, what its plugin manager needs the git *binary* for
+# (lazy.nvim shells out to it directly, not some Go/Lua git library), and
+# tree-sitter-cli, which nvim-treesitter's `main` branch needs to build
+# parsers (from the repos, not npm — the README is explicit about that).
+# Everything else Neovim's LSP setup needs — ripgrep/fd/unzip
+# (cli_tools.enabled), a C/C++ compiler (development.cpp.gcc/
+# development.cpp.clang), and Java/.NET runtimes
+# (development.jdk/development.dotnet) — lives in those other entries
+# instead; see docs/host-config/ide/neovim.md for the full breakdown of
+# which entry backs which language server.
+[hyper-lin.ide.neovim]
+enabled = true
+packages = ["neovim", "git", "tree-sitter-cli"]
 
 [hyper-lin.nvidia]
 enabled = true

@@ -55,12 +55,14 @@
 {{- $cliTools        := get $cfg "cli_tools" | default dict -}}
 {{- $cliToolsEnabled := get $cliTools "enabled" | default (list) -}}
 
-{{- $fonts        := get $cfg "fonts" | default dict -}}
-{{- $fontsEnabled := get $fonts "enabled" | default (list) -}}
+{{- $fonts          := get $cfg "fonts" | default dict -}}
+{{- $fontsEnabled   := get $fonts "enabled" | default (list) -}}
+{{- $fontsNerdFont  := get $fonts "nerd_font" | default false -}}
 
 {{- $containers              := get $cfg "containers" | default dict -}}
 {{- $containersDocker        := get $containers "docker" | default dict -}}
 {{- $containersDockerEnabled := get $containersDocker "enabled" | default false -}}
+{{- $containersDockerPackages := get $containersDocker "packages" | default (list "docker") -}}
 
 {{- $networking                     := get $cfg "networking" | default dict -}}
 {{- $networkingSystemdResolved      := get $networking "systemd_resolved" | default dict -}}
@@ -109,6 +111,16 @@
 {{- $passwordManagers := get $cfg "password_managers" | default dict -}}
 
 {{- $office := get $cfg "office" | default dict -}}
+
+{{- $development := get $cfg "development" | default dict -}}
+
+{{- $ide := get $cfg "ide" | default dict -}}
+{{- $networkTools := get $cfg "network_tools" | default dict -}}
+
+{{- $sccache          := get $cfg "sccache" | default dict -}}
+{{- $sccacheCacheSize := get $sccache "cache_size" | default "" -}}
+{{- $sccacheCacheDir  := get $sccache "cache_dir" | default "" -}}
+{{- $sccachePcm       := get $sccache "preprocessor_cache_mode" | default dict -}}
 
 {{- $tailscale         := get $cfg "tailscale" | default dict -}}
 {{- $tailscaleOperator := get $tailscale "operator" | default false -}}
@@ -169,10 +181,12 @@
     enabled = {{ toJson $cliToolsEnabled }}
 
     [data.fonts]
-    enabled = {{ toJson $fontsEnabled }}
+    enabled   = {{ toJson $fontsEnabled }}
+    nerd_font = {{ $fontsNerdFont }}
 
     [data.containers.docker]
-    enabled = {{ $containersDockerEnabled }}
+    enabled  = {{ $containersDockerEnabled }}
+    packages = {{ toJson $containersDockerPackages }}
 
     [data.networking.systemd_resolved]
     enabled = {{ $networkingSystemdResolvedEnabled }}
@@ -254,6 +268,66 @@
     enabled  = {{ get $app "enabled" | default false }}
     source   = {{ get $app "source" | default "pacman" | quote }}
     packages = {{ toJson (get $app "packages" | default (list)) }}
+    {{- end }}
+
+    [data.development]
+    {{- range $name, $entry := $development }}
+    {{- if hasKey $entry "packages" }}
+
+    [data.development.{{ $name | quote }}]
+    enabled      = {{ get $entry "enabled" | default false }}
+    source       = {{ get $entry "source" | default "pacman" | quote }}
+    packages     = {{ toJson (get $entry "packages" | default (list)) }}
+    post_install = {{ get $entry "post_install" | default "" | quote }}
+    desktop_only = {{ get $entry "desktop_only" | default false }}
+    groups       = {{ toJson (get $entry "groups" | default (list)) }}
+    {{- else }}
+    {{-   range $subName, $sub := $entry }}
+
+    [data.development.{{ $name | quote }}.{{ $subName | quote }}]
+    enabled      = {{ get $sub "enabled" | default false }}
+    source       = {{ get $sub "source" | default "pacman" | quote }}
+    packages     = {{ toJson (get $sub "packages" | default (list)) }}
+    post_install = {{ get $sub "post_install" | default "" | quote }}
+    desktop_only = {{ get $sub "desktop_only" | default false }}
+    groups       = {{ toJson (get $sub "groups" | default (list)) }}
+    {{-   end }}
+    {{- end }}
+    {{- end }}
+
+    [data.ide]
+    {{- range $name, $app := $ide }}
+
+    [data.ide.{{ $name | quote }}]
+    enabled  = {{ get $app "enabled" | default false }}
+    source   = {{ get $app "source" | default "pacman" | quote }}
+    packages = {{ toJson (get $app "packages" | default (list)) }}
+    profiles = {{ toJson (get $app "profiles" | default (list)) }}
+    {{- end }}
+
+    [data.sccache]
+    cache_size = {{ $sccacheCacheSize | quote }}
+    cache_dir  = {{ $sccacheCacheDir | quote }}
+
+    # Copied through key-for-key rather than defaulted per key: three of
+    # these default to true upstream, and `default` can't tell an explicit
+    # false from unset — see the ssh.disable_password_auth note in
+    # docs/host-config/ssh-hardening.md. Only what the host sets gets here.
+    [data.sccache.preprocessor_cache_mode]
+    {{- range $key, $value := $sccachePcm }}
+    {{ $key }} = {{ $value }}
+    {{- end }}
+
+    [data.network_tools]
+    {{- range $name, $tool := $networkTools }}
+
+    [data.network_tools.{{ $name | quote }}]
+    enabled      = {{ get $tool "enabled" | default false }}
+    source       = {{ get $tool "source" | default "pacman" | quote }}
+    packages     = {{ toJson (get $tool "packages" | default (list)) }}
+    post_install = {{ get $tool "post_install" | default "" | quote }}
+    desktop_only = {{ get $tool "desktop_only" | default false }}
+    groups       = {{ toJson (get $tool "groups" | default (list)) }}
     {{- end }}
 
     [data.tailscale]

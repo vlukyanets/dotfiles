@@ -1,6 +1,6 @@
 # Shell
 
-[`.chezmoiscripts/run_once_before_07-configure-shell.sh.tmpl`](../../.chezmoiscripts/run_once_before_07-configure-shell.sh.tmpl)
+[`.chezmoiscripts/run_once_before_08-configure-shell.sh.tmpl`](../../.chezmoiscripts/run_once_before_08-configure-shell.sh.tmpl)
 is gated behind `shell.zsh.enabled` (default `false`) the same way the
 [AUR script](aur.md) is gated behind `pkg_mgmt.aur.enabled` — hosts that
 leave it unset skip it entirely. When enabled, it installs `zsh` and (if it
@@ -29,3 +29,13 @@ Powerlevel10k. `dot_zshrc.tmpl` already sources `~/.p10k.zsh` if present
 (`[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh`) regardless of this flag,
 so a host with the file missing just falls through to `p10k configure`'s
 interactive wizard on first oh-my-zsh shell start instead of failing.
+
+`dot_zshrc.tmpl` also has one hook unrelated to oh-my-zsh: on a host with
+`development.fnm.enabled` (see [Development](development.md#node-via-fnm)),
+it adds `eval "$(fnm env --use-on-cd)"`, guarded by `command -v fnm` the
+same way the `zoxide`/`eza` aliases already are — so a directory's
+`.node-version`/`.nvmrc` switches Node versions automatically on `cd`.
+It also exports `CMAKE_C_COMPILER_LAUNCHER`/`CMAKE_CXX_COMPILER_LAUNCHER=sccache`
+behind `command -v sccache` — see [Development](development.md#sccache)
+— and wires up `fzf --zsh` behind `command -v fzf`, like the other
+[`cli_tools`](cli-tools.md) hooks.

@@ -1,5 +1,11 @@
+# Repo files, not dotfiles: chezmoi treats every non-dot name in the source
+# as a target, so without this they'd land in $HOME.
+README.md
+LICENSE
+CLAUDE.md
 docs
 system
+ci
 
 {{- if not .shell.zsh.enabled }}
 .zshrc
@@ -30,4 +36,49 @@ system
 
 {{- if not (eq .desktop.niri.shell "noctalia") }}
 .local/state/noctalia
+{{- end }}
+
+{{- if not (has "tmux" .cli_tools.enabled) }}
+.config/tmux
+{{- end }}
+
+{{- if not (has "direnv" .cli_tools.enabled) }}
+.config/direnv
+{{- end }}
+
+{{- if not (has "tealdeer" .cli_tools.enabled) }}
+.config/tealdeer
+{{- end }}
+
+{{- /* sccache has no enabled flag of its own: its config, and the cargo
+     config that points rustc at it, are wanted exactly when some enabled
+     development entry (leaf or group member) installs the package. */}}
+{{- $sccache := false }}
+{{- range $name, $entry := .development }}
+{{-   if hasKey $entry "packages" }}
+{{-     if and $entry.enabled (has "sccache" $entry.packages) }}{{ $sccache = true }}{{ end }}
+{{-   else }}
+{{-     range $subName, $sub := $entry }}
+{{-       if and $sub.enabled (has "sccache" $sub.packages) }}{{ $sccache = true }}{{ end }}
+{{-     end }}
+{{-   end }}
+{{- end }}
+{{- if not $sccache }}
+.config/sccache
+.cargo/config.toml
+{{- end }}
+
+{{- $ghDev := get .development "gh" | default dict }}
+{{- if not (get $ghDev "enabled" | default false) }}
+.config/gh
+{{- end }}
+
+{{- $vscodeIde := get .ide "vscode" | default dict }}
+{{- if not (get $vscodeIde "enabled" | default false) }}
+.config/Code
+{{- end }}
+
+{{- $neovimIde := get .ide "neovim" | default dict }}
+{{- if not (get $neovimIde "enabled" | default false) }}
+.config/nvim
 {{- end }}

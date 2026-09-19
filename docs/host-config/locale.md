@@ -1,6 +1,6 @@
 # Locale
 
-[`.chezmoiscripts/run_once_before_03-configure-locale.sh.tmpl`](../../.chezmoiscripts/run_once_before_03-configure-locale.sh.tmpl)
+[`.chezmoiscripts/run_once_before_04-configure-locale.sh.tmpl`](../../.chezmoiscripts/run_once_before_04-configure-locale.sh.tmpl)
 enables each entry in `locale.locales` in `/etc/locale.gen` (uncommenting it
 if it's already there commented out, appending it otherwise) and runs
 `locale-gen`, then writes `/etc/locale.conf` (`LANG`) and `/etc/vconsole.conf`

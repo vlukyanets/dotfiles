@@ -12,7 +12,7 @@ $SUDO_CMD pacman -S --needed --noconfirm reflector
 echo "==> Writing /etc/xdg/reflector/reflector.conf"
 $SUDO_CMD mkdir -p /etc/xdg/reflector
 $SUDO_CMD tee /etc/xdg/reflector/reflector.conf >/dev/null <<CONF
-# Managed by chezmoi (.chezmoiscripts/run_once_before_01-configure-reflector.sh.tmpl)
+# Managed by chezmoi (.chezmoiscripts/run_once_before_02-configure-reflector.sh.tmpl)
 --save $REFLECTOR_SAVE
 {{- if .pkg_mgmt.reflector.country }}
 --country {{ join "," .pkg_mgmt.reflector.country }}
@@ -27,7 +27,7 @@ CONF
 echo "==> Configuring reflector.timer (/etc/systemd/system/reflector.timer.d/override.conf)"
 $SUDO_CMD mkdir -p /etc/systemd/system/reflector.timer.d
 $SUDO_CMD tee /etc/systemd/system/reflector.timer.d/override.conf >/dev/null <<CONF
-# Managed by chezmoi (.chezmoiscripts/run_once_before_01-configure-reflector.sh.tmpl)
+# Managed by chezmoi (.chezmoiscripts/run_once_before_02-configure-reflector.sh.tmpl)
 [Timer]
 OnCalendar=
 OnCalendar={{ .pkg_mgmt.reflector.timer.on_calendar }}

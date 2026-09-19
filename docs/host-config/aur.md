@@ -1,6 +1,6 @@
 # AUR / paru
 
-[`.chezmoiscripts/run_once_before_02-configure-aur.sh.tmpl`](../../.chezmoiscripts/run_once_before_02-configure-aur.sh.tmpl)
+[`.chezmoiscripts/run_once_before_03-configure-aur.sh.tmpl`](../../.chezmoiscripts/run_once_before_03-configure-aur.sh.tmpl)
 builds and installs [paru](https://github.com/Morganamilo/paru) from the AUR,
 gated entirely behind `pkg_mgmt.aur.enabled` (default `false`) — hosts that
 leave it unset skip the script without touching the network. When enabled,
