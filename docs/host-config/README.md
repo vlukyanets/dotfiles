@@ -66,6 +66,11 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.desktop.enabled`                  | whether to install a desktop environment at all |
 | `.desktop.environment`              | which desktop environment to install (only `"niri"` implemented) |
 | `.desktop.niri.shell`                | which shell/bar layer to install on top of niri (only `"noctalia"` implemented; only read when `.desktop.environment` is `"niri"`) |
+| `.desktop.niri.noctalia.font`        | fontconfig family for noctalia's whole shell, `""` (default) = its own `sans-serif` (only read when `.desktop.niri.shell` is `"noctalia"`) |
+| `.desktop.niri.noctalia.font_package` | pacman package providing that font, installed next to `noctalia`; `""` (default) installs nothing extra |
+| `.desktop.niri.noctalia.theme.source` | where noctalia's palette comes from — `"builtin"` (default), `"community"` or `"wallpaper"` |
+| `.desktop.niri.noctalia.theme.name`   | which palette: a builtin name, a community palette name from [noctalia.dev/palettes](https://noctalia.dev/palettes), or an m3 scheme; `""` (default) = noctalia's own pick |
+| `.desktop.niri.noctalia.theme.mode`   | `"dark"` (default) or `"light"` |
 | `.greeter.type`                      | which greetd greeter to install and configure — `""` (none, default), `"tuigreet"`, or `"noctalia-greeter"` from the AUR. Independent of `.desktop.*` |
 | `.greeter.noctalia_greeter.session`   | forces a specific Wayland session for noctalia-greeter instead of showing its session picker (only read when `.greeter.type` is `"noctalia-greeter"`) |
 | `.greeter.noctalia_greeter.user`      | skips noctalia-greeter's user list, straight to the password prompt for this login (only read when `.greeter.type` is `"noctalia-greeter"`) |

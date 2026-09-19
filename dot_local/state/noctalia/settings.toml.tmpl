@@ -2,7 +2,21 @@ config_version = 14
 
 [bar.default]
 end = [ "keyboard_layout", "media", "tray", "notifications", "clipboard", "network", "bluetooth", "volume", "brightness", "battery", "control-center", "session" ]
-start = [ "launcher", "wallpaper", "workspaces" ]
+font_scale = 1.1
+margin_ends = 0
+start = [ "launcher", "workspaces" ]
+
+[shell]
+font_family = {{ .desktop.niri.noctalia.font | default "sans-serif" | quote }}
+
+{{ with .desktop.niri.noctalia.theme -}}
+[theme]
+source = {{ .source | quote }}
+mode = {{ .mode | quote }}
+{{- if .name }}
+{{ if eq .source "community" }}community_palette{{ else if eq .source "wallpaper" }}wallpaper_scheme{{ else }}builtin{{ end }} = {{ .name | quote }}
+{{- end }}
+{{- end }}
 
 [control_center.calendar]
 show_week_numbers = true

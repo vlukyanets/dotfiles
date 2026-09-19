@@ -38,9 +38,12 @@ ignored otherwise. It picks a shell/bar layer to install on top of the bare
 compositor. Default `""` installs niri with nothing on top. The only value
 currently implemented is `"noctalia"`, which installs the single `noctalia`
 package (the desktop shell's own official package, not the older AUR
-`noctalia-shell` quickshell config). As with `desktop.environment`, a
-non-empty value the script doesn't recognize is an error, not a silent
-no-op.
+`noctalia-shell` quickshell config), plus `desktop.niri.noctalia.font_package`
+if set — the pacman package behind the font `desktop.niri.noctalia.font`
+asks noctalia to render in (see [noctalia](desktop/noctalia.md)); both
+default to `""`, i.e. no extra package and noctalia's own `sans-serif`. As
+with `desktop.environment`, a non-empty value the script doesn't recognize
+is an error, not a silent no-op.
 
 Adding a second desktop environment means teaching this script a new `{{ if
 eq .desktop.environment "..." }}` branch (and, if it has its own shell/bar
@@ -51,6 +54,6 @@ options, a new `desktop.<environment>.*` sub-table next to `desktop.niri.*`
 
 - [niri](desktop/niri.md) — `dot_config/niri/*`, the compositor config
   itself (this page only covers installing the package)
-- [noctalia](desktop/noctalia.md) — `dot_local/state/noctalia/settings.toml`,
+- [noctalia](desktop/noctalia.md) — `dot_local/state/noctalia/settings.toml.tmpl`,
   the shell's own settings file (this page only covers installing the
   package)

@@ -286,6 +286,33 @@
 #                    "niri" — see docs/host-config/desktop/niri.md. It
 #                    reads locale.languages for its keyboard layout list
 #                    and fcitx5.enabled for input-method integration.
+#   [<host>.desktop.niri.noctalia]
+#     Read only when desktop.niri.shell = "noctalia" — ignored otherwise.
+#     font          string  fontconfig family name noctalia renders the whole
+#                    shell (bar, launcher, panels) in, written to
+#                    shell.font_family in ~/.local/state/noctalia/settings.toml.
+#                    Default: "" — noctalia's own default, "sans-serif".
+#     font_package  string  pacman package that provides `font`, installed
+#                    next to noctalia by run_once_before_15-configure-desktop
+#                    .sh.tmpl. Default: "" — nothing extra is installed,
+#                    which is fine when `font` is already covered by
+#                    fonts.enabled (pacman --needed makes listing it in both
+#                    harmless). A `font` with no package behind it isn't an
+#                    error — fontconfig substitutes its default.
+#   [<host>.desktop.niri.noctalia.theme]
+#     source  string  where the colour palette comes from — noctalia's
+#                    theme.source: "builtin" (default), "community" (a
+#                    palette from https://noctalia.dev/palettes) or
+#                    "wallpaper" (Material You generated from the wallpaper).
+#     name    string  which one: a builtin name (Noctalia, Catppuccin,
+#                    Dracula, Gruvbox, Kanagawa, Nord, Oxocarbon), a
+#                    community palette's name exactly as the gallery shows
+#                    it (e.g. "Cyberpunk", "Catppuccin Mocha Mauve"), or an
+#                    m3 scheme for wallpaper. Default: "" — noctalia's own
+#                    pick for that source (builtin → Noctalia).
+#     mode    string  "dark" (default) or "light".
+#                    None of these are validated; a wrong name makes
+#                    noctalia fall back to its default palette, not fail.
 #   [<host>.greeter]
 #     type  string  which greetd greeter to install and write into
 #                    /etc/greetd/config.toml. A separate, top-level concern
@@ -699,6 +726,15 @@ environment = "niri"
 [hyper-lin.desktop.niri]
 shell = "noctalia"
 
+[hyper-lin.desktop.niri.noctalia]
+font         = "FiraCode Nerd Font Propo"
+font_package = "ttf-firacode-nerd"
+
+[hyper-lin.desktop.niri.noctalia.theme]
+source = "community"
+name   = "Cyberpunk"
+mode   = "dark"
+
 [hyper-lin.greeter]
 type = "noctalia-greeter"
 
@@ -1033,6 +1069,13 @@ packages = ["firefox"]
 # environment = "niri"
 # [homelab.desktop.niri]
 # shell = "noctalia"
+# [homelab.desktop.niri.noctalia]
+# font         = "FiraCode Nerd Font Propo"    # unset → sans-serif
+# font_package = "ttf-firacode-nerd"
+# [homelab.desktop.niri.noctalia.theme]
+# source = "community"    # builtin (default) | community | wallpaper
+# name   = "Cyberpunk"    # from https://noctalia.dev/palettes
+# mode   = "dark"
 #
 # [homelab.greeter]
 # type = "noctalia-greeter"    # or "tuigreet"; the AUR one needs pkg-mgmt.aur.enabled = true
