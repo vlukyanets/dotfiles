@@ -76,6 +76,8 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.greeter.noctalia_greeter.user`      | skips noctalia-greeter's user list, straight to the password prompt for this login (only read when `.greeter.type` is `"noctalia-greeter"`) |
 | `.nvidia.enabled`                    | whether to detect and install an NVIDIA driver at all |
 | `.fcitx5.enabled`                    | whether to install fcitx5 and write its config/profile — see [fcitx5](fcitx5.md) |
+| `.fcitx5.cloudpinyin`                | whether pinyin candidates also query an online backend (default `false`; every syllable typed leaves the machine while on) |
+| `.fcitx5.cloudpinyin_backend`        | which service that is — `"Google"`, `"GoogleCN"` or `"Baidu"` (default) |
 | `.browsers.<name>.package`           | pacman package to install for this browser entry |
 | `.browsers.<name>.source`            | where `.browsers.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.browsers.<name>.settings`          | about:config preference name → value, written into that browser's `policies.json` |

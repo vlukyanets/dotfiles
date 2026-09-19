@@ -113,6 +113,7 @@
 {{- $fcitx5            := get $cfg "fcitx5" | default dict -}}
 {{- $fcitx5Enabled     := get $fcitx5 "enabled" | default false -}}
 {{- $fcitx5Cloudpinyin := get $fcitx5 "cloudpinyin" | default false -}}
+{{- $fcitx5CloudpinyinBackend := get $fcitx5 "cloudpinyin_backend" | default "Baidu" -}}
 
 {{- $browsers := get $cfg "browsers" | default dict -}}
 
@@ -247,6 +248,7 @@
     [data.fcitx5]
     enabled     = {{ $fcitx5Enabled }}
     cloudpinyin = {{ $fcitx5Cloudpinyin }}
+    cloudpinyin_backend = {{ $fcitx5CloudpinyinBackend | quote }}
 
     [data.browsers]
     {{- range $name, $browser := $browsers }}

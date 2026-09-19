@@ -378,6 +378,13 @@
 #                    this turns it on. Every pinyin syllable typed while
 #                    it's on leaves the machine, so it's opt-in and
 #                    separate from enabled — see docs/host-config/fcitx5.md.
+#     cloudpinyin_backend  string  which online service cloudpinyin queries,
+#                    written to dot_config/fcitx5/conf/private_cloudpinyin.conf.tmpl. One
+#                    of the three compiled into the module: "Google"
+#                    (google.com Input Tools), "GoogleCN" (google.cn —
+#                    fcitx5's own default, unreliable outside mainland
+#                    China), "Baidu" (default here). Only meaningful with
+#                    cloudpinyin = true; the value isn't validated.
 #   [<host>.browsers.<name>]
 #     <name> is an arbitrary label, not read anywhere except log output —
 #                    pick one per browser you want installed (e.g. "firefox",
@@ -653,6 +660,8 @@ timezone = "Europe/Kyiv"
 
 [hyper-lin.fcitx5]
 enabled = true
+cloudpinyin = true
+cloudpinyin_backend = "Google"
 
 [hyper-lin.pkg-mgmt.pacman]
 parallel-downloads = 2

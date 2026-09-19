@@ -122,8 +122,11 @@ config, not the install script.
   (a `#`-commented description above each key, its default value also
   commented out unless actually set — same as what fcitx5 itself writes
   the first time it runs). Every key here is left exactly as fcitx5's own
-  defaults except `CloudPinyinEnabled`, the one line templated from
-  `fcitx5.cloudpinyin`. The template follows fcitx5's own rule for that
+  defaults except two: `PageSize=10` (candidates per page — fcitx5's
+  default is 7, its maximum 10; a fixed repo-wide preference, uncommented
+  because it's a non-default value) and `CloudPinyinEnabled`, the one
+  line templated from `fcitx5.cloudpinyin`. The template follows fcitx5's
+  own rule for that
   line too: `CloudPinyinEnabled=True` uncommented when the flag is on (a
   non-default value, same as the pre-existing `FirstRun=False` line
   below it), `# CloudPinyinEnabled=False` when it's off — `False` *is*
@@ -136,14 +139,33 @@ config, not the install script.
   the rest of the file intact avoids silently wiping out fcitx5's own
   reference documentation of every other pinyin setting on every
   `chezmoi apply`.
-- [`dot_config/fcitx5/conf/cloudpinyin.conf`](../../dot_config/fcitx5/conf/cloudpinyin.conf)
-  — the backend's own settings, currently just `Backend=Baidu`. Shipped
-  unconditionally alongside the rest of `dot_config/fcitx5/conf/` (dormant,
-  same as the addon itself, when the flag above is off) rather than
-  gated separately — one inert file is simpler than a second
-  `.chezmoiignore.tmpl` rule for what `CloudPinyinEnabled` already
-  controls. Google's backend needs a VPN from most networks that also
-  need cloudpinyin's help; Baidu doesn't, hence the default.
+- [`dot_config/fcitx5/conf/private_cloudpinyin.conf.tmpl`](../../dot_config/fcitx5/conf/private_cloudpinyin.conf.tmpl)
+  — the module's own settings. The only templated line is `Backend`,
+  from `fcitx5.cloudpinyin_backend`; the three values are the ones
+  compiled into `libcloudpinyin.so`: `Google` (google.com Input Tools),
+  `GoogleCN` (google.cn, fcitx5's own default — unreliable outside
+  mainland China) and `Baidu` (this repo's default: Google's backend
+  needs a VPN from most networks that also need cloudpinyin's help,
+  Baidu doesn't). Shipped unconditionally alongside the rest of
+  `dot_config/fcitx5/conf/` (dormant, same as the addon itself, when the
+  flag above is off) rather than gated separately — one inert file is
+  simpler than a second `.chezmoiignore.tmpl` rule for what
+  `CloudPinyinEnabled` already controls. The file mirrors what fcitx5
+  writes when the module's settings are saved (captured by asking the
+  running daemon to save them over D-Bus — `org.fcitx.Fcitx.Controller1
+  .SetConfig` on `fcitx://config/addon/cloudpinyin`): every other option
+  at its default and therefore commented out, `[Toggle Key]` included,
+  mode 0600, trailing blank line. `Backend` follows the same rule, so
+  `GoogleCN` — the default — renders commented and the other two
+  uncommented; same reasoning as `pinyin.conf` above, so a GUI save
+  leaves `chezmoi apply` nothing to do.
+
+A running fcitx5 doesn't re-read either file on `chezmoi apply`, and
+`fcitx5-remote -r` only reloads the global config — the engine's own
+`CloudPinyinEnabled` stays as it was. `gdbus call --session --dest
+org.fcitx.Fcitx5 --object-path /controller --method
+org.fcitx.Fcitx.Controller1.ReloadAddonConfig pinyin` (and `cloudpinyin`)
+picks the change up without a restart.
 
 Every pinyin syllable typed leaves the machine for whichever backend is
 configured while this is on — that's the tradeoff for the better
