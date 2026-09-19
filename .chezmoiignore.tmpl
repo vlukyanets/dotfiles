@@ -46,3 +46,8 @@ system
 {{- if not (get $vscodeIde "enabled" | default false) }}
 .config/Code
 {{- end }}
+
+{{- $neovimIde := get .ide "neovim" | default dict }}
+{{- if not (get $neovimIde "enabled" | default false) }}
+.config/nvim
+{{- end }}

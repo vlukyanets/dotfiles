@@ -55,8 +55,9 @@
 {{- $cliTools        := get $cfg "cli_tools" | default dict -}}
 {{- $cliToolsEnabled := get $cliTools "enabled" | default (list) -}}
 
-{{- $fonts        := get $cfg "fonts" | default dict -}}
-{{- $fontsEnabled := get $fonts "enabled" | default (list) -}}
+{{- $fonts          := get $cfg "fonts" | default dict -}}
+{{- $fontsEnabled   := get $fonts "enabled" | default (list) -}}
+{{- $fontsNerdFont  := get $fonts "nerd_font" | default false -}}
 
 {{- $containers              := get $cfg "containers" | default dict -}}
 {{- $containersDocker        := get $containers "docker" | default dict -}}
@@ -173,7 +174,8 @@
     enabled = {{ toJson $cliToolsEnabled }}
 
     [data.fonts]
-    enabled = {{ toJson $fontsEnabled }}
+    enabled   = {{ toJson $fontsEnabled }}
+    nerd_font = {{ $fontsNerdFont }}
 
     [data.containers.docker]
     enabled = {{ $containersDockerEnabled }}

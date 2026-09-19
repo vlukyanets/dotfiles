@@ -29,3 +29,4 @@ where that IDE has one — its own dotfile in `.chezmoiignore.tmpl`.
 ## Per-IDE docs
 
 - [Visual Studio Code](ide/vscode.md)
+- [Neovim](ide/neovim.md)

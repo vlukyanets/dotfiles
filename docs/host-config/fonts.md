@@ -12,3 +12,10 @@ missing glyphs, not an error, on a host with no matching font available,
 e.g. `fonts.enabled = ["ttf-meslo-nerd"]` for powerlevel10k/eza, or
 `["ttf-firacode-nerd", "ttf-nerd-fonts-symbols-mono", "noto-fonts-emoji"]`
 for kitty.
+
+`fonts.nerd_font` (default `false`) is a separate plain boolean, not derived
+from `enabled` — nothing here tries to pattern-match package names to guess
+whether one of them is a Nerd Font. Set it to `true` once `enabled` actually
+includes one; other templates read it directly, e.g.
+[`dot_config/nvim/init.lua.tmpl`](../../dot_config/nvim/init.lua.tmpl)'s
+`vim.g.have_nerd_font` (see [Neovim](ide/neovim.md)).

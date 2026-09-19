@@ -50,6 +50,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.shell.zsh.oh_my_zsh.enabled`      | whether to also install oh-my-zsh, powerlevel10k, and the zsh plugins dot_zshrc.tmpl expects |
 | `.cli_tools.enabled`                | pacman packages to install (standalone CLI tools, e.g. neovim/zoxide/eza) |
 | `.fonts.enabled`                    | pacman packages to install (fonts, e.g. a Nerd Font for powerlevel10k/eza icons) |
+| `.fonts.nerd_font`                  | whether `.fonts.enabled` actually includes a Nerd Font (read by e.g. Neovim's `have_nerd_font`) |
 | `.containers.docker.enabled`        | whether to install docker, enable docker.service, and add the user to the docker group |
 | `.ssh.enabled`                      | whether to write an sshd_config.d hardening drop-in at all |
 | `.ssh.disable_password_auth`        | writes PasswordAuthentication no into that drop-in when true |

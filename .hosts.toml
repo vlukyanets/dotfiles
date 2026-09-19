@@ -159,6 +159,12 @@
 #                    putting "eza" in cli_tools.enabled without also listing
 #                    a font here just gets broken/missing glyphs, not an
 #                    error.
+#     nerd_font  bool  whether `enabled` above actually includes a Nerd
+#                    Font (default: false) — not derived from `enabled`
+#                    itself (a package name like "ttf-firacode-nerd" isn't
+#                    something worth pattern-matching on), just a plain
+#                    flag other templates read, e.g.
+#                    dot_config/nvim/init.lua.tmpl's `vim.g.have_nerd_font`.
 #   [<host>.containers.docker]
 #     enabled  bool  whether run_once_before_11-configure-containers.sh.tmpl
 #                    installs docker, runs `systemctl enable --now
@@ -558,7 +564,7 @@ enabled = true
 # binds spawn playerctl/brightnessctl directly, and switch-layout.sh.tmpl
 # shells out to jq to parse `niri msg -j keyboard-layouts`.
 [hyper-lin.cli_tools]
-enabled = ["pipewire-pulse", "pipewire-alsa", "wireplumber", "jq", "playerctl", "brightnessctl"]
+enabled = ["pipewire-pulse", "pipewire-alsa", "wireplumber", "jq", "playerctl", "brightnessctl", "ripgrep", "fd", "unzip", "zip", "htop"]
 
 [hyper-lin.desktop]
 enabled = true
@@ -572,6 +578,7 @@ type = "noctalia-greeter"
 
 [hyper-lin.fonts]
 enabled = ["ttf-firacode-nerd", "ttf-nerd-fonts-symbols-mono", "noto-fonts-emoji"]
+nerd_font = true
 
 [hyper-lin.terminals.kitty]
 enabled = true
@@ -673,6 +680,20 @@ packages = ["valgrind", "strace", "ltrace", "perf"]
 enabled = true
 source = "aur"
 packages = ["visual-studio-code-bin"]
+
+# The editor, what its plugin manager needs the git *binary* for
+# (lazy.nvim shells out to it directly, not some Go/Lua git library), and
+# tree-sitter-cli, which nvim-treesitter's `main` branch needs to build
+# parsers (from the repos, not npm — the README is explicit about that).
+# Everything else Neovim's LSP setup needs — ripgrep/fd/unzip
+# (cli_tools.enabled), a C/C++ compiler (development.cpp.gcc/
+# development.cpp.clang), and Java/.NET runtimes
+# (development.jdk/development.dotnet) — lives in those other entries
+# instead; see docs/host-config/ide/neovim.md for the full breakdown of
+# which entry backs which language server.
+[hyper-lin.ide.neovim]
+enabled = true
+packages = ["neovim", "git", "tree-sitter-cli"]
 
 [hyper-lin.nvidia]
 enabled = true
