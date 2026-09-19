@@ -78,6 +78,8 @@
 {{- $zramSize                  := get $zram "size" | default "min(ram / 2, 4096)" -}}
 {{- $zramCompressionAlgorithm  := get $zram "compression-algorithm" | default "zstd" -}}
 {{- $zramSwapPriority          := get $zram "swap-priority" | default 100 -}}
+{{- $zramSwappiness            := get $zram "swappiness" | default 0 -}}
+{{- $zramWatermarkScaleFactor  := get $zram "watermark-scale-factor" | default 0 -}}
 
 {{- $thp        := get $cfg "thp" | default dict -}}
 {{- $thpEnabled := get $thp "enabled" | default false -}}
@@ -89,6 +91,14 @@
 
 {{- $desktopNiri      := get $desktop "niri" | default dict -}}
 {{- $desktopNiriShell := get $desktopNiri "shell" | default "" -}}
+
+{{- $noctalia            := get $desktopNiri "noctalia" | default dict -}}
+{{- $noctaliaFont        := get $noctalia "font" | default "" -}}
+{{- $noctaliaFontPackage := get $noctalia "font_package" | default "" -}}
+{{- $noctaliaTheme       := get $noctalia "theme" | default dict -}}
+{{- $noctaliaThemeSource := get $noctaliaTheme "source" | default "builtin" -}}
+{{- $noctaliaThemeName   := get $noctaliaTheme "name" | default "" -}}
+{{- $noctaliaThemeMode   := get $noctaliaTheme "mode" | default "dark" -}}
 
 {{- $greeter     := get $cfg "greeter" | default dict -}}
 {{- $greeterType := get $greeter "type" | default "" -}}
@@ -103,6 +113,7 @@
 {{- $fcitx5            := get $cfg "fcitx5" | default dict -}}
 {{- $fcitx5Enabled     := get $fcitx5 "enabled" | default false -}}
 {{- $fcitx5Cloudpinyin := get $fcitx5 "cloudpinyin" | default false -}}
+{{- $fcitx5CloudpinyinBackend := get $fcitx5 "cloudpinyin_backend" | default "Baidu" -}}
 
 {{- $browsers := get $cfg "browsers" | default dict -}}
 
@@ -201,6 +212,8 @@
     size                   = {{ $zramSize | quote }}
     compression_algorithm  = {{ $zramCompressionAlgorithm | quote }}
     swap_priority          = {{ $zramSwapPriority }}
+    swappiness             = {{ $zramSwappiness }}
+    watermark_scale_factor = {{ $zramWatermarkScaleFactor }}
 
     [data.thp]
     enabled = {{ $thpEnabled }}
@@ -212,6 +225,15 @@
 
     [data.desktop.niri]
     shell = {{ $desktopNiriShell | quote }}
+
+    [data.desktop.niri.noctalia]
+    font         = {{ $noctaliaFont | quote }}
+    font_package = {{ $noctaliaFontPackage | quote }}
+
+    [data.desktop.niri.noctalia.theme]
+    source = {{ $noctaliaThemeSource | quote }}
+    name   = {{ $noctaliaThemeName | quote }}
+    mode   = {{ $noctaliaThemeMode | quote }}
 
     [data.greeter]
     type = {{ $greeterType | quote }}
@@ -226,6 +248,7 @@
     [data.fcitx5]
     enabled     = {{ $fcitx5Enabled }}
     cloudpinyin = {{ $fcitx5Cloudpinyin }}
+    cloudpinyin_backend = {{ $fcitx5CloudpinyinBackend | quote }}
 
     [data.browsers]
     {{- range $name, $browser := $browsers }}

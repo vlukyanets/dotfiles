@@ -30,17 +30,23 @@ just cosmetic defaults:
   suppresses fcitx5's own switch-notification popup, since niri's
   `Mod+Space` bind already retitles the hotkey overlay
   (`hotkey-overlay-title="Switch Language"`) instead.
-- `DisabledAddons=notificationitem` — disables the "Notification Item"
-  addon (`libnotificationitem.so`), the one that publishes a
-  StatusNotifierItem (SNI) over D-Bus. On niri there's no XEmbed tray for
-  classicui's own X11 tray window to fall back to either, so this is the
-  only thing actually putting a fcitx5 icon in any tray/status bar —
-  disabling it hides that icon outright. `classicui.conf`'s
+- `[Behavior/DisabledAddons]` with `0=notificationitem` — disables the
+  "Notification Item" addon (`libnotificationitem.so`), the one that
+  publishes a StatusNotifierItem (SNI) over D-Bus. On niri there's no
+  XEmbed tray for classicui's own X11 tray window to fall back to either,
+  so this is the only thing actually putting a fcitx5 icon in any
+  tray/status bar — disabling it hides that icon outright. The shape
+  matters: `DisabledAddons` is a list, and fcitx5 stores lists as a
+  sub-group with numbered keys; a plain `DisabledAddons=notificationitem`
+  line under `[Behavior]` (what this file had at first) is silently
+  ignored, and `busctl --user call org.fcitx.Fcitx5 /controller
+  org.fcitx.Fcitx.Controller1 GetAddonsV2` still reports the addon
+  enabled. `classicui.conf`'s
   `PreferTextIcon`/`ShowLayoutNameInIcon` (see [Theme](#theme) below) are
   left as-is even though they're now moot — harmless dormant config, same
   as `cloudpinyin.conf` when [Cloud Pinyin](#cloud-pinyin) is off.
 
-## `dot_config/fcitx5/profile.tmpl`
+## `dot_config/fcitx5/modify_profile`
 
 Lists which input methods fcitx5 actually has available —
 `fcitx5-remote -s <name>` (used by
@@ -51,15 +57,31 @@ input method this profile declares. Built from
 mapping `config.kdl.tmpl` and `switch-layout.sh.tmpl` use for their own
 lists, so all three stay in agreement without hand-syncing separate
 per-file lists — see [niri](desktop/niri.md#keyboard-layouts-and-localelanguages)
-for why that matters. `DefaultIM` is set to whichever input method comes
-first in `locale.languages`' order.
+for why that matters.
+
+It's a `modify_` template rather than a plain one because fcitx5 rewrites
+`~/.config/fcitx5/profile` on every exit, saving whichever input method
+was active as `DefaultIM`. With a plain template every apply would put
+the first language back — and, before that, chezmoi would stop on the
+file "changed since chezmoi last wrote it" and ask what to do, every
+time. A modify template gets the current file on `.chezmoi.stdin` and
+produces the new one: the group and its items come from
+`locale.languages` as before, but `DefaultIM` is carried over from the
+existing file when it's still one of the listed input methods (a value
+that isn't, or a missing file, falls back to the first language). So
+when the language list hasn't changed, the output equals what fcitx5
+wrote and apply has nothing to do. `conf/pinyin.conf` is rewritten by
+fcitx5 the same way, but that one comes out byte-identical to the
+template (the template mirrors fcitx5's own serialization — defaults
+commented out, mode 0600, trailing blank line and all; see below), so it
+stays a plain file.
 
 Unlike the old `__dotfiles` version — a `run_onchange_after_*` script that
 wrote `~/.config/fcitx5/profile` imperatively and force-restarted a live
-fcitx5 daemon (`pkill -KILL fcitx5; fcitx5 -d`) — this is a plain chezmoi
-dotfile, the same as every other app config in this repo. A running
-session doesn't pick up a `locale.languages` change until fcitx5 is
-restarted (next login, or manually), the same caveat
+fcitx5 daemon (`pkill -KILL fcitx5; fcitx5 -d`) — this is a chezmoi
+dotfile like every other app config in this repo. A running session
+doesn't pick up a `locale.languages` change until fcitx5 is restarted
+(next login, or manually), the same caveat
 [Firefox](browsers/firefox.md) already has for `browsers.<name>.settings`
 changes not reaching an already-open profile.
 
@@ -95,25 +117,55 @@ rare words a local dictionary doesn't have. No separate package —
 (`OnDemand=True`, dormant until switched on), so this flag only touches
 config, not the install script.
 
-- [`dot_config/fcitx5/conf/pinyin.conf.tmpl`](../../dot_config/fcitx5/conf/pinyin.conf.tmpl)
+- [`dot_config/fcitx5/conf/private_pinyin.conf.tmpl`](../../dot_config/fcitx5/conf/private_pinyin.conf.tmpl)
   — the pinyin addon's own config file, in fcitx5's own generated format
   (a `#`-commented description above each key, its default value also
   commented out unless actually set — same as what fcitx5 itself writes
   the first time it runs). Every key here is left exactly as fcitx5's own
-  defaults except `CloudPinyinEnabled`, the one line templated straight
-  from `fcitx5.cloudpinyin` and left uncommented (an active setting,
-  same convention as the pre-existing `FirstRun=False` line below it) —
-  keeping the rest of the file intact avoids silently wiping out fcitx5's
-  own reference documentation of every other pinyin setting on every
+  defaults except two: `PageSize=10` (candidates per page — fcitx5's
+  default is 7, its maximum 10; a fixed repo-wide preference, uncommented
+  because it's a non-default value) and `CloudPinyinEnabled`, the one
+  line templated from `fcitx5.cloudpinyin`. The template follows fcitx5's
+  own rule for that
+  line too: `CloudPinyinEnabled=True` uncommented when the flag is on (a
+  non-default value, same as the pre-existing `FirstRun=False` line
+  below it), `# CloudPinyinEnabled=False` when it's off — `False` *is*
+  the default, and fcitx5 re-serializes a default back to a comment.
+  That, the `private_` prefix (fcitx5 saves the file as 0600) and the
+  trailing blank line are what make fcitx5's own rewrite of this file
+  byte-identical to the template; an earlier version wrote the `False`
+  uncommented, and every `chezmoi apply` after fcitx5 had saved its
+  settings stopped on "changed since chezmoi last wrote it". Keeping
+  the rest of the file intact avoids silently wiping out fcitx5's own
+  reference documentation of every other pinyin setting on every
   `chezmoi apply`.
-- [`dot_config/fcitx5/conf/cloudpinyin.conf`](../../dot_config/fcitx5/conf/cloudpinyin.conf)
-  — the backend's own settings, currently just `Backend=Baidu`. Shipped
-  unconditionally alongside the rest of `dot_config/fcitx5/conf/` (dormant,
-  same as the addon itself, when the flag above is off) rather than
-  gated separately — one inert file is simpler than a second
-  `.chezmoiignore.tmpl` rule for what `CloudPinyinEnabled` already
-  controls. Google's backend needs a VPN from most networks that also
-  need cloudpinyin's help; Baidu doesn't, hence the default.
+- [`dot_config/fcitx5/conf/private_cloudpinyin.conf.tmpl`](../../dot_config/fcitx5/conf/private_cloudpinyin.conf.tmpl)
+  — the module's own settings. The only templated line is `Backend`,
+  from `fcitx5.cloudpinyin_backend`; the three values are the ones
+  compiled into `libcloudpinyin.so`: `Google` (google.com Input Tools),
+  `GoogleCN` (google.cn, fcitx5's own default — unreliable outside
+  mainland China) and `Baidu` (this repo's default: Google's backend
+  needs a VPN from most networks that also need cloudpinyin's help,
+  Baidu doesn't). Shipped unconditionally alongside the rest of
+  `dot_config/fcitx5/conf/` (dormant, same as the addon itself, when the
+  flag above is off) rather than gated separately — one inert file is
+  simpler than a second `.chezmoiignore.tmpl` rule for what
+  `CloudPinyinEnabled` already controls. The file mirrors what fcitx5
+  writes when the module's settings are saved (captured by asking the
+  running daemon to save them over D-Bus — `org.fcitx.Fcitx.Controller1
+  .SetConfig` on `fcitx://config/addon/cloudpinyin`): every other option
+  at its default and therefore commented out, `[Toggle Key]` included,
+  mode 0600, trailing blank line. `Backend` follows the same rule, so
+  `GoogleCN` — the default — renders commented and the other two
+  uncommented; same reasoning as `pinyin.conf` above, so a GUI save
+  leaves `chezmoi apply` nothing to do.
+
+A running fcitx5 doesn't re-read either file on `chezmoi apply`, and
+`fcitx5-remote -r` only reloads the global config — the engine's own
+`CloudPinyinEnabled` stays as it was. `gdbus call --session --dest
+org.fcitx.Fcitx5 --object-path /controller --method
+org.fcitx.Fcitx.Controller1.ReloadAddonConfig pinyin` (and `cloudpinyin`)
+picks the change up without a restart.
 
 Every pinyin syllable typed leaves the machine for whichever backend is
 configured while this is on — that's the tradeoff for the better

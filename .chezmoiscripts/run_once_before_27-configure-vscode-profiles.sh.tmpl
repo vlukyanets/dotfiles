@@ -20,13 +20,17 @@ exit 0
 {{- end }}
 
 {{- /* The catalog: `extensions` are installed into the Default profile
-     and applied to all profiles; `profiles.<name>` has that profile's own
-     extensions and optional settings overrides. ide.vscode.profiles picks
-     names out of it; empty means all. Ids are lowercased: that's how VS
-     Code stores them, and the shell below compares them as strings. */}}
+     and applied to all profiles; `excluded` are uninstalled again right
+     after — members an extension pack in that list drags in that aren't
+     wanted; `profiles.<name>` has that profile's own extensions and
+     optional settings overrides. ide.vscode.profiles picks names out of
+     it; empty means all. Ids are lowercased: that's how VS Code stores
+     them, and the shell below compares them as strings. */}}
 {{- $catalog := include "dot_config/Code/User/profiles.json" | fromJson }}
 {{- $common := list }}
 {{- range get $catalog "extensions" | default (list) }}{{ $common = append $common (lower .) }}{{ end }}
+{{- $excluded := list }}
+{{- range get $catalog "excluded" | default (list) }}{{ $excluded = append $excluded (lower .) }}{{ end }}
 {{- $all := get $catalog "profiles" | default dict }}
 {{- $wanted := get $vscode "profiles" | default (list) }}
 {{- $profiles := dict }}
@@ -65,6 +69,7 @@ STORAGE="$USER_DIR/globalStorage/storage.json"
 EXT_DIR="$HOME/.vscode/extensions"
 WANT='{{ toJson $want }}'
 COMMON="{{ join " " $common }}"
+EXCLUDED="{{ join " " $excluded }}"
 
 if ! command -v code >/dev/null 2>&1; then
     echo "==> code is not on PATH — is ide.vscode.packages installed? (run_once_before_25-configure-ide.sh.tmpl)" >&2
@@ -168,6 +173,22 @@ FAILED=""
 
 echo "==> Installing Default profile extensions ($COMMON)"
 install_extensions "" {{ range $common }}--install-extension {{ . }} {{ end }}|| FAILED="$FAILED Default"
+{{- if $excluded }}
+
+# An extension pack installs its whole membership and the CLI has no way
+# to skip one (github.remotehub, say, hard-depends on the
+# ms-vscode.remote-repositories pack, which also brings
+# ms-vscode.azure-repos). A member isn't a dependency though, so it can
+# be uninstalled afterwards without taking the pack — or anything that
+# depends on the pack — with it. Skipped when not installed, so a rerun
+# is a no-op.
+for id in $EXCLUDED; do
+    if code --list-extensions | grep -qix "$id"; then
+        echo "==> Uninstalling $id (profiles.json excluded)"
+        code --uninstall-extension "$id" || FAILED="$FAILED $id"
+    fi
+done
+{{- end }}
 
 # "Apply Extension to all Profiles" in the UI is a flag on the Default
 # profile's entry in ~/.vscode/extensions/extensions.json:
@@ -187,6 +208,7 @@ if [ -f "$EXT_DIR/extensions.json" ]; then
         next=""
         for id in $queue; do
             case " $SCOPED " in *" $id "*) continue ;; esac
+            case " $EXCLUDED " in *" $id "*) continue ;; esac
             SCOPED="$SCOPED $id"
             dir=$(jq -r --arg id "$id" '
                 [.[] | select((.identifier.id | ascii_downcase) == $id)

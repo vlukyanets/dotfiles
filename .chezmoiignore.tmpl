@@ -73,6 +73,11 @@ ci
 .config/gh
 {{- end }}
 
+{{- $goDev := get .development "go" | default dict }}
+{{- if not (get $goDev "enabled" | default false) }}
+.config/go
+{{- end }}
+
 {{- $vscodeIde := get .ide "vscode" | default dict }}
 {{- if not (get $vscodeIde "enabled" | default false) }}
 .config/Code

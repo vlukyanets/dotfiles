@@ -59,16 +59,25 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.zram.size`                        | zram-generator.conf zram-size= formula for the zram0 section |
 | `.zram.compression_algorithm`       | zram-generator.conf compression-algorithm= for the zram0 section |
 | `.zram.swap_priority`               | zram-generator.conf swap-priority= for the zram0 section |
+| `.zram.swappiness`                  | vm.swappiness written to /etc/sysctl.d/99-zram.conf, with vm.page-cluster = 0 (0 = no drop-in) |
+| `.zram.watermark_scale_factor`      | vm.watermark_scale_factor in that drop-in (0 = untouched) |
 | `.thp.enabled`                      | whether to override transparent hugepage mode at all |
 | `.thp.mode`                         | value written to /sys/kernel/mm/transparent_hugepage/enabled |
 | `.desktop.enabled`                  | whether to install a desktop environment at all |
 | `.desktop.environment`              | which desktop environment to install (only `"niri"` implemented) |
 | `.desktop.niri.shell`                | which shell/bar layer to install on top of niri (only `"noctalia"` implemented; only read when `.desktop.environment` is `"niri"`) |
+| `.desktop.niri.noctalia.font`        | fontconfig family for noctalia's whole shell, `""` (default) = its own `sans-serif` (only read when `.desktop.niri.shell` is `"noctalia"`) |
+| `.desktop.niri.noctalia.font_package` | pacman package providing that font, installed next to `noctalia`; `""` (default) installs nothing extra |
+| `.desktop.niri.noctalia.theme.source` | where noctalia's palette comes from — `"builtin"` (default), `"community"` or `"wallpaper"` |
+| `.desktop.niri.noctalia.theme.name`   | which palette: a builtin name, a community palette name from [noctalia.dev/palettes](https://noctalia.dev/palettes), or an m3 scheme; `""` (default) = noctalia's own pick |
+| `.desktop.niri.noctalia.theme.mode`   | `"dark"` (default) or `"light"` |
 | `.greeter.type`                      | which greetd greeter to install and configure — `""` (none, default), `"tuigreet"`, or `"noctalia-greeter"` from the AUR. Independent of `.desktop.*` |
 | `.greeter.noctalia_greeter.session`   | forces a specific Wayland session for noctalia-greeter instead of showing its session picker (only read when `.greeter.type` is `"noctalia-greeter"`) |
 | `.greeter.noctalia_greeter.user`      | skips noctalia-greeter's user list, straight to the password prompt for this login (only read when `.greeter.type` is `"noctalia-greeter"`) |
 | `.nvidia.enabled`                    | whether to detect and install an NVIDIA driver at all |
 | `.fcitx5.enabled`                    | whether to install fcitx5 and write its config/profile — see [fcitx5](fcitx5.md) |
+| `.fcitx5.cloudpinyin`                | whether pinyin candidates also query an online backend (default `false`; every syllable typed leaves the machine while on) |
+| `.fcitx5.cloudpinyin_backend`        | which service that is — `"Google"`, `"GoogleCN"` or `"Baidu"` (default) |
 | `.browsers.<name>.package`           | pacman package to install for this browser entry |
 | `.browsers.<name>.source`            | where `.browsers.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.browsers.<name>.settings`          | about:config preference name → value, written into that browser's `policies.json` |

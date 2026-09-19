@@ -344,8 +344,9 @@ packages = ["valgrind", "strace", "ltrace", "perf"]
 
 ## `gh` and its config
 
-`development.gh` is the one entry with a dotfile riding on its `enabled`
-flag, the same way [`ide.vscode`](ide/vscode.md)'s config does:
+`development.gh` and `development.go` are the entries with a dotfile
+riding on their `enabled` flag, the same way [`ide.vscode`](ide/vscode.md)'s
+config does. For `gh`:
 [`dot_config/gh/config.yml`](../../dot_config/gh/config.yml) is only
 written when the entry is enabled (gated in
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl)). It sets
@@ -354,3 +355,14 @@ written when the entry is enabled (gated in
 things to know: `gh config set` rewrites the file and strips comments, so
 changes go in the chezmoi source and get re-applied; and `hosts.yml` next
 to it — where `gh auth login` stores tokens — is deliberately not managed.
+
+For `go`: [`dot_config/go/env.tmpl`](../../dot_config/go/env.tmpl) is the
+file the `go` command reads on its own (`GOENV`, what `go env -w` writes
+to), so it holds in any shell, hooked or not. It moves `GOPATH` to
+`~/.local/share/go` — `GOMODCACHE` follows as `<GOPATH>/pkg/mod` — and
+points `GOBIN` at `~/.local/bin`, which is already on `PATH`; without it
+Go's default `GOPATH` is `~/go`, and the first `go install` (Mason
+fetching `gopls`, say) plants a visible `go/` directory in `$HOME`. An
+existing `~/go` is only a module cache plus installed binaries, safe to
+delete once the file is in place. Same caveat as `gh`: `go env -w`
+rewrites the file without its comments.

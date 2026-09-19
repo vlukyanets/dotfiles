@@ -18,7 +18,7 @@ $SUDO_CMD pacman -S --needed --noconfirm \
 {{-   if eq .desktop.niri.shell "noctalia" }}
 
 echo "==> Installing noctalia shell"
-$SUDO_CMD pacman -S --needed --noconfirm noctalia
+$SUDO_CMD pacman -S --needed --noconfirm noctalia{{ with .desktop.niri.noctalia.font_package }} {{ . }}{{ end }}
 {{-   else if .desktop.niri.shell }}
 
 echo "==> Unknown desktop.niri.shell '{{ .desktop.niri.shell }}' — supported values: \"noctalia\"" >&2

@@ -1,0 +1,37 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /* fcitx5 rewrites this file on every exit, saving the input method
+     that was active as DefaultIM. A plain template would put the host's
+     first language back on every apply — and, worse, chezmoi would stop
+     and ask about the file "changed since chezmoi last wrote it" every
+     time. So this is a modify template: the group and its items come from
+     locale.languages as before, but DefaultIM is carried over from the
+     existing file (.chezmoi.stdin) when it's still one of the listed
+     input methods, and the result equals what fcitx5 wrote whenever the
+     language list hasn't changed. */ -}}
+{{- $codes := fromJson (includeTemplate "language-codes" .) -}}
+{{- $items := list -}}
+{{- range .locale.languages -}}
+{{-   $c := get $codes . -}}
+{{-   if $c -}}{{- $items = append $items (get $c "fcitx5") -}}{{- end -}}
+{{- end -}}
+{{- $default := first $items -}}
+{{- $current := regexFind "(?m)^DefaultIM=\\S+" .chezmoi.stdin | trimPrefix "DefaultIM=" -}}
+{{- if and $current (has $current $items) -}}{{- $default = $current -}}{{- end -}}
+[Groups/0]
+# Group Name
+Name=Default
+# Layout
+Default Layout=us
+# Default Input Method
+DefaultIM={{ $default }}
+
+{{ range $i, $im := $items -}}
+[Groups/0/Items/{{ $i }}]
+# Name
+Name={{ $im }}
+# Layout
+Layout=
+
+{{ end -}}
+[GroupOrder]
+0=Default

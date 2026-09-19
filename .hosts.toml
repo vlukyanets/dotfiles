@@ -222,6 +222,30 @@
 #     swap-priority  int  swap-priority= in that same section (default:
 #                    100, zram-generator's own default — high enough that
 #                    the kernel prefers zram over any disk-backed swap).
+#     swappiness  int  vm.swappiness to set alongside the device, via
+#                    /etc/sysctl.d/99-zram.conf and `sysctl -w` right away
+#                    (default: 0 — no drop-in at all, the kernel's 60
+#                    stands). The 60 default is tuned for disk swap;
+#                    with zram, swapping is cheap and the Arch wiki
+#                    suggests going well above it (100–180) so the kernel
+#                    starts compressing idle pages before it starts
+#                    dropping file cache. The drop-in also fixes
+#                    vm.page-cluster = 0: swap-in reads one page instead
+#                    of 2^3 — read-ahead pays off on a disk with seek
+#                    cost, on zram it's just seven extra decompressions.
+#     watermark-scale-factor  int  vm.watermark_scale_factor in that same
+#                    drop-in (default: 0 — untouched, kernel default 10).
+#                    Widens the gap between the low and high free-memory
+#                    watermarks (units of 0.01% of a zone) so kswapd
+#                    starts compressing into zram earlier and with more
+#                    headroom, instead of the allocating process doing
+#                    synchronous direct reclaim. The Arch wiki names 125;
+#                    the cost is that much memory kept free rather than
+#                    used as page cache. Only meaningful with swappiness
+#                    set. vm.watermark_boost_factor, which the same wiki
+#                    page zeroes, is deliberately not offered: with
+#                    thp.mode = "always" the boost's defragmentation is
+#                    what keeps huge pages available.
 #   [<host>.thp]
 #     enabled  bool  whether run_once_before_14-configure-thp.sh.tmpl
 #                    touches transparent hugepage config at all (default:
@@ -262,6 +286,33 @@
 #                    "niri" — see docs/host-config/desktop/niri.md. It
 #                    reads locale.languages for its keyboard layout list
 #                    and fcitx5.enabled for input-method integration.
+#   [<host>.desktop.niri.noctalia]
+#     Read only when desktop.niri.shell = "noctalia" — ignored otherwise.
+#     font          string  fontconfig family name noctalia renders the whole
+#                    shell (bar, launcher, panels) in, written to
+#                    shell.font_family in ~/.local/state/noctalia/settings.toml.
+#                    Default: "" — noctalia's own default, "sans-serif".
+#     font_package  string  pacman package that provides `font`, installed
+#                    next to noctalia by run_once_before_15-configure-desktop
+#                    .sh.tmpl. Default: "" — nothing extra is installed,
+#                    which is fine when `font` is already covered by
+#                    fonts.enabled (pacman --needed makes listing it in both
+#                    harmless). A `font` with no package behind it isn't an
+#                    error — fontconfig substitutes its default.
+#   [<host>.desktop.niri.noctalia.theme]
+#     source  string  where the colour palette comes from — noctalia's
+#                    theme.source: "builtin" (default), "community" (a
+#                    palette from https://noctalia.dev/palettes) or
+#                    "wallpaper" (Material You generated from the wallpaper).
+#     name    string  which one: a builtin name (Noctalia, Catppuccin,
+#                    Dracula, Gruvbox, Kanagawa, Nord, Oxocarbon), a
+#                    community palette's name exactly as the gallery shows
+#                    it (e.g. "Cyberpunk", "Catppuccin Mocha Mauve"), or an
+#                    m3 scheme for wallpaper. Default: "" — noctalia's own
+#                    pick for that source (builtin → Noctalia).
+#     mode    string  "dark" (default) or "light".
+#                    None of these are validated; a wrong name makes
+#                    noctalia fall back to its default palette, not fail.
 #   [<host>.greeter]
 #     type  string  which greetd greeter to install and write into
 #                    /etc/greetd/config.toml. A separate, top-level concern
@@ -313,7 +364,7 @@
 #                    fcitx5-chinese-addons when "chinese" is in
 #                    locale.languages) at all (default: false). Also
 #                    controls whether dot_config/fcitx5/* is written
-#                    (config, profile.tmpl) and, in
+#                    (config, modify_profile) and, in
 #                    dot_config/niri/config.kdl.tmpl and
 #                    dot_config/niri/switch-layout.sh.tmpl, the IM
 #                    environment variables, spawning fcitx5 at startup, and
@@ -327,6 +378,13 @@
 #                    this turns it on. Every pinyin syllable typed while
 #                    it's on leaves the machine, so it's opt-in and
 #                    separate from enabled — see docs/host-config/fcitx5.md.
+#     cloudpinyin_backend  string  which online service cloudpinyin queries,
+#                    written to dot_config/fcitx5/conf/private_cloudpinyin.conf.tmpl. One
+#                    of the three compiled into the module: "Google"
+#                    (google.com Input Tools), "GoogleCN" (google.cn —
+#                    fcitx5's own default, unreliable outside mainland
+#                    China), "Baidu" (default here). Only meaningful with
+#                    cloudpinyin = true; the value isn't validated.
 #   [<host>.browsers.<name>]
 #     <name> is an arbitrary label, not read anywhere except log output —
 #                    pick one per browser you want installed (e.g. "firefox",
@@ -602,6 +660,8 @@ timezone = "Europe/Kyiv"
 
 [hyper-lin.fcitx5]
 enabled = true
+cloudpinyin = true
+cloudpinyin_backend = "Google"
 
 [hyper-lin.pkg-mgmt.pacman]
 parallel-downloads = 2
@@ -613,12 +673,16 @@ jobs = "20%"
 [hyper-lin.pkg-mgmt.reflector]
 country = ["Ukraine", "Poland", "Slovakia"]
 
+# bluetooth is here for noctalia's bluetooth widget, which is only a
+# D-Bus client of org.bluez — with no bluez the toggle does nothing.
+# bluez-utils adds bluetoothctl for pairing from a terminal.
 [hyper-lin.services]
-enabled = ["sshd", "tailscaled"]
+enabled = ["sshd", "tailscaled", "bluetooth"]
 
 [hyper-lin.services.packages]
 sshd = ["openssh"]
 tailscaled = ["tailscale"]
+bluetooth = ["bluez", "bluez-utils"]
 
 [hyper-lin.networking.systemd_resolved]
 enabled = true
@@ -628,6 +692,8 @@ operator = true
 
 [hyper-lin.zram]
 enabled = true
+swappiness = 100
+watermark-scale-factor = 125
 
 [hyper-lin.pkg-mgmt.aur]
 enabled = true
@@ -669,6 +735,15 @@ environment = "niri"
 [hyper-lin.desktop.niri]
 shell = "noctalia"
 
+[hyper-lin.desktop.niri.noctalia]
+font         = "FiraCode Nerd Font Propo"
+font_package = "ttf-firacode-nerd"
+
+[hyper-lin.desktop.niri.noctalia.theme]
+source = "community"
+name   = "Cyberpunk"
+mode   = "dark"
+
 [hyper-lin.greeter]
 type = "noctalia-greeter"
 
@@ -707,7 +782,9 @@ packages = ["fnm"]
 # which a run_once script doesn't have.
 post_install = "fnm install --lts && fnm default lts-latest && fnm exec --using=lts-latest -- npm install -g pnpm"
 
-# delve is Go's debugger, and what nvim-dap/VS Code drive for Go.
+# delve is Go's debugger, and what nvim-dap/VS Code drive for Go. Enabling
+# this entry also writes ~/.config/go/env (GOPATH under ~/.local/share,
+# GOBIN = ~/.local/bin) so Go doesn't grow a ~/go directory.
 [hyper-lin.development.go]
 enabled = true
 packages = ["go", "delve"]
@@ -1001,6 +1078,13 @@ packages = ["firefox"]
 # environment = "niri"
 # [homelab.desktop.niri]
 # shell = "noctalia"
+# [homelab.desktop.niri.noctalia]
+# font         = "FiraCode Nerd Font Propo"    # unset → sans-serif
+# font_package = "ttf-firacode-nerd"
+# [homelab.desktop.niri.noctalia.theme]
+# source = "community"    # builtin (default) | community | wallpaper
+# name   = "Cyberpunk"    # from https://noctalia.dev/palettes
+# mode   = "dark"
 #
 # [homelab.greeter]
 # type = "noctalia-greeter"    # or "tuigreet"; the AUR one needs pkg-mgmt.aur.enabled = true

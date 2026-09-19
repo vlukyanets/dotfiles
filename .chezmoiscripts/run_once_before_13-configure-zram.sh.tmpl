@@ -22,6 +22,27 @@ compression-algorithm = {{ .zram.compression_algorithm }}
 swap-priority = {{ .zram.swap_priority }}
 CONF
 
+{{- if .zram.swappiness }}
+
+# The kernel's defaults are tuned for disk-backed swap: swappiness 60
+# (hold on to anonymous pages, drop file cache first) and page-cluster 3
+# (read 8 pages per swap-in, since the seek is the expensive part). zram
+# has no seek and swapping is a compression, so swap more eagerly and
+# read back one page at a time. Written as a sysctl drop-in (survives
+# reboots) and applied with `sysctl -p` on it (the drop-in alone would
+# wait for the next boot).
+echo "==> Writing /etc/sysctl.d/99-zram.conf (vm.swappiness = {{ .zram.swappiness }})"
+$SUDO_CMD tee /etc/sysctl.d/99-zram.conf >/dev/null <<CONF
+# Managed by chezmoi (.chezmoiscripts/run_once_before_13-configure-zram.sh.tmpl)
+vm.swappiness = {{ .zram.swappiness }}
+vm.page-cluster = 0
+{{- if .zram.watermark_scale_factor }}
+vm.watermark_scale_factor = {{ .zram.watermark_scale_factor }}
+{{- end }}
+CONF
+$SUDO_CMD sysctl -q -p /etc/sysctl.d/99-zram.conf
+{{- end }}
+
 echo "==> Reloading systemd generators"
 $SUDO_CMD systemctl daemon-reload
 
