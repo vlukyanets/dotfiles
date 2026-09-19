@@ -143,7 +143,8 @@ same already-a-member check as [`containers.docker`](containers.md) so
 re-applying is a no-op, and the same caveat that a fresh add only takes
 effect in a new login session. It's skipped along with everything else
 when `desktop_only` skips the entry. Nothing under `development` on
-hyper-lin uses it yet.
+hyper-lin uses it yet — the shape is shared with
+[Network tools](network-tools.md), where `wireshark` does.
 
 ### Python via `uv`
 

@@ -58,3 +58,10 @@ flag, so a host without the tool doesn't get an orphaned dotfile):
   just `auto_update = true` so `tldr` fetches its page cache on first run
   (and refreshes it monthly) instead of failing with "cache not found"
   until someone runs `tldr --update`.
+
+## Not here: network tools
+
+`nmap`, `tcpdump`, `dig`, wireshark and the like have their own feature,
+[Network tools](network-tools.md), rather than a place in this list — they
+want `desktop_only`/`groups` (wireshark's Qt frontend and capture group)
+that a flat package list can't express.

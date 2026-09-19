@@ -86,6 +86,9 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.ide.<name>.enabled`                | whether to install this IDE entry — see [IDE](ide.md) |
 | `.ide.<name>.source`                 | where `.ide.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.ide.<name>.packages`               | packages to install for this entry |
+| `.network_tools.<name>.enabled`      | whether to install this network tool entry — see [Network tools](network-tools.md) |
+| `.network_tools.<name>.source`       | where `.network_tools.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
+| `.network_tools.<name>.packages`     | packages to install for this entry |
 | `.tailscale.operator`                | whether to set the applying user as tailscale's operator, so `tailscale` works without sudo (independent of installing/enabling tailscale itself — see [services](#scripts)) |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
@@ -128,6 +131,7 @@ variables above; see its own page for what it does with them:
 23. [Office](office.md)
 24. [Development](development.md)
 25. [IDE](ide.md)
+26. [Network tools](network-tools.md)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

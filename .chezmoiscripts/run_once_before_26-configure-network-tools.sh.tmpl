@@ -1,0 +1,58 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .network_tools }}
+
+echo "==> Skipping network tools install (network_tools is empty for this host)"
+exit 0
+{{- end }}
+
+{{- range $name, $tool := .network_tools }}
+{{- if $tool.enabled }}
+{{- $skipped := and $tool.desktop_only (not $.desktop.enabled) }}
+{{-   if $skipped }}
+
+echo "==> Skipping {{ $name }} (desktop_only, but desktop.enabled is false for this host)"
+{{-   else if eq $tool.source "aur" }}
+{{-     if not $.pkg_mgmt.aur.enabled }}
+
+echo "==> network_tools.{{ $name }}.source is \"aur\", but pkg_mgmt.aur.enabled is false for this host — enable it first" >&2
+exit 1
+{{-     end }}
+
+echo "==> Installing {{ $name }} via paru ({{ join " " $tool.packages }})"
+paru -S --needed --noconfirm {{ join " " $tool.packages }}
+{{-   else if eq $tool.source "pacman" }}
+
+echo "==> Installing {{ $name }} ({{ join " " $tool.packages }})"
+$SUDO_CMD pacman -S --needed --noconfirm {{ join " " $tool.packages }}
+{{-   else }}
+
+echo "==> Unknown network_tools.{{ $name }}.source '{{ $tool.source }}' — supported values: \"pacman\", \"aur\"" >&2
+exit 1
+{{-   end }}
+
+{{-   if and $tool.post_install (not $skipped) }}
+
+echo "==> Running post_install for {{ $name }}: {{ $tool.post_install }}"
+{{ $tool.post_install }}
+{{-   end }}
+{{-   if and $tool.groups (not $skipped) }}
+
+USER_NAME=$(whoami)
+{{-     range $group := $tool.groups }}
+
+if id -nG "$USER_NAME" | grep -qw {{ $group }}; then
+    echo "==> $USER_NAME already in the {{ $group }} group, skipping"
+else
+    echo "==> Adding $USER_NAME to the {{ $group }} group ({{ $name }})"
+    $SUDO_CMD gpasswd -a "$USER_NAME" {{ $group }}
+    echo "    NOTE: log out and back in for the new group membership to take effect"
+fi
+{{-     end }}
+{{-   end }}
+{{- end }}
+{{- end }}

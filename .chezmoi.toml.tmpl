@@ -115,6 +115,7 @@
 {{- $development := get $cfg "development" | default dict -}}
 
 {{- $ide := get $cfg "ide" | default dict -}}
+{{- $networkTools := get $cfg "network_tools" | default dict -}}
 
 {{- $tailscale         := get $cfg "tailscale" | default dict -}}
 {{- $tailscaleOperator := get $tailscale "operator" | default false -}}
@@ -296,6 +297,18 @@
     enabled  = {{ get $app "enabled" | default false }}
     source   = {{ get $app "source" | default "pacman" | quote }}
     packages = {{ toJson (get $app "packages" | default (list)) }}
+    {{- end }}
+
+    [data.network_tools]
+    {{- range $name, $tool := $networkTools }}
+
+    [data.network_tools.{{ $name | quote }}]
+    enabled      = {{ get $tool "enabled" | default false }}
+    source       = {{ get $tool "source" | default "pacman" | quote }}
+    packages     = {{ toJson (get $tool "packages" | default (list)) }}
+    post_install = {{ get $tool "post_install" | default "" | quote }}
+    desktop_only = {{ get $tool "desktop_only" | default false }}
+    groups       = {{ toJson (get $tool "groups" | default (list)) }}
     {{- end }}
 
     [data.tailscale]

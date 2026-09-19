@@ -510,6 +510,27 @@
 #                    (default: [] — same "no targets specified" pacman/paru
 #                    error as an empty office.<name>.packages if left empty
 #                    while enabled).
+#   [<host>.network_tools.<name>]
+#     Same "labeled map, one entry per program" shape as
+#                    [<host>.development.<name>] above, leaves only (no
+#                    groups) — <name> is an arbitrary label, e.g. "nmap",
+#                    "dig", "wireshark". For network diagnostics that
+#                    aren't tied to any language toolchain: scanners,
+#                    tracers, DNS lookup, packet capture.
+#     enabled  bool  whether run_once_before_26-configure-network-tools.sh.tmpl
+#                    installs this entry (default: false).
+#     source   string  "pacman" (default) or "aur", as for development.
+#     packages  list of strings  packages to install for this entry
+#                    (default: []).
+#     post_install  string  shell command run once after this entry's
+#                    packages install (default: "" — nothing runs).
+#     desktop_only  bool  skip on a host where desktop.enabled is false
+#                    (default: false), as for development — e.g.
+#                    wireshark-qt, while tcpdump/tshark still go everywhere.
+#     groups  list of strings  system groups to add the applying user to
+#                    after install (default: []), as for development —
+#                    "wireshark" is the one that matters here: without it,
+#                    wireshark and tshark only see interfaces under sudo.
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -695,6 +716,32 @@ desktop_only = true
 [hyper-lin.development.tracing]
 enabled = true
 packages = ["valgrind", "strace", "ltrace", "perf"]
+
+[hyper-lin.network_tools.nmap]
+enabled = true
+packages = ["nmap"]
+
+[hyper-lin.network_tools.mtr]
+enabled = true
+packages = ["mtr"]
+
+# bind is for dig/host/nslookup — Arch ships the resolver utilities in the
+# same package as the named server; nothing here enables named.service.
+[hyper-lin.network_tools.dig]
+enabled = true
+packages = ["bind"]
+
+[hyper-lin.network_tools.tcpdump]
+enabled = true
+packages = ["tcpdump"]
+
+# wireshark-qt pulls in wireshark-cli (tshark) and the `wireshark` group
+# that gates capture without root. GUI, so desktop_only.
+[hyper-lin.network_tools.wireshark]
+enabled = true
+packages = ["wireshark-qt"]
+desktop_only = true
+groups = ["wireshark"]
 
 [hyper-lin.ide.vscode]
 enabled = true
