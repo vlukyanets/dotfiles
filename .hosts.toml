@@ -313,7 +313,7 @@
 #                    fcitx5-chinese-addons when "chinese" is in
 #                    locale.languages) at all (default: false). Also
 #                    controls whether dot_config/fcitx5/* is written
-#                    (config, profile.tmpl) and, in
+#                    (config, modify_profile) and, in
 #                    dot_config/niri/config.kdl.tmpl and
 #                    dot_config/niri/switch-layout.sh.tmpl, the IM
 #                    environment variables, spawning fcitx5 at startup, and

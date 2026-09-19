@@ -15,7 +15,7 @@
 # Show stroke candidates when typing with h(一), s(丨), p(丿), n(㇏), z(𠃍)
 # StrokeCandidateEnabled=True
 # Enable Cloud Pinyin
-CloudPinyinEnabled={{ if .fcitx5.cloudpinyin }}True{{ else }}False{{ end }}
+{{ if .fcitx5.cloudpinyin }}CloudPinyinEnabled=True{{ else }}# CloudPinyinEnabled=False{{ end }}
 # Cloud Pinyin Candidate Order
 # CloudPinyinIndex=2
 # Show animation when Cloud Pinyin is loading
@@ -152,3 +152,4 @@ FirstRun=False
 # Z_ZH=False
 # Correction Layout
 # Correction=None
+
