@@ -26,6 +26,14 @@ that adding `keyboard_layout` only overrides the one field actually
 changed, not the whole bar. `noctalia msg config-reload` picks up an edit
 to this file without a compositor restart.
 
+The widgets in that list are clients, not providers: `bluetooth` talks
+to BlueZ over D-Bus (`org.bluez`) and `network` to NetworkManager, and
+neither pulls its daemon in. A host that wants the bluetooth toggle to do
+anything needs `bluetooth` in [`services.enabled`](../services.md) with
+`bluez` (and `bluez-utils` for `bluetoothctl`) in `services.packages` —
+without it the widget renders, the switch flips, and nothing happens,
+even with the adapter present and rfkill clear.
+
 Everything else in the file — `control_center.calendar.show_week_numbers`,
 `lockscreen_widgets`, `wallpaper.default`/`wallpaper.last` — is whatever
 noctalia's GUI had already written on `hyper-lin` at the time this file

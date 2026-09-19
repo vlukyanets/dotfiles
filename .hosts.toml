@@ -637,12 +637,16 @@ jobs = "20%"
 [hyper-lin.pkg-mgmt.reflector]
 country = ["Ukraine", "Poland", "Slovakia"]
 
+# bluetooth is here for noctalia's bluetooth widget, which is only a
+# D-Bus client of org.bluez — with no bluez the toggle does nothing.
+# bluez-utils adds bluetoothctl for pairing from a terminal.
 [hyper-lin.services]
-enabled = ["sshd", "tailscaled"]
+enabled = ["sshd", "tailscaled", "bluetooth"]
 
 [hyper-lin.services.packages]
 sshd = ["openssh"]
 tailscaled = ["tailscale"]
+bluetooth = ["bluez", "bluez-utils"]
 
 [hyper-lin.networking.systemd_resolved]
 enabled = true
