@@ -36,3 +36,8 @@ system
 {{- if not (eq .desktop.niri.shell "noctalia") }}
 .local/state/noctalia
 {{- end }}
+
+{{- $ghDev := get .development "gh" | default dict }}
+{{- if not (get $ghDev "enabled" | default false) }}
+.config/gh
+{{- end }}

@@ -263,3 +263,16 @@ enabled = true
 packages = ["valgrind", "strace", "ltrace", "perf"]
 
 ```
+
+## `gh` and its config
+
+`development.gh` is the one entry with a dotfile riding on its `enabled`
+flag:
+[`dot_config/gh/config.yml`](../../dot_config/gh/config.yml) is only
+written when the entry is enabled (gated in
+[`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl)). It sets
+`git_protocol: ssh` and a `co` → `pr checkout` alias, and leaves
+`editor`/`pager` blank so they fall through to `$EDITOR`/`$PAGER`. Two
+things to know: `gh config set` rewrites the file and strips comments, so
+changes go in the chezmoi source and get re-applied; and `hosts.yml` next
+to it — where `gh auth login` stores tokens — is deliberately not managed.
