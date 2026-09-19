@@ -36,7 +36,7 @@ src=.
 if [ "$host" = _empty ]; then
     src="$out/source"
     mkdir -p "$src"
-    git ls-files -z | tar --null -T - -cf - | tar -C "$src" -xf -
+    git ls-files -z --cached --others --exclude-standard | tar --null -T - -cf - | tar -C "$src" -xf -
     printf '\n[_empty]\n' >> "$src/.hosts.toml"
 fi
 
