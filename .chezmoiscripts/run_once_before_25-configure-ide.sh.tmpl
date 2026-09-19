@@ -1,0 +1,34 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .ide }}
+
+echo "==> Skipping IDE install (ide is empty for this host)"
+exit 0
+{{- end }}
+
+{{- range $name, $app := .ide }}
+{{- if $app.enabled }}
+{{-   if eq $app.source "aur" }}
+{{-     if not $.pkg_mgmt.aur.enabled }}
+
+echo "==> ide.{{ $name }}.source is \"aur\", but pkg_mgmt.aur.enabled is false for this host — enable it first" >&2
+exit 1
+{{-     end }}
+
+echo "==> Installing {{ $name }} via paru ({{ join " " $app.packages }})"
+paru -S --needed --noconfirm {{ join " " $app.packages }}
+{{-   else if eq $app.source "pacman" }}
+
+echo "==> Installing {{ $name }} ({{ join " " $app.packages }})"
+$SUDO_CMD pacman -S --needed --noconfirm {{ join " " $app.packages }}
+{{-   else }}
+
+echo "==> Unknown ide.{{ $name }}.source '{{ $app.source }}' — supported values: \"pacman\", \"aur\"" >&2
+exit 1
+{{-   end }}
+{{- end }}
+{{- end }}

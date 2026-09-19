@@ -41,3 +41,8 @@ system
 {{- if not (get $ghDev "enabled" | default false) }}
 .config/gh
 {{- end }}
+
+{{- $vscodeIde := get .ide "vscode" | default dict }}
+{{- if not (get $vscodeIde "enabled" | default false) }}
+.config/Code
+{{- end }}

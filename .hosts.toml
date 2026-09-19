@@ -477,6 +477,24 @@
 #                    development.cpp.gcc/development.cpp.clang — a plain
 #                    development.<name> leaf is for anything with just one
 #                    obvious choice.
+#   [<host>.ide.<name>]
+#     Same "labeled map, one entry per program" shape as
+#                    [<host>.office.<name>] above — <name> is an
+#                    arbitrary label, e.g. "vscode". Also gates that IDE's
+#                    own dotfiles in .chezmoiignore.tmpl (e.g.
+#                    ~/.config/Code for "vscode") — see
+#                    docs/host-config/ide/vscode.md.
+#     enabled  bool  whether run_once_before_25-configure-ide.sh.tmpl
+#                    installs this entry (default: false).
+#     source   string  where `packages` comes from, one of "pacman"
+#                    (default) or "aur". "aur" requires
+#                    pkg-mgmt.aur.enabled = true on this host — the script
+#                    exits with an error if it isn't, rather than silently
+#                    falling back to pacman.
+#     packages  list of strings  packages to install for this entry
+#                    (default: [] — same "no targets specified" pacman/paru
+#                    error as an empty office.<name>.packages if left empty
+#                    while enabled).
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -650,6 +668,11 @@ desktop_only = true
 [hyper-lin.development.tracing]
 enabled = true
 packages = ["valgrind", "strace", "ltrace", "perf"]
+
+[hyper-lin.ide.vscode]
+enabled = true
+source = "aur"
+packages = ["visual-studio-code-bin"]
 
 [hyper-lin.nvidia]
 enabled = true

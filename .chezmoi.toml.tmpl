@@ -112,6 +112,8 @@
 
 {{- $development := get $cfg "development" | default dict -}}
 
+{{- $ide := get $cfg "ide" | default dict -}}
+
 {{- $tailscale         := get $cfg "tailscale" | default dict -}}
 {{- $tailscaleOperator := get $tailscale "operator" | default false -}}
 
@@ -281,6 +283,15 @@
     groups       = {{ toJson (get $sub "groups" | default (list)) }}
     {{-   end }}
     {{- end }}
+    {{- end }}
+
+    [data.ide]
+    {{- range $name, $app := $ide }}
+
+    [data.ide.{{ $name | quote }}]
+    enabled  = {{ get $app "enabled" | default false }}
+    source   = {{ get $app "source" | default "pacman" | quote }}
+    packages = {{ toJson (get $app "packages" | default (list)) }}
     {{- end }}
 
     [data.tailscale]
