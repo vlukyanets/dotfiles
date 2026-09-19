@@ -10,3 +10,6 @@
   automatically whenever the script's content changes
 - `.chezmoitemplates/*` — reusable template partials, pulled into other
   templates with `includeTemplate "<name>" .` (no file extension in `<name>`)
+- `ci/*.sh` + `.github/workflows/ci.yml` — render-and-lint checks for every
+  host in `.hosts.toml`, see [CI](ci.md); not dotfiles, ignored by chezmoi
+  like `docs/` and `system/`

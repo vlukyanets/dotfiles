@@ -78,6 +78,7 @@ if [ "$DRIVER_SOURCE" = aur ] && [ "{{ .pkg_mgmt.aur.enabled }}" != "true" ]; th
 fi
 
 echo "==> Installing $DRIVER_PACKAGE $HEADERS_PACKAGE $NVIDIA_LIB32"
+# shellcheck disable=SC2086 # NVIDIA_LIB32 may be empty, and an empty arg isn't a package
 if [ "$DRIVER_SOURCE" = aur ]; then
     paru -S --needed --noconfirm $DRIVER_PACKAGE $HEADERS_PACKAGE $NVIDIA_LIB32
 else

@@ -652,8 +652,11 @@ enabled = true
 # diff`), and only writes the [filter "lfs"] block — what `git lfs
 # install` would put there — when "git-lfs" is. tealdeer likewise gets
 # its config (auto-updating cache) only when listed.
+#
+# shellcheck, luacheck and lychee are what this repo's CI runs (ci/*.sh,
+# docs/ci.md), here so the same checks run locally before a push.
 [hyper-lin.cli_tools]
-enabled = ["pipewire-pulse", "pipewire-alsa", "wireplumber", "jq", "yq", "playerctl", "brightnessctl", "tmux", "direnv", "zoxide", "eza", "fzf", "yazi", "bat", "tealdeer", "ripgrep", "fd", "unzip", "zip", "7zip", "rsync", "wget", "curl", "ncdu", "duf", "htop", "btop", "just", "git-delta", "git-lfs"]
+enabled = ["pipewire-pulse", "pipewire-alsa", "wireplumber", "jq", "yq", "playerctl", "brightnessctl", "tmux", "direnv", "zoxide", "eza", "fzf", "yazi", "bat", "tealdeer", "ripgrep", "fd", "unzip", "zip", "7zip", "rsync", "wget", "curl", "ncdu", "duf", "htop", "btop", "just", "git-delta", "git-lfs", "shellcheck", "luacheck", "lychee"]
 
 [hyper-lin.containers.docker]
 enabled = true

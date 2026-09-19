@@ -192,7 +192,9 @@ if [ -f "$EXT_DIR/extensions.json" ]; then
                 [.[] | select((.identifier.id | ascii_downcase) == $id)
                      | .relativeLocation // (.location.path | split("/") | last)] | first // ""' \
                 "$EXT_DIR/extensions.json")
-            [ -n "$dir" ] && [ -f "$EXT_DIR/$dir/package.json" ] || continue
+            if [ -z "$dir" ] || [ ! -f "$EXT_DIR/$dir/package.json" ]; then
+                continue
+            fi
             next="$next $(jq -r '[.extensionPack[]? | ascii_downcase] | join(" ")' "$EXT_DIR/$dir/package.json")"
         done
         queue=$next

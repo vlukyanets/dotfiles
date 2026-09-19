@@ -1,0 +1,61 @@
+name: CI Dotfiles
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Every job runs in an Arch container: the checks then use the same pacman
+# packages (chezmoi, shellcheck, luacheck, lychee) the hosts do, not
+# whatever version Ubuntu ships — shellcheck 0.10 vs 0.11 already disagreed
+# once. A container's workspace is owned by another uid, hence the
+# safe.directory line before anything runs git.
+env:
+  PACKAGES: git jq python chezmoi shellcheck luacheck lychee
+
+jobs:
+  hosts:
+    name: Registered hosts
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    outputs:
+      hosts: ${{ steps.list.outputs.hosts }}
+    steps:
+      - run: pacman -Syu --noconfirm --needed $PACKAGES
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: list
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          echo "hosts=$(ci/hosts.sh | jq -Rsc 'split("\n") | map(select(. != ""))')" >> "$GITHUB_OUTPUT"
+
+  render:
+    name: Render ${{ matrix.host }} (${{ matrix.variant }})
+    needs: hosts
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        host: ${{ fromJson(needs.hosts.outputs.hosts) }}
+        variant: [default, headless, zsh]
+        include:
+          - host: _empty
+            variant: default
+    steps:
+      - run: pacman -Syu --noconfirm --needed $PACKAGES
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: ci/render.sh "${{ matrix.host }}" "${{ matrix.variant }}"
+      - run: ci/check-scripts.sh
+
+  data:
+    name: Data files and docs
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    steps:
+      - run: pacman -Syu --noconfirm --needed $PACKAGES
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: ci/check-data.sh
+      - name: Links between the docs
+        run: lychee --offline --include-fragments --no-progress '**/*.md'

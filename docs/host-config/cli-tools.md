@@ -21,7 +21,11 @@ out to `rg`/`fd`, and Mason's installer needs `unzip` to extract most
 servers it downloads. That's a plain cross-feature dependency, not
 anything this script enforces: enabling `ide.neovim` without these three
 in `cli_tools.enabled` just leaves Telescope's grep/find broken and some
-Mason installs failing, not an error at apply time.
+Mason installs failing, not an error at apply time. `shellcheck`,
+`luacheck` and `lychee` are the same kind of entry with a different
+consumer: this repo's own [CI checks](../ci.md), which skip the linters
+that aren't installed — listing them on the machine you push from makes
+`ci/check-scripts.sh` run the full set locally.
 
 ## Tools with a managed config
 
