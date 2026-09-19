@@ -1,0 +1,72 @@
+#!/bin/sh
+
+set -eu
+
+SUDO_CMD="${SUDO_CMD:-sudo}"
+
+{{- if not .development }}
+
+echo "==> Skipping development toolchain install (development is empty for this host)"
+exit 0
+{{- end }}
+
+{{- define "installDevelopmentEntry" }}
+{{- $label := .label }}
+{{- $lang := .entry }}
+{{- $skipped := and $lang.desktop_only (not .root.desktop.enabled) }}
+{{-   if $skipped }}
+
+echo "==> Skipping {{ $label }} (desktop_only, but desktop.enabled is false for this host)"
+{{-   else if eq $lang.source "aur" }}
+{{-     if not .root.pkg_mgmt.aur.enabled }}
+
+echo "==> development.{{ $label }}.source is \"aur\", but pkg_mgmt.aur.enabled is false for this host — enable it first" >&2
+exit 1
+{{-     end }}
+
+echo "==> Installing {{ $label }} via paru ({{ join " " $lang.packages }})"
+paru -S --needed --noconfirm {{ join " " $lang.packages }}
+{{-   else if eq $lang.source "pacman" }}
+
+echo "==> Installing {{ $label }} ({{ join " " $lang.packages }})"
+$SUDO_CMD pacman -S --needed --noconfirm {{ join " " $lang.packages }}
+{{-   else }}
+
+echo "==> Unknown development.{{ $label }}.source '{{ $lang.source }}' — supported values: \"pacman\", \"aur\"" >&2
+exit 1
+{{-   end }}
+
+{{-   if and $lang.post_install (not $skipped) }}
+
+echo "==> Running post_install for {{ $label }}: {{ $lang.post_install }}"
+{{ $lang.post_install }}
+{{-   end }}
+{{-   if and $lang.groups (not $skipped) }}
+
+USER_NAME=$(whoami)
+{{-     range $group := $lang.groups }}
+
+if id -nG "$USER_NAME" | grep -qw {{ $group }}; then
+    echo "==> $USER_NAME already in the {{ $group }} group, skipping"
+else
+    echo "==> Adding $USER_NAME to the {{ $group }} group ({{ $label }})"
+    $SUDO_CMD gpasswd -a "$USER_NAME" {{ $group }}
+    echo "    NOTE: log out and back in for the new group membership to take effect"
+fi
+{{-     end }}
+{{-   end }}
+{{- end }}
+
+{{- range $name, $entry := .development }}
+{{- if hasKey $entry "packages" }}
+{{-   if $entry.enabled }}
+{{-     template "installDevelopmentEntry" (dict "label" $name "entry" $entry "root" $) }}
+{{-   end }}
+{{- else }}
+{{-   range $subName, $sub := $entry }}
+{{-     if $sub.enabled }}
+{{-       template "installDevelopmentEntry" (dict "label" (printf "%s.%s" $name $subName) "entry" $sub "root" $) }}
+{{-     end }}
+{{-   end }}
+{{- end }}
+{{- end }}

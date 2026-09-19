@@ -435,6 +435,48 @@
 #                    (default: [] — same "no targets specified" pacman/paru
 #                    error as an empty terminals.<name>.packages if left
 #                    empty while enabled).
+#   [<host>.development.<name>]
+#     Same "labeled map, one entry per program" shape as
+#                    [<host>.office.<name>] above — <name> is an
+#                    arbitrary label, e.g. "uv", "fnm", "go", "rustup".
+#     enabled  bool  whether run_once_before_24-configure-development.sh.tmpl
+#                    installs this entry (default: false).
+#     source   string  where `packages` comes from, one of "pacman"
+#                    (default) or "aur". "aur" requires
+#                    pkg-mgmt.aur.enabled = true on this host — the script
+#                    exits with an error if it isn't, rather than silently
+#                    falling back to pacman.
+#     packages  list of strings  packages to install for this entry
+#                    (default: [] — same "no targets specified" pacman/paru
+#                    error as an empty office.<name>.packages if left empty
+#                    while enabled).
+#     post_install  string  shell command run once, right after this
+#                    entry's packages install (default: "" — nothing runs).
+#                    For a package that's a toolchain manager rather than a
+#                    ready-to-use runtime, e.g. "rustup default stable" —
+#                    installing the rustup package alone doesn't select a
+#                    toolchain, so this is what actually does that.
+#     desktop_only  bool  skip this entry (with a log line, not an error)
+#                    on a host where desktop.enabled is false (default:
+#                    false — installed regardless). For GUI companions of
+#                    a CLI tool, e.g. sqlitebrowser next to sqlite: a
+#                    headless host still wants the CLI, never the Qt app.
+#     groups  list of strings  system groups to add the applying user to
+#                    after this entry installs (default: [] — none), same
+#                    idempotent gpasswd-with-membership-check as
+#                    containers.docker's `docker` group. For tools whose
+#                    package creates a group that gates unprivileged use,
+#                    e.g. "wireshark" for packet capture without sudo.
+#                    Membership only takes effect in a fresh login session.
+#     A <name> can also be a group instead of a leaf — one more level of
+#                    nesting, [<host>.development.<name>.<subname>], each
+#                    <subname> its own leaf with the same
+#                    enabled/source/packages/post_install fields. Use this
+#                    when a language has more than one competing toolchain
+#                    worth toggling independently, e.g.
+#                    development.cpp.gcc/development.cpp.clang — a plain
+#                    development.<name> leaf is for anything with just one
+#                    obvious choice.
 #
 # To register a new machine, add a [<hostname>] table below (it can be
 # empty — its presence is what marks the host as known). `chezmoi init`
@@ -525,6 +567,89 @@ packages = ["rbw", "pinentry"]
 enabled = true
 source = "aur"
 packages = ["onlyoffice-bin"]
+
+# No version pinned: `uv python install` with no argument fetches the
+# latest stable CPython, and --default also links it as plain `python`/
+# `python3` under ~/.local/bin (already on PATH via .zshrc), so there's a
+# system-independent interpreter for ad-hoc use outside any project.
+[hyper-lin.development.uv]
+enabled = true
+packages = ["uv"]
+post_install = "uv python install --default"
+
+[hyper-lin.development.fnm]
+enabled = true
+packages = ["fnm"]
+# pnpm via npm inside fnm's own node rather than Arch's `pnpm` package,
+# which would drag in a system `nodejs` alongside fnm's. `fnm exec
+# --using` runs with that version on PATH without needing the shell hook,
+# which a run_once script doesn't have.
+post_install = "fnm install --lts && fnm default lts-latest && fnm exec --using=lts-latest -- npm install -g pnpm"
+
+# delve is Go's debugger, and what nvim-dap/VS Code drive for Go.
+[hyper-lin.development.go]
+enabled = true
+packages = ["go", "delve"]
+
+[hyper-lin.development.rustup]
+enabled = true
+packages = ["rustup"]
+post_install = "rustup default stable"
+
+[hyper-lin.development.gh]
+enabled = true
+packages = ["github-cli"]
+
+# Grouped under development.cpp instead of flat development.<name>: gcc
+# and clang are two competing C/C++ toolchains, not one tool with a
+# single obvious label — each gets its own enabled/source/packages/
+# post_install, same shape as any other entry, just one level deeper.
+# make/cmake/meson/ninja go in both, since which build-system generator a
+# given C/C++ project uses is independent of which compiler it's built
+# with. The debugger follows the compiler instead: gdb with gcc, lldb
+# (plus lld, LLVM's linker) with clang — each understands its own
+# toolchain's debug info best. cppcheck is compiler-agnostic like the
+# build tools, so it's in both too.
+[hyper-lin.development.cpp.gcc]
+enabled = true
+packages = ["gcc", "gdb", "make", "cmake", "meson", "ninja", "cppcheck"]
+
+[hyper-lin.development.cpp.clang]
+enabled = true
+packages = ["clang", "lldb", "lld", "llvm", "make", "cmake", "meson", "ninja", "cppcheck"]
+
+[hyper-lin.development.jdk]
+enabled = true
+packages = ["jdk-openjdk"]
+
+[hyper-lin.development.dotnet]
+enabled = true
+packages = ["dotnet-sdk"]
+
+# kotlin is just the compiler (kotlinc); gradle is the build tool every
+# non-trivial Kotlin project assumes. Both run on development.jdk above.
+[hyper-lin.development.kotlin]
+enabled = true
+packages = ["kotlin", "gradle"]
+
+# Two entries, not one: the CLI is wanted everywhere, the Qt GUI only where
+# there's a desktop to draw it on (desktop_only).
+[hyper-lin.development.sqlite]
+enabled = true
+packages = ["sqlite"]
+
+[hyper-lin.development.sqlitebrowser]
+enabled = true
+packages = ["sqlitebrowser"]
+desktop_only = true
+
+# Language-agnostic runtime inspection, so its own entry rather than
+# stuffed into cpp: strace/ltrace trace syscalls/library calls of any
+# binary, perf samples anything with symbols, valgrind instruments native
+# code whichever compiler built it.
+[hyper-lin.development.tracing]
+enabled = true
+packages = ["valgrind", "strace", "ltrace", "perf"]
 
 [hyper-lin.nvidia]
 enabled = true

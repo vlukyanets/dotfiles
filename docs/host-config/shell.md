@@ -29,3 +29,9 @@ Powerlevel10k. `dot_zshrc.tmpl` already sources `~/.p10k.zsh` if present
 (`[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh`) regardless of this flag,
 so a host with the file missing just falls through to `p10k configure`'s
 interactive wizard on first oh-my-zsh shell start instead of failing.
+
+`dot_zshrc.tmpl` also has one hook unrelated to oh-my-zsh: on a host with
+`development.fnm.enabled` (see [Development](development.md#node-via-fnm)),
+it adds `eval "$(fnm env --use-on-cd)"`, guarded by `command -v fnm` the
+same way the `zoxide`/`eza` aliases already are — so a directory's
+`.node-version`/`.nvmrc` switches Node versions automatically on `cd`.

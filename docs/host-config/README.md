@@ -79,6 +79,9 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.office.<name>.enabled`             | whether to install this office entry — see [Office](office.md) |
 | `.office.<name>.source`              | where `.office.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.office.<name>.packages`            | packages to install for this entry |
+| `.development.<name>.enabled`        | whether to install this language toolchain entry — see [Development](development.md) |
+| `.development.<name>.source`         | where `.development.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
+| `.development.<name>.packages`       | packages to install for this entry |
 | `.tailscale.operator`                | whether to set the applying user as tailscale's operator, so `tailscale` works without sudo (independent of installing/enabling tailscale itself — see [services](#scripts)) |
 
 (Source data uses `pkg-mgmt` with a hyphen; the generated `[data]` uses
@@ -119,6 +122,7 @@ variables above; see its own page for what it does with them:
 21. [fcitx5](fcitx5.md)
 22. [Password managers](password-managers.md)
 23. [Office](office.md)
+24. [Development](development.md)
 
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) is where to skip whole
 files on hosts where they don't apply.

@@ -110,6 +110,8 @@
 
 {{- $office := get $cfg "office" | default dict -}}
 
+{{- $development := get $cfg "development" | default dict -}}
+
 {{- $tailscale         := get $cfg "tailscale" | default dict -}}
 {{- $tailscaleOperator := get $tailscale "operator" | default false -}}
 
@@ -254,6 +256,31 @@
     enabled  = {{ get $app "enabled" | default false }}
     source   = {{ get $app "source" | default "pacman" | quote }}
     packages = {{ toJson (get $app "packages" | default (list)) }}
+    {{- end }}
+
+    [data.development]
+    {{- range $name, $entry := $development }}
+    {{- if hasKey $entry "packages" }}
+
+    [data.development.{{ $name | quote }}]
+    enabled      = {{ get $entry "enabled" | default false }}
+    source       = {{ get $entry "source" | default "pacman" | quote }}
+    packages     = {{ toJson (get $entry "packages" | default (list)) }}
+    post_install = {{ get $entry "post_install" | default "" | quote }}
+    desktop_only = {{ get $entry "desktop_only" | default false }}
+    groups       = {{ toJson (get $entry "groups" | default (list)) }}
+    {{- else }}
+    {{-   range $subName, $sub := $entry }}
+
+    [data.development.{{ $name | quote }}.{{ $subName | quote }}]
+    enabled      = {{ get $sub "enabled" | default false }}
+    source       = {{ get $sub "source" | default "pacman" | quote }}
+    packages     = {{ toJson (get $sub "packages" | default (list)) }}
+    post_install = {{ get $sub "post_install" | default "" | quote }}
+    desktop_only = {{ get $sub "desktop_only" | default false }}
+    groups       = {{ toJson (get $sub "groups" | default (list)) }}
+    {{-   end }}
+    {{- end }}
     {{- end }}
 
     [data.tailscale]
