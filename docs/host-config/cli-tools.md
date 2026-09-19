@@ -42,6 +42,18 @@ flag, so a host without the tool doesn't get an orphaned dotfile):
   30s `warn_timeout` instead of the 5s default, which anything creating a
   venv trips over. The shell hook itself lives in `dot_zshrc.tmpl`, as
   above.
+- `git-delta` — no file of its own, but
+  [`dot_gitconfig.tmpl`](../../dot_gitconfig.tmpl) checks `has "git-delta"
+  .cli_tools.enabled` before setting `core.pager = delta` (plus
+  `interactive.diffFilter`, `merge.conflictStyle = zdiff3`, and
+  `diff.colorMoved`). Unlike the `command -v` checks in `.zshrc`, git
+  config has no runtime fallback: an uninstalled pager breaks every `git
+  diff` and `git log`, so the template has to gate it at apply time
+  instead.
+- `git-lfs` — same file, same idea: the `[filter "lfs"]` block that `git
+  lfs install` would otherwise write into `~/.gitconfig` is templated in
+  behind `has "git-lfs"`, so a fresh host gets it from `apply` instead of
+  from remembering to run that command once.
 - `tealdeer` — [`dot_config/tealdeer/config.toml`](../../dot_config/tealdeer/config.toml),
   just `auto_update = true` so `tldr` fetches its page cache on first run
   (and refreshes it monthly) instead of failing with "cache not found"
