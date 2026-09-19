@@ -510,6 +510,43 @@
 #                    (default: [] — same "no targets specified" pacman/paru
 #                    error as an empty office.<name>.packages if left empty
 #                    while enabled).
+#   [<host>.sccache]
+#     Settings written to ~/.config/sccache/config by
+#                    dot_config/sccache/config.tmpl. Written only on a host
+#                    where some enabled development entry lists "sccache"
+#                    in its packages (.chezmoiignore.tmpl checks every leaf
+#                    and group member); the same check gates
+#                    ~/.cargo/config.toml, which points cargo at sccache.
+#                    There's no separate enabled flag. Everything left
+#                    unset is omitted from the file, so sccache's own
+#                    defaults stay in charge.
+#     cache_size  string  [cache.disk] size — cache cap, with a K/M/G/T
+#                    suffix (base 1024, same as SCCACHE_CACHE_SIZE), e.g.
+#                    "20G" (default: "" → omitted → sccache's 10G).
+#     cache_dir  string  [cache.disk] dir — where the cache lives
+#                    (default: "" → omitted → sccache's ~/.cache/sccache).
+#                    A leading "~/" is expanded by the template, since
+#                    sccache itself takes the path literally.
+#   [<host>.sccache.preprocessor_cache_mode]
+#     Written verbatim as [cache.disk.preprocessor_cache_mode] — the
+#                    C/C++-only "skip the preprocessor, track the headers"
+#                    mode, gcc/clang only. Any key set here is copied
+#                    through as-is (no per-key default, so a `false` is
+#                    written as `false`); keys left out aren't written.
+#                    sccache's own defaults, and what each key relaxes:
+#     use_preprocessor_cache_mode  bool  the mode itself (default true).
+#     file_stat_matches  bool  trust size/mtime/ctime of a header instead
+#                    of hashing its contents (default false — hash them).
+#     use_ctime_for_stat  bool  include ctime in that stat check (default
+#                    true; only matters with file_stat_matches).
+#     ignore_time_macros  bool  cache a file that uses __DATE__/__TIME__/
+#                    __TIMESTAMP__ anyway (default false — such a file is
+#                    never cached in this mode).
+#     skip_system_headers  bool  don't hash /usr/include & co., only
+#                    track their paths (default false).
+#     hash_working_directory  bool  include CWD in the key (default
+#                    true; false lets builds from different directories
+#                    share entries).
 #   [<host>.network_tools.<name>]
 #     Same "labeled map, one entry per program" shape as
 #                    [<host>.development.<name>] above, leaves only (no
@@ -662,6 +699,17 @@ enabled = true
 packages = ["rustup"]
 post_install = "rustup default stable"
 
+# One cache for both rustc (via ~/.cargo/config.toml's rustc-wrapper) and
+# C/C++ (via CMAKE_*_COMPILER_LAUNCHER exported from .zshrc) — its own
+# entry rather than a package in rustup or cpp.*, since it serves both.
+# Settings live in [hyper-lin.sccache] below.
+[hyper-lin.development.sccache]
+enabled = true
+packages = ["sccache"]
+
+[hyper-lin.sccache]
+cache_size = "20G"
+
 [hyper-lin.development.gh]
 enabled = true
 packages = ["github-cli"]
@@ -675,7 +723,8 @@ packages = ["github-cli"]
 # with. The debugger follows the compiler instead: gdb with gcc, lldb
 # (plus lld, LLVM's linker) with clang — each understands its own
 # toolchain's debug info best. cppcheck is compiler-agnostic like the
-# build tools, so it's in both too.
+# build tools, so it's in both too. Compilation caching is
+# development.sccache below, not a package here.
 [hyper-lin.development.cpp.gcc]
 enabled = true
 packages = ["gcc", "gdb", "make", "cmake", "meson", "ninja", "cppcheck"]

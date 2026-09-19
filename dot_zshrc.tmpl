@@ -34,6 +34,15 @@ source $ZSH/oh-my-zsh.sh
 
 export PATH="$HOME/.local/bin:$PATH"
 
+# sccache can't masquerade as the compiler the way ccache's symlink dir
+# does, so it's wired in where the build system looks for a launcher:
+# CMake reads these at first configure (rustc's hook is in
+# ~/.cargo/config.toml). meson/plain make need CC="sccache gcc" by hand.
+if command -v sccache &>/dev/null; then
+    export CMAKE_C_COMPILER_LAUNCHER=sccache
+    export CMAKE_CXX_COMPILER_LAUNCHER=sccache
+fi
+
 if command -v nvim &>/dev/null; then
     export EDITOR=nvim
 elif command -v vim &>/dev/null; then

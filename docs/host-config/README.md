@@ -83,6 +83,7 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.development.<name>.enabled`        | whether to install this language toolchain entry — see [Development](development.md) |
 | `.development.<name>.source`         | where `.development.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.development.<name>.packages`       | packages to install for this entry |
+| `.sccache.cache_size` / `.cache_dir` / `.preprocessor_cache_mode.*` | `~/.config/sccache/config` settings — see [Development](development.md#sccache-config) |
 | `.ide.<name>.enabled`                | whether to install this IDE entry — see [IDE](ide.md) |
 | `.ide.<name>.source`                 | where `.ide.<name>.packages` comes from, `"pacman"` (default) or `"aur"` |
 | `.ide.<name>.packages`               | packages to install for this entry |

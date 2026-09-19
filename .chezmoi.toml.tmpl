@@ -117,6 +117,11 @@
 {{- $ide := get $cfg "ide" | default dict -}}
 {{- $networkTools := get $cfg "network_tools" | default dict -}}
 
+{{- $sccache          := get $cfg "sccache" | default dict -}}
+{{- $sccacheCacheSize := get $sccache "cache_size" | default "" -}}
+{{- $sccacheCacheDir  := get $sccache "cache_dir" | default "" -}}
+{{- $sccachePcm       := get $sccache "preprocessor_cache_mode" | default dict -}}
+
 {{- $tailscale         := get $cfg "tailscale" | default dict -}}
 {{- $tailscaleOperator := get $tailscale "operator" | default false -}}
 
@@ -297,6 +302,19 @@
     enabled  = {{ get $app "enabled" | default false }}
     source   = {{ get $app "source" | default "pacman" | quote }}
     packages = {{ toJson (get $app "packages" | default (list)) }}
+    {{- end }}
+
+    [data.sccache]
+    cache_size = {{ $sccacheCacheSize | quote }}
+    cache_dir  = {{ $sccacheCacheDir | quote }}
+
+    # Copied through key-for-key rather than defaulted per key: three of
+    # these default to true upstream, and `default` can't tell an explicit
+    # false from unset — see the ssh.disable_password_auth note in
+    # docs/host-config/ssh-hardening.md. Only what the host sets gets here.
+    [data.sccache.preprocessor_cache_mode]
+    {{- range $key, $value := $sccachePcm }}
+    {{ $key }} = {{ $value }}
     {{- end }}
 
     [data.network_tools]

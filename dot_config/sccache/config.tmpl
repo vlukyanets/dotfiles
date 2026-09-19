@@ -1,0 +1,28 @@
+# Managed by chezmoi — edit the template, not this file:
+#   chezmoi edit ~/.config/sccache/config
+# Values come from [<host>.sccache] in .hosts.toml; anything left unset
+# there is omitted here so sccache's own default applies.
+{{- $size := .sccache.cache_size }}
+{{- $dir := .sccache.cache_dir }}
+{{- $pcm := .sccache.preprocessor_cache_mode }}
+{{- if or $size $dir $pcm }}
+
+[cache.disk]
+{{- if $dir }}
+{{- /* sccache doesn't expand ~ itself (it'd make a directory literally
+     named "~"), so a leading ~/ is resolved here. */}}
+dir = {{ (replace "~/" (printf "%s/" .chezmoi.homeDir) $dir) | quote }}
+{{- end }}
+{{- if $size }}
+{{- /* sccache parses this the same way it parses SCCACHE_CACHE_SIZE
+     (K/M/G/T suffix, base 1024), so the string goes through as-is. */}}
+size = {{ $size | quote }}
+{{- end }}
+{{- if $pcm }}
+
+[cache.disk.preprocessor_cache_mode]
+{{- range $key, $value := $pcm }}
+{{ $key }} = {{ $value }}
+{{- end }}
+{{- end }}
+{{- end }}

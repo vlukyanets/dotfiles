@@ -49,6 +49,24 @@ system
 .config/tealdeer
 {{- end }}
 
+{{- /* sccache has no enabled flag of its own: its config, and the cargo
+     config that points rustc at it, are wanted exactly when some enabled
+     development entry (leaf or group member) installs the package. */}}
+{{- $sccache := false }}
+{{- range $name, $entry := .development }}
+{{-   if hasKey $entry "packages" }}
+{{-     if and $entry.enabled (has "sccache" $entry.packages) }}{{ $sccache = true }}{{ end }}
+{{-   else }}
+{{-     range $subName, $sub := $entry }}
+{{-       if and $sub.enabled (has "sccache" $sub.packages) }}{{ $sccache = true }}{{ end }}
+{{-     end }}
+{{-   end }}
+{{- end }}
+{{- if not $sccache }}
+.config/sccache
+.cargo/config.toml
+{{- end }}
+
 {{- $ghDev := get .development "gh" | default dict }}
 {{- if not (get $ghDev "enabled" | default false) }}
 .config/gh

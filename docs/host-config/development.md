@@ -80,7 +80,8 @@ rounds the clang side out with the rest of the toolchain (`llvm-objdump`,
 `llvm-ar`, `llvm-symbolizer`, `opt`…) that `clang` alone doesn't pull in.
 
 `cppcheck` is compiler-agnostic like the build tools and goes in both
-entries too.
+entries too. Compilation caching isn't a `cpp` package at all — see
+`sccache` below.
 
 `go` carries `delve` alongside it: the Go debugger, and what `nvim-dap`
 and VS Code's Go extension drive, has no version-manager story to worry
@@ -92,6 +93,13 @@ Kotlin project assumes — goes in the same entry. Both run on whatever
 `development.jdk` installed; enabling `kotlin` without it just leaves
 `kotlinc` failing to find a JVM. This is also what backs
 [`ide.neovim`](ide/neovim.md)'s `kotlin_language_server`.
+
+These exist mainly to give [`ide.neovim`](ide/neovim.md)'s `clangd`,
+`jdtls`, and `omnisharp` language servers a compiler/runtime to run
+against — `gcc`/`clang` (plus `make`) also happen to be what compiles
+`nvim-treesitter`'s parsers and `telescope-fzf-native.nvim`'s native
+module. A host with `ide.neovim.enabled` but one of these unset just gets
+that language's LSP server failing to start, not an install-time error.
 
 ### `sqlite` and `desktop_only`
 
@@ -116,13 +124,6 @@ packages = ["sqlitebrowser"]
 desktop_only = true
 ```
 
-These exist mainly to give [`ide.neovim`](ide/neovim.md)'s `clangd`,
-`jdtls`, and `omnisharp` language servers a compiler/runtime to run
-against — `gcc`/`clang` (plus `make`) also happen to be what compiles
-`nvim-treesitter`'s parsers and `telescope-fzf-native.nvim`'s native
-module. A host with `ide.neovim.enabled` but one of these unset just gets
-that language's LSP server failing to start, not an install-time error.
-
 ### Tracing, and `groups`
 
 `tracing` is its own entry rather than part of `cpp`: `strace`/`ltrace`
@@ -145,6 +146,79 @@ effect in a new login session. It's skipped along with everything else
 when `desktop_only` skips the entry. Nothing under `development` on
 hyper-lin uses it yet — the shape is shared with
 [Network tools](network-tools.md), where `wireshark` does.
+
+### `sccache`
+
+[sccache](https://github.com/mozilla/sccache) is its own entry,
+`development.sccache`, rather than a package inside `rustup` or `cpp.*`,
+because one cache serves both: it wraps `rustc` for cargo and
+`gcc`/`clang` for C/C++ builds. It's what this repo uses instead of
+ccache — ccache only knows C-family compilers, and sccache covers those
+too, at the cost of one difference in how it's wired in: ccache ships a
+directory of compiler-named symlinks to put first on `PATH`, sccache
+can't masquerade like that and has to be named as a *launcher* wherever
+the build system looks for one. So:
+
+- **Rust**: [`dot_cargo/config.toml.tmpl`](../../dot_cargo/config.toml.tmpl)
+  becomes `~/.cargo/config.toml` with `[build] rustc-wrapper = "sccache"`.
+  Note cargo's incremental compilation (on by default in the `dev`
+  profile) is not cacheable, so sccache mostly speeds up dependency
+  crates and clean/release builds, not edit-compile loops on your own
+  crate.
+- **C/C++ via CMake**: [`dot_zshrc.tmpl`](../../dot_zshrc.tmpl) exports
+  `CMAKE_C_COMPILER_LAUNCHER=sccache` and `CMAKE_CXX_COMPILER_LAUNCHER=sccache`
+  behind `command -v sccache`; CMake picks those up at first configure.
+- **meson / plain make**: no global hook — `CC="sccache gcc" CXX="sccache
+  g++"` on the command line when wanted.
+
+Both dotfiles are gated in [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl)
+the same way, with no `enabled` flag of their own: it walks every
+`development` leaf and group member and writes them exactly when an
+enabled one lists `"sccache"` in its `packages`. A `rustc-wrapper`
+pointing at a binary that isn't installed would break every cargo build,
+which is why the cargo config in particular can't just be unconditional.
+
+#### sccache config
+
+[`dot_config/sccache/config.tmpl`](../../dot_config/sccache/config.tmpl)
+becomes `~/.config/sccache/config` (same gate), filled from
+`[<host>.sccache]`. Anything left unset there is omitted from the file,
+so sccache's own defaults apply:
+
+| field                        | config key                             | default                          |
+| ---------------------------- | -------------------------------------- | -------------------------------- |
+| `cache_size`                 | `[cache.disk] size`                    | `""` → sccache's 10G             |
+| `cache_dir`                  | `[cache.disk] dir`                     | `""` → `~/.cache/sccache`        |
+| `preprocessor_cache_mode.*`  | `[cache.disk.preprocessor_cache_mode]` | `{}` → nothing written           |
+
+`cache_size` takes a `K`/`M`/`G`/`T` suffix (base 1024) and goes into
+the file as that string — sccache's docs show `size` as a byte count,
+but its parser accepts the same suffixed form as `SCCACHE_CACHE_SIZE`.
+`cache_dir` may start with `~/` — the template expands it, because
+sccache takes the path literally (its docs list `dir` as required, but
+the field has a default in the code, so it's simply left out when
+unset).
+
+`preprocessor_cache_mode` is the C/C++-only mode (gcc/clang, local cache)
+that skips re-running the preprocessor and tracks included headers
+instead — the counterpart of ccache's direct mode, and where the
+equivalents of ccache's `sloppiness` live (`ignore_time_macros`,
+`skip_system_headers`, `file_stat_matches`…). Its keys are copied through
+verbatim rather than given per-key defaults, because three of them
+default to `true` upstream and Go template's `default` can't tell an
+explicit `false` from unset (the same trap
+[ssh-hardening.md](ssh-hardening.md) describes). The keys and sccache's
+defaults are listed in [`.hosts.toml`](../../.hosts.toml)'s field
+reference; hyper-lin sets none of them, only the cap:
+
+```toml
+[hyper-lin.development.sccache]
+enabled = true
+packages = ["sccache"]
+
+[hyper-lin.sccache]
+cache_size = "20G"
+```
 
 ### Python via `uv`
 
@@ -226,6 +300,10 @@ enabled = true
 packages = ["rustup"]
 post_install = "rustup default stable"
 
+[hyper-lin.development.sccache]
+enabled = true
+packages = ["sccache"]
+
 [hyper-lin.development.gh]
 enabled = true
 packages = ["github-cli"]
@@ -262,13 +340,12 @@ desktop_only = true
 [hyper-lin.development.tracing]
 enabled = true
 packages = ["valgrind", "strace", "ltrace", "perf"]
-
 ```
 
 ## `gh` and its config
 
 `development.gh` is the one entry with a dotfile riding on its `enabled`
-flag:
+flag, the same way [`ide.vscode`](ide/vscode.md)'s config does:
 [`dot_config/gh/config.yml`](../../dot_config/gh/config.yml) is only
 written when the entry is enabled (gated in
 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl)). It sets
