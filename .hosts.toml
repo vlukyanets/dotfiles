@@ -175,6 +175,14 @@
 #                    group membership only takes effect in a fresh login
 #                    session — the script prints a reminder rather than
 #                    trying to fix that itself.
+#     packages  list of strings  pacman packages the script installs when
+#                    enabled (default: ["docker"] — just the engine). The
+#                    CLI plugins, docker-buildx (`docker build` via
+#                    BuildKit) and docker-compose (`docker compose`), are
+#                    separate Arch packages the engine doesn't pull in, so
+#                    a host that wants them lists them here explicitly.
+#                    docker.service and the docker group are handled the
+#                    same regardless of what's listed.
 #   [<host>.ssh]
 #     enabled  bool  whether
 #                    run_once_before_12-configure-ssh-hardening.sh.tmpl
@@ -573,6 +581,10 @@ enabled = true
 # its config (auto-updating cache) only when listed.
 [hyper-lin.cli_tools]
 enabled = ["pipewire-pulse", "pipewire-alsa", "wireplumber", "jq", "yq", "playerctl", "brightnessctl", "tmux", "direnv", "zoxide", "eza", "fzf", "yazi", "bat", "tealdeer", "ripgrep", "fd", "unzip", "zip", "7zip", "rsync", "wget", "curl", "ncdu", "duf", "htop", "btop", "just", "git-delta", "git-lfs"]
+
+[hyper-lin.containers.docker]
+enabled = true
+packages = ["docker", "docker-buildx", "docker-compose"]
 
 [hyper-lin.desktop]
 enabled = true

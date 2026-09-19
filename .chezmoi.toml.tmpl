@@ -62,6 +62,7 @@
 {{- $containers              := get $cfg "containers" | default dict -}}
 {{- $containersDocker        := get $containers "docker" | default dict -}}
 {{- $containersDockerEnabled := get $containersDocker "enabled" | default false -}}
+{{- $containersDockerPackages := get $containersDocker "packages" | default (list "docker") -}}
 
 {{- $networking                     := get $cfg "networking" | default dict -}}
 {{- $networkingSystemdResolved      := get $networking "systemd_resolved" | default dict -}}
@@ -178,7 +179,8 @@
     nerd_font = {{ $fontsNerdFont }}
 
     [data.containers.docker]
-    enabled = {{ $containersDockerEnabled }}
+    enabled  = {{ $containersDockerEnabled }}
+    packages = {{ toJson $containersDockerPackages }}
 
     [data.networking.systemd_resolved]
     enabled = {{ $networkingSystemdResolvedEnabled }}
