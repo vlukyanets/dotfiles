@@ -5,8 +5,11 @@
         "tamasfe.even-better-toml",
         "redhat.vscode-yaml",
         "ms-azuretools.vscode-containers",
-        "ms-vscode.remote-repositories",
+        "github.remotehub",
         "ms-vscode-remote.vscode-remote-extensionpack"
+    ],
+    "excluded": [
+        "ms-vscode.azure-repos"
     ],
     "profiles": {
         ".NET": {

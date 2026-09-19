@@ -84,5 +84,6 @@
 
     "telemetry.telemetryLevel": "off",
     "security.workspace.trust.enabled": true,
-    "workbench.startupEditor": "none"
+    "workbench.startupEditor": "none",
+    "window.zoomLevel": 1
 }

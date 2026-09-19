@@ -46,6 +46,7 @@ chezmoi source). Its shape:
 ```json
 {
     "extensions": ["editorconfig.editorconfig", "ms-vscode-remote.vscode-remote-extensionpack", "..."],
+    "excluded":   ["ms-vscode.azure-repos"],
     "profiles": {
         ".NET":   { "extensions": ["ms-dotnettools.csharp"] },
         "Python": {
@@ -63,10 +64,19 @@ chezmoi source). Its shape:
   *Apply Extension to all Profiles* does, so every profile — the ones
   here and any created later from the UI — sees it without a copy of
   its own. Editor-wide things go here — EditorConfig, the spell checker, TOML/YAML support,
-  the container tools, Remote Repositories, and the Remote Development
+  the container tools, GitHub Repositories, and the Remote Development
   pack — an extension pack that pulls in Remote-SSH (and its config
   editor), Tunnels, Remote Explorer, Dev Containers and WSL as
   dependencies, so none of those are listed on their own.
+- `excluded` is the list of extensions the script uninstalls right after
+  the shared install: what an extension pack drags in that isn't wanted.
+  The CLI can't install a pack minus one member, but a member isn't a
+  dependency, so removing it afterwards leaves the pack (and whatever
+  depends on the pack) intact. The one entry is `ms-vscode.azure-repos`:
+  `github.remotehub` hard-depends on the `ms-vscode.remote-repositories`
+  pack, whose other member that is. Excluded ids are also left out of
+  the *apply to all profiles* marking below. A rerun with nothing to
+  remove is a no-op.
 - `profiles.<name>` keys are the display names exactly as VS Code shows
   them. Each has its own `extensions` (marketplace IDs, `publisher.name`
   as `code --list-extensions` prints them) and optional `settings` —
