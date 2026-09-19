@@ -26,3 +26,17 @@ fallback, so a `true`-shaped default would silently ignore a host trying
 to turn hardening back off. Keeping every boolean here false-shaped, the
 same as `ssh.enabled` and every other opt-in flag in this repo, sidesteps
 that entirely.
+
+## Client config
+
+Separately from the server side above, and not gated on anything,
+[`private_dot_ssh/config`](../../private_dot_ssh/config) becomes
+`~/.ssh/config` (mode 0600, `~/.ssh` itself 0700) on every host. It's
+deliberately thin: `Include config.d/*` first, then a `Host *` block with
+`AddKeysToAgent yes` and a 60s keepalive. The per-host `Host` blocks —
+LAN boxes, tailscale peers — live in `~/.ssh/config.d/`, which chezmoi
+creates but doesn't populate (a `.keep` in the source keeps the directory
+around; the files inside are yours), since machine names and addresses
+don't belong in a public repo. `Include` has to be first because ssh
+takes the first value it sees for each option: anything in `Host *` is a
+fallback the included entries can override, not the other way round.
