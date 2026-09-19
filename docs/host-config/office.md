@@ -1,6 +1,6 @@
 # Office
 
-[`.chezmoiscripts/run_once_before_22-configure-office.sh.tmpl`](../../.chezmoiscripts/run_once_before_22-configure-office.sh.tmpl)
+[`.chezmoiscripts/run_once_before_23-configure-office.sh.tmpl`](../../.chezmoiscripts/run_once_before_23-configure-office.sh.tmpl)
 installs whatever's listed under `office.<name>` with `enabled = true`
 (default `{}` — no entries, script exits immediately), the same shape as
 [Terminals](terminals.md) and [Password managers](password-managers.md).

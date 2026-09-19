@@ -1,6 +1,6 @@
 # Pacman & makepkg
 
-[`.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl`](../../.chezmoiscripts/run_once_before_00-configure-pacman.sh.tmpl)
+[`.chezmoiscripts/run_once_before_01-configure-pacman.sh.tmpl`](../../.chezmoiscripts/run_once_before_01-configure-pacman.sh.tmpl)
 wires up `/etc/pacman.conf.d/options.conf` (`ParallelDownloads`), optionally
 enables the `[multilib]` repo via `/etc/pacman.conf.d/multilib.conf`, and
 writes `/etc/makepkg.conf.d/dotfiles.conf` (`MAKEFLAGS`, `OPTIONS`, and

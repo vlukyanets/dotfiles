@@ -20,7 +20,7 @@ with one caveat: arkenfox is a `user.js`, reapplied fresh into a Firefox
 write at package install time. A profile-level override (about:config, an
 extension, sync) sticks around across restarts instead of being
 overwritten back on the next launch the way arkenfox's own `user.js`
-would. Re-running `run_once_before_17-configure-browsers.sh.tmpl` (e.g.
+would. Re-running `run_once_before_18-configure-browsers.sh.tmpl` (e.g.
 via `chezmoi init --apply`, since `run_once_` scripts only re-run when
 their rendered content changes) rewrites `policies.json`, but doesn't
 touch prefs a profile has since changed by hand.

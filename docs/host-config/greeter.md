@@ -1,6 +1,6 @@
 # Greeter
 
-[`.chezmoiscripts/run_once_before_15-configure-greeter.sh.tmpl`](../../.chezmoiscripts/run_once_before_15-configure-greeter.sh.tmpl)
+[`.chezmoiscripts/run_once_before_16-configure-greeter.sh.tmpl`](../../.chezmoiscripts/run_once_before_16-configure-greeter.sh.tmpl)
 is gated behind `greeter.type` (default `""`) — hosts that leave it unset
 skip it entirely and `greetd` is never installed. It's a separate,
 top-level concern from [`desktop.*`](desktop.md): nothing here checks
@@ -58,7 +58,7 @@ instead or, worse, running head-first into a `paru: command not found`.
 This is deliberately checked here rather than aborting `chezmoi init`
 outright over it (the way an unregistered hostname does in
 `.chezmoi.toml.tmpl`): script ordering already guarantees
-`run_once_before_02-configure-aur.sh.tmpl` runs, and would itself abort the
+`run_once_before_03-configure-aur.sh.tmpl` runs, and would itself abort the
 whole `apply` under `set -eu`, before this script ever gets to run whenever
 `pkg-mgmt.aur.enabled` is actually `true` — so by the time this script's
 own `paru -S` line is reached, `paru` failing to be on `PATH` can only mean

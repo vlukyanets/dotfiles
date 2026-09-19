@@ -1,6 +1,6 @@
 # Tailscale
 
-[`.chezmoiscripts/run_once_before_18-configure-tailscale.sh.tmpl`](../../.chezmoiscripts/run_once_before_18-configure-tailscale.sh.tmpl)
+[`.chezmoiscripts/run_once_before_19-configure-tailscale.sh.tmpl`](../../.chezmoiscripts/run_once_before_19-configure-tailscale.sh.tmpl)
 is gated behind `tailscale.operator` (default `false`) — hosts that leave it
 unset skip it entirely. It does one thing: `tailscale set --operator=<user>`
 for the applying user, so `tailscale up`/`status`/etc. work without `sudo`

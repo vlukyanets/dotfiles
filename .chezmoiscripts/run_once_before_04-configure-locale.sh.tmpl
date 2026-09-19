@@ -25,13 +25,13 @@ $SUDO_CMD locale-gen
 
 echo "==> Writing /etc/locale.conf"
 $SUDO_CMD tee /etc/locale.conf >/dev/null <<CONF
-# Managed by chezmoi (.chezmoiscripts/run_once_before_03-configure-locale.sh.tmpl)
+# Managed by chezmoi (.chezmoiscripts/run_once_before_04-configure-locale.sh.tmpl)
 LANG=$LOCALE_LANG
 CONF
 
 echo "==> Writing /etc/vconsole.conf"
 $SUDO_CMD tee /etc/vconsole.conf >/dev/null <<CONF
-# Managed by chezmoi (.chezmoiscripts/run_once_before_03-configure-locale.sh.tmpl)
+# Managed by chezmoi (.chezmoiscripts/run_once_before_04-configure-locale.sh.tmpl)
 KEYMAP=$LOCALE_KEYMAP
 CONF
 

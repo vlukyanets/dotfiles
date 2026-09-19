@@ -1,6 +1,6 @@
 # Password managers
 
-[`.chezmoiscripts/run_once_before_21-configure-password-managers.sh.tmpl`](../../.chezmoiscripts/run_once_before_21-configure-password-managers.sh.tmpl)
+[`.chezmoiscripts/run_once_before_22-configure-password-managers.sh.tmpl`](../../.chezmoiscripts/run_once_before_22-configure-password-managers.sh.tmpl)
 installs whatever's listed under `password_managers.<name>` with
 `enabled = true` (default `{}` — no entries, script exits immediately),
 the same shape as [Terminals](terminals.md). Each entry's own `packages`

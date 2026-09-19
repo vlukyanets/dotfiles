@@ -1,6 +1,6 @@
 # CLI tools
 
-[`.chezmoiscripts/run_once_before_08-configure-cli-tools.sh.tmpl`](../../.chezmoiscripts/run_once_before_08-configure-cli-tools.sh.tmpl)
+[`.chezmoiscripts/run_once_before_09-configure-cli-tools.sh.tmpl`](../../.chezmoiscripts/run_once_before_09-configure-cli-tools.sh.tmpl)
 installs every package listed in `cli_tools.enabled` (default `[]` — the
 script exits immediately on hosts that don't set it) in one `pacman -S
 --needed` call. It's for standalone CLI tools, distinct from

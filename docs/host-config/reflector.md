@@ -1,6 +1,6 @@
 # Reflector
 
-[`.chezmoiscripts/run_once_before_01-configure-reflector.sh.tmpl`](../../.chezmoiscripts/run_once_before_01-configure-reflector.sh.tmpl)
+[`.chezmoiscripts/run_once_before_02-configure-reflector.sh.tmpl`](../../.chezmoiscripts/run_once_before_02-configure-reflector.sh.tmpl)
 installs `reflector`, writes its flags to
 `/etc/xdg/reflector/reflector.conf` (the `@`-argfile `reflector.service`
 already reads), drops an override at
