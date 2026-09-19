@@ -59,6 +59,8 @@ template variables saved to `~/.config/chezmoi/chezmoi.toml`:
 | `.zram.size`                        | zram-generator.conf zram-size= formula for the zram0 section |
 | `.zram.compression_algorithm`       | zram-generator.conf compression-algorithm= for the zram0 section |
 | `.zram.swap_priority`               | zram-generator.conf swap-priority= for the zram0 section |
+| `.zram.swappiness`                  | vm.swappiness written to /etc/sysctl.d/99-zram.conf, with vm.page-cluster = 0 (0 = no drop-in) |
+| `.zram.watermark_scale_factor`      | vm.watermark_scale_factor in that drop-in (0 = untouched) |
 | `.thp.enabled`                      | whether to override transparent hugepage mode at all |
 | `.thp.mode`                         | value written to /sys/kernel/mm/transparent_hugepage/enabled |
 | `.desktop.enabled`                  | whether to install a desktop environment at all |

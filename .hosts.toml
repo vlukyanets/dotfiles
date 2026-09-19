@@ -222,6 +222,30 @@
 #     swap-priority  int  swap-priority= in that same section (default:
 #                    100, zram-generator's own default — high enough that
 #                    the kernel prefers zram over any disk-backed swap).
+#     swappiness  int  vm.swappiness to set alongside the device, via
+#                    /etc/sysctl.d/99-zram.conf and `sysctl -w` right away
+#                    (default: 0 — no drop-in at all, the kernel's 60
+#                    stands). The 60 default is tuned for disk swap;
+#                    with zram, swapping is cheap and the Arch wiki
+#                    suggests going well above it (100–180) so the kernel
+#                    starts compressing idle pages before it starts
+#                    dropping file cache. The drop-in also fixes
+#                    vm.page-cluster = 0: swap-in reads one page instead
+#                    of 2^3 — read-ahead pays off on a disk with seek
+#                    cost, on zram it's just seven extra decompressions.
+#     watermark-scale-factor  int  vm.watermark_scale_factor in that same
+#                    drop-in (default: 0 — untouched, kernel default 10).
+#                    Widens the gap between the low and high free-memory
+#                    watermarks (units of 0.01% of a zone) so kswapd
+#                    starts compressing into zram earlier and with more
+#                    headroom, instead of the allocating process doing
+#                    synchronous direct reclaim. The Arch wiki names 125;
+#                    the cost is that much memory kept free rather than
+#                    used as page cache. Only meaningful with swappiness
+#                    set. vm.watermark_boost_factor, which the same wiki
+#                    page zeroes, is deliberately not offered: with
+#                    thp.mode = "always" the boost's defragmentation is
+#                    what keeps huge pages available.
 #   [<host>.thp]
 #     enabled  bool  whether run_once_before_14-configure-thp.sh.tmpl
 #                    touches transparent hugepage config at all (default:
@@ -628,6 +652,8 @@ operator = true
 
 [hyper-lin.zram]
 enabled = true
+swappiness = 100
+watermark-scale-factor = 125
 
 [hyper-lin.pkg-mgmt.aur]
 enabled = true

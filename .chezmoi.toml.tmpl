@@ -78,6 +78,8 @@
 {{- $zramSize                  := get $zram "size" | default "min(ram / 2, 4096)" -}}
 {{- $zramCompressionAlgorithm  := get $zram "compression-algorithm" | default "zstd" -}}
 {{- $zramSwapPriority          := get $zram "swap-priority" | default 100 -}}
+{{- $zramSwappiness            := get $zram "swappiness" | default 0 -}}
+{{- $zramWatermarkScaleFactor  := get $zram "watermark-scale-factor" | default 0 -}}
 
 {{- $thp        := get $cfg "thp" | default dict -}}
 {{- $thpEnabled := get $thp "enabled" | default false -}}
@@ -201,6 +203,8 @@
     size                   = {{ $zramSize | quote }}
     compression_algorithm  = {{ $zramCompressionAlgorithm | quote }}
     swap_priority          = {{ $zramSwapPriority }}
+    swappiness             = {{ $zramSwappiness }}
+    watermark_scale_factor = {{ $zramWatermarkScaleFactor }}
 
     [data.thp]
     enabled = {{ $thpEnabled }}
