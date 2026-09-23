@@ -28,7 +28,8 @@ Build order: `config` → `render`, `engine`, `tooling` → `packages` → `feat
 3. Python ≥ 3.11 (`tomllib` from the stdlib); dependencies are added only
    when a module needs them (`tomli-w` with `config`, Jinja2 with `render`).
 4. Every apply reconciles live state; a clean apply prints nothing and asks
-   for no password. Features are booleans; `false` never uninstalls.
+   for no password. A feature is `features.<name>` with `enabled` and its
+   settings; `enabled = false` never uninstalls.
 5. Specs live in `docs/spec/`, one `SPEC-<id>.md` per module.
 6. Commits: imperative plain-language subject, optional one-paragraph body,
    no Conventional Commits prefixes, no AI attribution. `master` starts

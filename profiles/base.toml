@@ -3,19 +3,19 @@
 # machine is (timezone, mirrors, hardware) belong to the host.
 
 [features]
-pacman    = true
-makepkg   = true
-reflector = true
-aur       = true
-paccache  = true
-pkgfile   = true
-locale    = true
-nobeep    = true
-oomd      = true
-timesyncd = true
-zsh       = true
-cli_tools = true
-neovim    = true
-htop      = true
-btop      = true
-ssh_agent = true
+pacman.enabled    = true
+makepkg.enabled   = true
+reflector.enabled = true
+aur.enabled       = true
+paccache.enabled  = true
+pkgfile.enabled   = true
+locale.enabled    = true
+nobeep.enabled    = true
+oomd.enabled      = true
+timesyncd.enabled = true
+zsh.enabled       = true
+cli_tools.enabled = true
+neovim.enabled    = true
+htop.enabled      = true
+btop.enabled      = true
+ssh_agent.enabled = true

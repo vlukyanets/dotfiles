@@ -19,7 +19,7 @@ User stories:
   identity and a handful of overrides, not 70 feature flags copied by hand.
 - A second machine like an existing one is `extends = ["hyper-lin"]` plus
   what differs.
-- A typo (`features.nvidai`), a wrong type (`swap.size = 20`), an unknown
+- A typo (`features.nvidai`), a wrong type (`features.swap.size = 20`), an unknown
   parent or an inheritance cycle fails with the file and the key path
   named, for every host at once in CI.
 
@@ -47,11 +47,17 @@ name  = "Valentin Lukyanets"
 email = "valikluks95@gmail.com"
 
 [features]
-docker = true
+docker.enabled = true          # a feature with no settings: one dotted key
 
-[swap]
-size = "20g"
+[features.swap]                # a feature with settings: its own table
+enabled = true
+size    = "20g"
 ```
+
+Every feature is a table `features.<name>` with `enabled` (default
+`false`) and its settings; `git`, `secrets` and `ssh` are not features and
+stay at the top level. `features.locale.console` holds the console font,
+which the `locale` feature applies.
 
 Resolution for host `H`:
 
@@ -95,9 +101,9 @@ Output of `config` is TOML, the same shape as the input files. `--explain`
 prints one line per leaf, itself valid TOML:
 
 ```
-features.docker = true  # hosts/hyper-lin.toml
-features.sshd = true  # profiles/server.toml
-swap.size = ""  # defaults.toml
+features.docker.enabled = true  # hosts/hyper-lin.toml
+features.sshd.enabled = true  # profiles/server.toml
+features.swap.size = ""  # defaults.toml
 ```
 
 Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
@@ -153,9 +159,11 @@ def resolve(root: Path, host: str) -> dict:
   = defaults; `secrets.backend` enum.
 - `--explain` names the right file for a value set in defaults, a profile
   and the host.
-- **Parity test:** for `hyper-lin`, the resolved config equals `defaults.toml` deep-merged with its table from
-  `../__dotfiles/.hosts.toml` (a fixture copy in `tests/`, so the test does
-  not depend on the old checkout).
+- **Parity test:** for `hyper-lin` and for an unknown host, the resolved
+  config equals the old repo's `defaults.toml` deep-merged with the host's
+  table from its `.hosts.toml`, moved into the `features.<name>` layout
+  (fixture copies of both files in `tests/fixtures/`, so the test does not
+  depend on the old checkout).
 - `uv run dotfiles check` passes on the real data.
 
 ## Boundaries
@@ -190,3 +198,6 @@ def resolve(root: Path, host: str) -> dict:
    `server` = base + sshd, tailscale; `laptop` = base + luks_discard, swap,
    snapper, zram, bluetooth, fwupd + the desktop stack. Dev toolchains and
    personal apps stay in `hyper-lin`.
+5. Every feature is a table under `features` with `enabled` and its own
+   settings (was: `[features]` booleans plus a top-level table per
+   feature's settings).

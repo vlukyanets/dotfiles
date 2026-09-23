@@ -4,20 +4,20 @@ extends = ["base"]
 
 [features]
 # storage and power
-luks_discard = true
-swap         = true
-snapper      = true
-btrfs_scrub  = true
-zram         = true
-bluetooth    = true
-fwupd        = true
+luks_discard.enabled = true
+swap.enabled         = true
+snapper.enabled      = true
+btrfs_scrub.enabled  = true
+zram.enabled         = true
+bluetooth.enabled    = true
+fwupd.enabled        = true
 # desktop
-niri         = true
-noctalia     = true
-greetd       = true
-fcitx5       = true
-fonts        = true
-nerd_font    = true
-audio        = true
-kitty        = true
-firefox      = true
+niri.enabled         = true
+noctalia.enabled     = true
+greetd.enabled       = true
+fcitx5.enabled       = true
+fonts.enabled        = true
+nerd_font.enabled    = true
+audio.enabled        = true
+kitty.enabled        = true
+firefox.enabled      = true

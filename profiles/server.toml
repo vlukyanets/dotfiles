@@ -2,5 +2,5 @@
 extends = ["base"]
 
 [features]
-sshd      = true
-tailscale = true
+sshd.enabled      = true
+tailscale.enabled = true

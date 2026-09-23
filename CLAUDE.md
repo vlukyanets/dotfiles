@@ -17,6 +17,7 @@ how a feature behaves today, never edit it.
 ## Navigation
 
 - Keys and defaults: `defaults.toml` — the schema; a new key goes here first.
+  A feature is `features.<name>.enabled` plus its settings in the same table.
 - Profiles `profiles/`, machines `hosts/`; one namespace for `extends`.
 - Resolution, validation, merge, explain, check: `dotfiles/config.py`.
 - Why: `docs/spec/SPEC-<module>.md`, then `docs/spec/CAPABILITY-MAP.md`.
@@ -32,8 +33,8 @@ how a feature behaves today, never edit it.
 ## Pitfalls
 
 - `tests/test_config.py::test_hyper_lin_matches_the_chezmoi_repo` pins
-  hyper-lin to the old repo's data (`tests/fixtures/old-hosts.toml`).
-  Changing hyper-lin on purpose means updating that fixture in the same
-  commit.
+  hyper-lin to the old repo's data (`tests/fixtures/old-*.toml`, in the
+  old layout, converted by `to_features_layout`). Changing hyper-lin on
+  purpose means updating the fixture in the same commit.
 - `type(v) is type(want)`, not `isinstance`: TOML `true` would pass as an
   integer otherwise.

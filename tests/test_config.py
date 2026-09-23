@@ -74,15 +74,33 @@ def test_secrets_backend_is_checked(root):
         resolve("h", root)
 
 
+def to_features_layout(old: dict) -> dict:
+    """The chezmoi repo's layout ([features] booleans, one table per feature's
+    settings) in this repo's: features.<name>.enabled plus the settings."""
+    new = {key: old[key] for key in ("git", "secrets", "ssh")}
+    new["features"] = {name: {"enabled": on} for name, on in old["features"].items()}
+    for table, values in old.items():
+        if table == "console":
+            new["features"]["locale"]["console"] = values
+        elif table not in new:
+            new["features"][table].update(values)
+    return new
+
+
 def test_hyper_lin_matches_the_chezmoi_repo():
     """Parity with ../__dotfiles: its defaults.toml merged with its .hosts.toml table."""
     with (ROOT / "tests/fixtures/old-hosts.toml").open("rb") as f:
-        old = tomllib.load(f)["hyper-lin"]
-    with (ROOT / "defaults.toml").open("rb") as f:
-        expected = tomllib.load(f)
-    for table, values in old.items():
-        expected[table].update(values)
-    assert resolve("hyper-lin") == expected
+        host = tomllib.load(f)["hyper-lin"]
+    with (ROOT / "tests/fixtures/old-defaults.toml").open("rb") as f:
+        old = tomllib.load(f)
+    for table, values in host.items():
+        old[table].update(values)
+    assert resolve("hyper-lin") == to_features_layout(old)
+
+
+def test_defaults_match_the_chezmoi_repo():
+    with (ROOT / "tests/fixtures/old-defaults.toml").open("rb") as f:
+        assert resolve("unknown-host") == to_features_layout(tomllib.load(f))
 
 
 def test_host_extends_profile_and_overrides_it(root):
@@ -163,8 +181,8 @@ def test_real_profiles():
         "hosts/echo-server.toml",
     ]
     echo = resolve("echo-server")
-    assert echo["features"]["sshd"] and echo["features"]["zsh"]
-    assert not echo["features"]["niri"]
+    assert echo["features"]["sshd"]["enabled"] and echo["features"]["zsh"]["enabled"]
+    assert not echo["features"]["niri"]["enabled"]
 
 
 def test_check_reports_every_broken_host(root):

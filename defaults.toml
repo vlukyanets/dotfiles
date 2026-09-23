@@ -2,8 +2,11 @@
 #
 # This file is the schema. profiles/*.toml and hosts/*.toml override it, and
 # a key that is not here — or has a different type here — fails naming the
-# file and the key. Feature flags are booleans and default to off, so a host
-# without a file in hosts/ gets dotfiles and nothing else.
+# file and the key. Every feature is a table under [features] whose
+# `enabled` defaults to false, so a host without a file in hosts/ gets
+# dotfiles and nothing else. A feature with no settings is one dotted key,
+# `docker.enabled = false`; one with settings has its own [features.<name>]
+# table after the list.
 
 [git]
 name  = ""
@@ -28,102 +31,92 @@ authorized_keys = []
 
 [features]
 # packages
-pacman       = false  # /etc/pacman.conf.d drop-ins
-makepkg      = false  # /etc/makepkg.conf.d drop-in
-reflector    = false  # mirrorlist refresh on a timer
-aur          = false  # paru, built from the AUR once
+aur.enabled            = false  # paru, built from the AUR once
 # system
-locale       = false  # locales, LANG, keymap, console font, timezone
-nobeep       = false  # blacklist pcspkr
-oomd         = false  # systemd-oomd pressure tuning + the service
-bluetooth    = false  # bluez + bluetooth.service
-fwupd        = false  # fwupd + fwupd-refresh.timer
-timesyncd    = false  # systemd-timesyncd
-btrfs_scrub  = false  # btrfs-progs + btrfs-scrub@-.timer
-paccache     = false  # pacman-contrib + paccache.timer
-pkgfile      = false  # pkgfile + pkgfile-update.timer
-sshd         = false  # openssh, sshd.service, hardening drop-in
-resolved     = false  # systemd-resolved + NetworkManager handoff
-tailscale    = false  # tailscale, tailscaled.service, user as operator
-luks_discard = false  # rd.luks.options=<uuid>:discard in /etc/kernel/cmdline
-swap         = false  # swap file on its own btrfs subvolume
-snapper      = false  # snapper config, snap-pac, one snapshot pair per apply
-zram         = false  # zram-generator + vm sysctls
-thp          = false  # transparent hugepage mode, optional static reservation
-nvidia       = false  # driver for the detected GPU + nvtop
-plymouth     = false  # boot splash
+nobeep.enabled         = false  # blacklist pcspkr
+oomd.enabled           = false  # systemd-oomd pressure tuning + the service
+bluetooth.enabled      = false  # bluez + bluetooth.service
+fwupd.enabled          = false  # fwupd + fwupd-refresh.timer
+timesyncd.enabled      = false  # systemd-timesyncd
+btrfs_scrub.enabled    = false  # btrfs-progs + btrfs-scrub@-.timer
+paccache.enabled       = false  # pacman-contrib + paccache.timer
+pkgfile.enabled        = false  # pkgfile + pkgfile-update.timer
+resolved.enabled       = false  # systemd-resolved + NetworkManager handoff
+tailscale.enabled      = false  # tailscale, tailscaled.service, user as operator
+luks_discard.enabled   = false  # rd.luks.options=<uuid>:discard in /etc/kernel/cmdline
+nvidia.enabled         = false  # driver for the detected GPU + nvtop
+plymouth.enabled       = false  # boot splash
 # shell
-zsh          = false  # zsh as login shell, oh-my-zsh, p10k, plugins
-cli_tools    = false  # the everyday CLI set (list in the script)
-neovim       = false
-docker       = false
-libvirt      = false
-uv           = false  # + a default CPython
-fnm          = false  # + LTS node, pnpm
-go           = false
-android      = false  # android-tools, adbusers group
-rustup       = false  # + stable toolchain
-sccache      = false  # + cargo rustc-wrapper
-gh           = false
-cpp_gcc      = false
-cpp_clang    = false
-jdk          = false
-dotnet       = false
-kotlin       = false
-sqlite       = false
-tracing      = false  # valgrind, strace, ltrace, perf
-nmap         = false
-mtr          = false
-dig          = false
-tcpdump      = false
-claude_code  = false  # AUR
-veracrypt    = false
-htop         = false
-btop         = false
-iotop        = false
-yubikey      = false  # ykman, pcscd.socket
-ssh_agent    = false  # owned by secrets-ssh; .zshrc reads it
+zsh.enabled            = false  # zsh as login shell, oh-my-zsh, p10k, plugins
+cli_tools.enabled      = false  # the everyday CLI set (list in the script)
+neovim.enabled         = false
+docker.enabled         = false
+libvirt.enabled        = false
+uv.enabled             = false  # + a default CPython
+fnm.enabled            = false  # + LTS node, pnpm
+go.enabled             = false
+android.enabled        = false  # android-tools, adbusers group
+rustup.enabled         = false  # + stable toolchain
+gh.enabled             = false
+cpp_gcc.enabled        = false
+cpp_clang.enabled      = false
+jdk.enabled            = false
+dotnet.enabled         = false
+kotlin.enabled         = false
+sqlite.enabled         = false
+tracing.enabled        = false  # valgrind, strace, ltrace, perf
+nmap.enabled           = false
+mtr.enabled            = false
+dig.enabled            = false
+tcpdump.enabled        = false
+claude_code.enabled    = false  # AUR
+veracrypt.enabled      = false
+htop.enabled           = false
+btop.enabled           = false
+iotop.enabled          = false
+yubikey.enabled        = false  # ykman, pcscd.socket
+ssh_agent.enabled      = false  # owned by secrets-ssh; .zshrc reads it
 # desktop
-niri              = false  # compositor + portal, GTK dark theme, ~/.config/niri, mimeapps.list
-noctalia          = false  # shell on niri; [noctalia] below
-greetd            = false  # greetd + [greetd].greeter, /etc/greetd/config.toml
-fcitx5            = false  # input methods for locale.languages
-fonts             = false  # emoji + CJK fallbacks
-nerd_font         = false  # FiraCode Nerd Font + symbols; nvim reads it
-audio             = false  # pipewire-pulse/alsa/jack, wireplumber, playerctl, brightnessctl
-kitty             = false
-firefox           = false  # + policies.json
-onlyoffice        = false  # AUR
-evince            = false
-vscode            = false  # AUR + profiles from .chezmoidata/vscode.json
-wireshark         = false  # + wireshark group
-claude_desktop    = false  # AUR
-sqlitebrowser     = false
-vlc               = false
-termusic          = false  # TUI
-loupe             = false
-feh               = false
-discord           = false
-telegram          = false
-qbittorrent       = false
-yazi              = false  # TUI
-doublecmd         = false
-mission_center    = false
-obs_studio        = false
-gaming            = false  # steam, gamemode, mangohud; needs pacman.multilib
+niri.enabled           = false  # compositor + portal, GTK dark theme, ~/.config/niri, mimeapps.list
+fonts.enabled          = false  # emoji + CJK fallbacks
+nerd_font.enabled      = false  # FiraCode Nerd Font + symbols; nvim reads it
+audio.enabled          = false  # pipewire-pulse/alsa/jack, wireplumber, playerctl, brightnessctl
+kitty.enabled          = false
+firefox.enabled        = false  # + policies.json
+onlyoffice.enabled     = false  # AUR
+evince.enabled         = false
+vscode.enabled         = false  # AUR + profiles from .chezmoidata/vscode.json
+wireshark.enabled      = false  # + wireshark group
+claude_desktop.enabled = false  # AUR
+sqlitebrowser.enabled  = false
+vlc.enabled            = false
+termusic.enabled       = false  # TUI
+loupe.enabled          = false
+feh.enabled            = false
+discord.enabled        = false
+telegram.enabled       = false
+qbittorrent.enabled    = false
+yazi.enabled           = false  # TUI
+doublecmd.enabled      = false
+mission_center.enabled = false
+obs_studio.enabled     = false
+gaming.enabled         = false  # steam, gamemode, mangohud; needs features.pacman.multilib
 
-[pacman]
+[features.pacman]
+enabled            = false  # /etc/pacman.conf.d drop-ins
 parallel_downloads = 5
 multilib           = false
 
-[makepkg]
+[features.makepkg]
+enabled = false  # /etc/makepkg.conf.d drop-in
 # "4", "20%" (of nproc, at least 1) or any shell expression, written into
 # makepkg.conf verbatim so it is evaluated at every build.
 jobs    = "$(nproc)"
 # Extra OPTIONS+=(...) entries, e.g. ["ccache", "!debug"].
 options = []
 
-[reflector]
+[features.reflector]
+enabled            = false  # mirrorlist refresh on a timer
 country            = []        # empty: every country
 protocol           = "https"
 latest             = 20
@@ -134,59 +127,69 @@ completion_percent = 100       # minimum completion percent a mirror must have
 on_calendar        = "weekly"  # reflector.timer overrides
 on_boot_sec        = "15min"
 
-[locale]
-lang     = "en_US.UTF-8"
-locales  = ["en_US.UTF-8 UTF-8"]
-keymap   = "us"
-timezone = "UTC"
+[features.locale]
+enabled   = false  # locales, LANG, keymap, console font, timezone
+lang      = "en_US.UTF-8"
+locales   = ["en_US.UTF-8 UTF-8"]
+keymap    = "us"
+timezone  = "UTC"
 # Names from .chezmoidata/languages.toml, in keyboard-layout order; niri,
 # fcitx5 and switch-layout.sh read the same list.
 languages = ["english"]
 
-[console]
+[features.locale.console]
 font     = ""  # a file in /usr/share/kbd/consolefonts, e.g. "ter-v20n"
 packages = []  # what ships it, e.g. ["terminus-font"]
 
-[sshd]
+[features.sshd]
+enabled           = false  # openssh, sshd.service, hardening drop-in
 password_auth     = true
 permit_root_login = "prohibit-password"
 
-[swap]
-size = ""  # btrfs mkswapfile size, e.g. "20g"; required when the feature is on
+[features.swap]
+enabled = false  # swap file on its own btrfs subvolume
+size    = ""  # btrfs mkswapfile size, e.g. "20g"; required when the feature is on
 
-[snapper]
+[features.snapper]
+enabled                = false  # snapper config, snap-pac, one snapshot pair per apply
 timeline               = false
 number_limit           = 10
 number_limit_important = 5
 important_packages     = []  # a transaction touching one of these marks the pair important
 important_commands     = []  # snap-pac's own rule for terminal runs
 
-[zram]
+[features.zram]
+enabled                = false  # zram-generator + vm sysctls
 size                   = "min(ram / 2, 4096)"
 algorithm              = "zstd"
 priority               = 100
 swappiness             = 0  # 0: leave the kernel default
 watermark_scale_factor = 0  # 0: leave the kernel default
 
-[thp]
+[features.thp]
+enabled = false  # transparent hugepage mode, optional static reservation
 mode    = "always"
 reserve = 0  # vm.nr_hugepages; 0: none
 
-[noctalia]
+[features.noctalia]
+enabled      = false  # shell on niri
 font         = "sans-serif"
 theme_source = "builtin"  # "builtin", "community" or "wallpaper"
 theme_name   = ""         # palette name; empty: noctalia's default
 theme_mode   = "dark"
 
-[greetd]
+[features.greetd]
+enabled = false  # greetd + the greeter below, /etc/greetd/config.toml
 greeter = "tuigreet"  # or "noctalia-greeter" (AUR)
 session = ""          # noctalia-greeter only: force this session
 user    = ""          # noctalia-greeter only: skip the user list
 
-[fcitx5]
+[features.fcitx5]
+enabled             = false  # input methods for features.locale.languages
 cloudpinyin         = false
 cloudpinyin_backend = "GoogleCN"  # or "Google", "Baidu"
 
-[sccache]
+[features.sccache]
+enabled    = false  # + cargo rustc-wrapper
 cache_size = ""  # e.g. "20G"; empty: sccache's default
 cache_dir  = ""  # empty: sccache's default (~/.cache/sccache)

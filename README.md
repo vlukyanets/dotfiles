@@ -20,10 +20,11 @@ A host or profile sets only what differs and may inherit:
 extends = ["laptop"]   # profiles or other hosts, merged left to right
 
 [features]
-docker = true
+docker.enabled = true
 
-[swap]
-size = "20g"
+[features.swap]
+enabled = true
+size    = "20g"
 ```
 
 Tables merge; values and arrays are replaced. A shared ancestor is merged
