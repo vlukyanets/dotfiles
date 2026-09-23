@@ -1,0 +1,19 @@
+# Public SSH keys of the machines that may appear in a host's
+# ssh.authorized_keys list (hosts/, profiles/). One entry per machine,
+# keyed by the name that list uses; the value is the key type and blob
+# exactly as the machine's ~/.ssh/id_*.pub has them, without the trailing
+# comment — home/.ssh/authorized_keys.j2 appends the machine name
+# as the comment itself.
+#
+# These are public keys, safe in a public repo: they let a server verify a
+# login from the matching private key and nothing else. What a machine
+# listed here needs to *be* isn't decided by this file — it doesn't have
+# to be a host in hosts/ (a Windows box with an OpenSSH client counts), and
+# a host in hosts/ doesn't have to be listed unless something should let it
+# in. Rotating a machine's key is a one-line change here and a deploy
+# on every host that lists it.
+
+[ssh_keys]
+nova-win      = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL4ge7qLArJtKK76wOgm01k8nxiyvMq5Y4VaGRbosJgt"
+nova-win-work = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMx7rCshYpRaCXKWXukP20XqAhcQI17cwMfX0cPdVseL"
+hyper-lin     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPKm6dvFzjBbSLFeD0w3MyvmcDJQpN35qwVvQ8u4Wd5g"

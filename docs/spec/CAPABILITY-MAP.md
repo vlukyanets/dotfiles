@@ -27,6 +27,8 @@ Build order: `config` → `render`, `engine`, `tooling` → `packages` → `feat
    the name used everywhere, so "template" means only a Jinja2 template.
 3. Python ≥ 3.11 (`tomllib` from the stdlib); dependencies are added only
    when a module needs them (`tomli-w` with `config`, Jinja2 with `render`).
+   A fresh machine needs git, python and uv, nothing else: the tool runs
+   from the checkout with `uv run dotfiles …`, dependencies from `uv.lock`.
 4. Every apply reconciles live state; a clean apply prints nothing and asks
    for no password. A feature is `features.<name>` with `enabled` and its
    settings; `enabled = false` never uninstalls.

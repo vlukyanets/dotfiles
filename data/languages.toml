@@ -1,0 +1,20 @@
+# Keyboard layouts and fcitx5 input methods by language name. A host's
+# features.locale.languages picks entries from here, in order; niri's xkb
+# layout list, fcitx5's profile and switch-layout.sh are all built from the
+# same list, so index N means the same language in each.
+
+[languages.english]
+xkb    = "us"
+fcitx5 = "keyboard-us"
+
+[languages.russian]
+xkb    = "ru"
+fcitx5 = "keyboard-ru"
+
+[languages.ukrainian]
+xkb    = "ua"
+fcitx5 = "keyboard-ua"
+
+[languages.chinese]
+xkb    = "cn"
+fcitx5 = "pinyin"

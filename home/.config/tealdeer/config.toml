@@ -1,0 +1,8 @@
+# Managed by dotfiles — edit home/.config/tealdeer/config.toml in the repo, not this file.
+
+[updates]
+# Fetch the page cache on first run and refresh it when it's stale,
+# instead of failing with "cache not found, run tldr --update" on a fresh
+# host.
+auto_update = true
+auto_update_interval_hours = 720

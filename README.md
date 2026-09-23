@@ -2,8 +2,9 @@
 
 A Python rework of [`vlukyanets/dotfiles`](https://github.com/vlukyanets/dotfiles)
 (chezmoi + bash): the same machine description, driven by a tool of its
-own with Jinja2 templates. Work in progress — today it resolves and checks
-host configuration; rendering dotfiles and provisioning come next (see the
+own with Jinja2 templates. Work in progress — today it resolves host
+configuration and renders and deploys the dotfiles in `home/`; provisioning
+(packages, system settings) comes next (see the
 [capability map](docs/spec/CAPABILITY-MAP.md)).
 
 ## How a host is described
@@ -33,14 +34,28 @@ value of another type fails naming the file and the key. A machine with no
 file in `hosts/` gets the defaults. The rules in full:
 [SPEC-config](docs/spec/SPEC-config.md).
 
+## Running it
+
+A fresh machine needs git, python and uv; nothing is installed into the
+system Python.
+
+    git clone git@github.com:vlukyanets/dotfiles.git && cd dotfiles
+    uv sync --locked            # creates .venv/ here, installs uv.lock into it
+    uv run dotfiles check
+
+`uv run` always uses the project's `.venv/` (creating and syncing it first
+when needed), with the system python only as the interpreter it was built
+from. `uv run --locked …` refuses to start if `uv.lock` is out of date
+instead of updating it. After `uv sync`, `.venv/bin/dotfiles` works without
+uv too.
+
 ## Commands
 
-    uv sync
     uv run dotfiles config                            # this machine, as TOML
     uv run dotfiles config --host hyper-lin --explain # each key with the file it came from
-    uv run dotfiles check                             # every host; exit 1 on any error
+    uv run dotfiles render --host hyper-lin --out DIR # a host's home tree, into an empty DIR
+    uv run dotfiles deploy --dry-run                  # what would change in $HOME
+    uv run dotfiles deploy                            # write it
+    uv run dotfiles check                             # every host resolves and renders
     uv run pytest
     uv run ruff check . && uv run ruff format --check .
-
-Without uv: `python -m dotfiles config` from the checkout, with
-`python-tomli-w` installed.

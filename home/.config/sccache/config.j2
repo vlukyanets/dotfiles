@@ -1,0 +1,19 @@
+# Managed by dotfiles — edit home/.config/sccache/config.j2 in the repo, not this file.
+# Values come from [features.sccache]; anything left empty is omitted
+# here so sccache's own default applies.
+{% set size = features.sccache.cache_size %}
+{% set dir = features.sccache.cache_dir %}
+{% if size or dir %}
+
+[cache.disk]
+{% if dir %}
+{# sccache doesn't expand ~ itself (it'd make a directory literally
+   named "~"), so a leading ~/ is resolved here. #}
+dir = {{ dir | replace("~/", home ~ "/") | quote }}
+{% endif %}
+{% if size %}
+{# sccache parses this the same way it parses SCCACHE_CACHE_SIZE
+   (K/M/G/T suffix, base 1024), so the string goes through as-is. #}
+size = {{ size | quote }}
+{% endif %}
+{% endif %}

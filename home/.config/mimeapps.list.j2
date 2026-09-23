@@ -1,0 +1,66 @@
+# Managed by dotfiles — each block follows the feature flag that installs
+# the program, so a default never points at something that isn't there.
+# Apps that register themselves (xdg-mime, "open with") write to this same
+# file; port such a change back here or the next apply reverts it.
+{# Image viewers in preference order; xdg-open takes the first one whose
+   .desktop file exists. #}
+{% set image_viewers = [] %}
+{% if features.loupe.enabled %}{% set image_viewers = image_viewers + ["org.gnome.Loupe.desktop"] %}{% endif %}
+{% if features.feh.enabled %}{% set image_viewers = image_viewers + ["feh.desktop"] %}{% endif %}
+[Default Applications]
+{% if features.firefox.enabled %}
+x-scheme-handler/http=firefox.desktop
+x-scheme-handler/https=firefox.desktop
+text/html=firefox.desktop
+application/xhtml+xml=firefox.desktop
+{% endif %}
+{% if features.evince.enabled %}
+application/pdf=org.gnome.Evince.desktop
+application/postscript=org.gnome.Evince.desktop
+image/vnd.djvu=org.gnome.Evince.desktop
+application/epub+zip=org.gnome.Evince.desktop
+{% endif %}
+{% if features.vlc.enabled %}
+video/mp4=vlc.desktop
+video/x-matroska=vlc.desktop
+video/webm=vlc.desktop
+video/x-msvideo=vlc.desktop
+video/quicktime=vlc.desktop
+video/mpeg=vlc.desktop
+audio/mpeg=vlc.desktop
+audio/flac=vlc.desktop
+audio/ogg=vlc.desktop
+audio/x-wav=vlc.desktop
+audio/mp4=vlc.desktop
+audio/aac=vlc.desktop
+{% endif %}
+{% if image_viewers %}
+{% set viewers = image_viewers | join(";") %}
+image/jpeg={{ viewers }}
+image/png={{ viewers }}
+image/gif={{ viewers }}
+image/webp={{ viewers }}
+image/avif={{ viewers }}
+image/heif={{ viewers }}
+image/bmp={{ viewers }}
+image/tiff={{ viewers }}
+image/svg+xml={{ viewers }}
+image/jxl={{ viewers }}
+{% endif %}
+{% if features.doublecmd.enabled %}
+inode/directory=doublecmd.desktop
+application/zip=doublecmd.desktop
+application/x-7z-compressed=doublecmd.desktop
+application/x-tar=doublecmd.desktop
+application/x-compressed-tar=doublecmd.desktop
+application/x-bzip-compressed-tar=doublecmd.desktop
+application/x-xz-compressed-tar=doublecmd.desktop
+application/vnd.rar=doublecmd.desktop
+{% endif %}
+{% if features.qbittorrent.enabled %}
+application/x-bittorrent=org.qbittorrent.qBittorrent.desktop
+x-scheme-handler/magnet=org.qbittorrent.qBittorrent.desktop
+{% endif %}
+{% if features.claude_code.enabled %}
+x-scheme-handler/claude-cli=claude-code-url-handler.desktop
+{% endif %}

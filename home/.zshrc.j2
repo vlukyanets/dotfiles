@@ -1,0 +1,121 @@
+# Managed by dotfiles — edit home/.zshrc.j2 in the repo, not this file.
+
+# Guard against non-interactive shells (e.g. scp/rsync over ssh invoking a
+# login shell just to run one command) sourcing this file: skip straight to
+# returning rather than paying for prompt/completion/plugin setup only an
+# interactive session needs.
+[[ $- == *i* ]] || return
+
+# Guard against being sourced by something other than zsh — the `${(%):-...}`
+# expansion below and everything past it is zsh-specific syntax.
+[[ -n "$ZSH_VERSION" ]] || return
+{% if features.zsh.enabled %}
+
+# Enable Powerlevel10k instant prompt. Must stay near the top, before any
+# other output.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="powerlevel10k/powerlevel10k"
+
+zstyle ':omz:update' mode reminder
+zstyle ':omz:update' frequency 30
+
+plugins=(battery git zsh-autosuggestions zsh-syntax-highlighting)
+
+source $ZSH/oh-my-zsh.sh
+
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+{% endif %}
+
+# ~/.local/bin first on PATH — pip/uv/cargo user installs. The user session gets the same from
+# ~/.config/environment.d/path.conf; the guard keeps nested shells from
+# stacking copies.
+case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) export PATH="$HOME/.local/bin:$PATH" ;;
+esac
+
+# sccache can't masquerade as the compiler the way ccache's symlink dir
+# does, so it's wired in where the build system looks for a launcher:
+# CMake reads these at first configure (rustc's hook is in
+# ~/.cargo/config.toml). meson/plain make need CC="sccache gcc" by hand.
+if command -v sccache &>/dev/null; then
+    export CMAKE_C_COMPILER_LAUNCHER=sccache
+    export CMAKE_CXX_COMPILER_LAUNCHER=sccache
+fi
+
+if command -v nvim &>/dev/null; then
+    export EDITOR=nvim
+elif command -v vim &>/dev/null; then
+    export EDITOR=vim
+else
+    export EDITOR=nano
+fi
+
+# Privilege-escalation command used throughout this repo's scripts and
+# aliases. Override before this file is sourced (e.g. in a profile that
+# loads earlier) to switch to doas or another sudo-alike.
+export SUDO_CMD="${SUDO_CMD:-sudo}"
+{% if features.ssh_agent.enabled %}
+
+# The user session gets this from ~/.config/environment.d; a tty or ssh
+# login doesn't, so point at the same ssh-agent.socket unit here — unless
+# something already set it (e.g. an agent forwarded over ssh -A), which
+# wins.
+export SSH_AUTH_SOCK="${SSH_AUTH_SOCK:-${XDG_RUNTIME_DIR:-/run/user/$UID}/ssh-agent.socket}"
+{% endif %}
+{% if features.libvirt.enabled %}
+
+# virsh/virt-install default to the per-user qemu:///session, where the
+# guests virt-manager creates (qemu:///system) don't exist; point them at
+# the system daemon so `virsh list` shows the same VMs.
+export LIBVIRT_DEFAULT_URI="${LIBVIRT_DEFAULT_URI:-qemu:///system}"
+{% endif %}
+
+if command -v zoxide &>/dev/null; then
+    eval "$(zoxide init zsh)"
+fi
+
+if command -v direnv &>/dev/null; then
+    eval "$(direnv hook zsh)"
+fi
+
+# C-r history search, C-t file picker, Alt-c cd picker.
+if command -v fzf &>/dev/null; then
+    eval "$(fzf --zsh)"
+fi
+{% if features.fnm.enabled %}
+
+if command -v fnm &>/dev/null; then
+    eval "$(fnm env --use-on-cd)"
+fi
+{% endif %}
+
+# "command not found" → which package ships it. pkgfile comes in with
+# pkgfile-update.timer (services.enabled); the hook file only exists then.
+if [[ -r /usr/share/doc/pkgfile/command-not-found.zsh ]]; then
+    source /usr/share/doc/pkgfile/command-not-found.zsh
+fi
+
+alias ..="cd .."
+alias open="xdg-open"
+
+if command -v eza &>/dev/null; then
+    alias lf='eza --icons --group-directories-first'
+    alias ll='eza -lh --icons --group-directories-first'
+    alias la='eza -lhga --icons --group-directories-first'
+    alias lt='eza --tree --icons --group-directories-first'
+    alias lf1='eza -1 --icons --group-directories-first'
+    alias ll1='eza -lh -1 --icons --group-directories-first'
+    alias lla='eza -lha --icons --group-directories-first'
+    alias lla1='eza -lha -1 --icons --group-directories-first'
+    alias lta='eza --tree -a --icons --group-directories-first'
+else
+    alias ll="ls -lah"
+fi
+
+alias update="$SUDO_CMD pacman -Syu"
+alias update-aur="paru -Syu"

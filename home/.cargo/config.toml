@@ -1,0 +1,6 @@
+# Managed by dotfiles — edit home/.cargo/config.toml in the repo, not this file.
+# Only written on a host with features.sccache — a wrapper that isn't
+# there would break every cargo build.
+
+[build]
+rustc-wrapper = "sccache"

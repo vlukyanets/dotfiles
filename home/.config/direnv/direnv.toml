@@ -1,0 +1,10 @@
+# Managed by dotfiles — edit home/.config/direnv/direnv.toml in the repo, not this file.
+
+[global]
+# Don't print the "export +FOO +BAR ~PATH" line on every directory change —
+# it's noise once you know an .envrc is there.
+hide_env_diff = true
+
+# How long an .envrc may run before direnv warns it's slow (default 5s —
+# too short for anything that creates a venv or runs a package manager).
+warn_timeout = "30s"

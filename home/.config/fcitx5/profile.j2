@@ -1,0 +1,27 @@
+{#
+  fcitx5 rewrites this file on every exit, saving the input method that was
+  active as DefaultIM. So the group and its items come from
+  features.locale.languages, but DefaultIM is carried over from the current
+  file while it is still one of them; and the layout is exactly the one
+  fcitx5 writes, so a deploy after fcitx5 saved it changes nothing.
+#}
+{% set items = features.locale.languages | map("extract", languages) | map(attribute="fcitx5") | list %}
+{% set saved = current | regex_search("(?m)^DefaultIM=(\\S+)") %}
+[Groups/0]
+# Group Name
+Name=Default
+# Layout
+Default Layout=us
+# Default Input Method
+DefaultIM={{ saved if saved in items else items[0] }}
+
+{% for im in items %}
+[Groups/0/Items/{{ loop.index0 }}]
+# Name
+Name={{ im }}
+# Layout
+# Layout=
+
+{% endfor %}
+[GroupOrder]
+0=Default

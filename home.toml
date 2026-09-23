@@ -1,0 +1,101 @@
+# Modes and gates for paths under home/ (without the .j2 suffix). A path
+# not listed is 0644 (file) or 0755 (directory) and deployed on every host.
+# `when` is a Jinja2 expression over the template context; a gate on a
+# directory covers everything under it. A dotfile follows the feature whose
+# script installs its program.
+
+[".zshrc"]
+when = "features.zsh.enabled"
+
+[".p10k.zsh"]
+when = "features.zsh.enabled"
+
+[".config/tmux"]
+when = "features.cli_tools.enabled"
+
+[".config/direnv"]
+when = "features.cli_tools.enabled"
+
+[".config/tealdeer"]
+when = "features.cli_tools.enabled"
+
+[".config/nvim"]
+when = "features.neovim.enabled"
+
+[".config/go"]
+when = "features.go.enabled"
+
+[".config/gh"]
+when = "features.gh.enabled"
+
+[".config/sccache"]
+when = "features.sccache.enabled"
+
+[".cargo/config.toml"]
+when = "features.sccache.enabled"
+
+[".config/htop"]
+mode = "700"
+when = "features.htop.enabled"
+
+[".config/htop/htoprc"]
+mode = "600"
+
+[".config/VeraCrypt"]
+mode = "700"
+when = "features.veracrypt.enabled"
+
+[".config/VeraCrypt/Configuration.xml"]
+mode = "600"
+
+[".config/environment.d/ssh-agent.conf"]
+when = "features.ssh_agent.enabled"
+
+[".config/rbw"]
+when = "secrets.backend == 'rbw'"
+
+[".config/kitty"]
+when = "features.kitty.enabled"
+
+[".config/Code"]
+when = "features.vscode.enabled"
+
+[".config/termusic"]
+when = "features.termusic.enabled"
+
+[".ssh"]
+mode = "700"
+
+[".ssh/authorized_keys"]
+when = "ssh.authorized_keys"
+
+# Only keeps config.d in git; chezmoi never created empty files either.
+[".ssh/config.d/.keep"]
+when = "false"
+
+[".config/niri"]
+when = "features.niri.enabled"
+
+[".config/niri/lock-screen.sh"]
+mode = "755"
+
+[".config/niri/switch-layout.sh"]
+mode = "755"
+
+[".config/mimeapps.list"]
+when = "features.niri.enabled"
+
+[".config/fcitx5"]
+when = "features.fcitx5.enabled"
+
+[".config/fcitx5/conf/pinyin.conf"]
+mode = "600"
+
+[".config/fcitx5/conf/cloudpinyin.conf"]
+mode = "600"
+
+[".local/share/fcitx5"]
+when = "features.fcitx5.enabled"
+
+[".local/state/noctalia"]
+when = "features.noctalia.enabled"

@@ -1,0 +1,44 @@
+## Managed by dotfiles — edit home/.gitconfig.j2 in the repo, not this file.
+
+[user]
+    name  = {{ git.name }}
+    email = {{ git.email }}
+
+[init]
+    defaultBranch = master
+[core]
+    # core.editor intentionally unset: git already falls back to
+    # $GIT_EDITOR, then $VISUAL, then $EDITOR (set in ~/.zshrc), then vi.
+[pull]
+    rebase = true
+[color]
+    ui = auto
+{% if features.cli_tools.enabled %}
+
+# Gated on features.cli_tools (which installs delta) rather than set
+# unconditionally: git has no `command -v` fallback for core.pager, so on a
+# host without delta installed every `git diff`/`git log` would just fail.
+[core]
+    pager = delta
+[interactive]
+    diffFilter = delta --color-only
+[delta]
+    navigate = true
+    line-numbers = true
+[merge]
+    # Three-way conflict hunks with the common ancestor's lines diffed out;
+    # delta's own recommended setting, and it renders them with color.
+    conflictStyle = zdiff3
+[diff]
+    colorMoved = default
+{% endif %}
+{% if features.cli_tools.enabled %}
+
+# Exactly what `git lfs install` writes into ~/.gitconfig — kept here so a
+# fresh host gets it from apply rather than from remembering to run that.
+[filter "lfs"]
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
+{% endif %}
