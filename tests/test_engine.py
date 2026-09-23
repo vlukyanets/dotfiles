@@ -21,13 +21,17 @@ from dotfiles.engine import (
 
 class Fake:
     """Stands in for engine._run: answers from ANSWERS (argv tuple -> (rc,
-    stdout)), 0 and "" otherwise, and records every argv in CALLS."""
+    stdout)), 0 and "" otherwise, and records every argv in CALLS. With
+    PROGRAMS, only those are faked; anything else really runs."""
 
-    def __init__(self):
+    def __init__(self, programs=None):
         self.answers: dict[tuple, tuple[int, str]] = {}
         self.calls: list[list[str]] = []
+        self.programs = programs
 
     def __call__(self, argv, check=False, **kwargs):
+        if self.programs is not None and argv[0] not in self.programs:
+            return subprocess.run(argv, check=check, text=True, **kwargs)
         self.calls.append(argv)
         rc, out = self.answers.get(tuple(argv), (0, ""))
         if rc and check:
@@ -205,3 +209,108 @@ def test_ensure_symlink():
     assert (engine.SYSROOT / "etc/localtime").readlink().as_posix() == (
         "/usr/share/zoneinfo/Europe/Berlin"
     )
+
+
+@pytest.fixture
+def system(monkeypatch) -> Fake:
+    """systemctl, sysctl, gsettings and usermod faked; sudo prefix off so the
+    calls read as the commands themselves."""
+    fake = Fake({"systemctl", "sysctl", "gsettings", "usermod"})
+    monkeypatch.setattr(engine, "_run", fake)
+    monkeypatch.setenv("SUDO_CMD", "")
+    return fake
+
+
+@pytest.mark.parametrize(
+    ("enabled", "active", "call"),
+    [
+        ("disabled", "inactive", ["enable", "--now"]),
+        ("", "", ["enable", "--now"]),  # not installed yet
+        ("enabled", "failed", ["start"]),
+        ("static", "inactive", ["start"]),
+    ],
+)
+def test_ensure_service(system, capsys, enabled, active, call):
+    from dotfiles.engine import ensure_service
+
+    for user, scope in ((False, []), (True, ["--user"])):
+        system.calls.clear()
+        system.answers = {
+            ("systemctl", *scope, "is-enabled", "x.timer"): (1, enabled + "\n"),
+            ("systemctl", *scope, "is-active", "x.timer"): (3, active + "\n"),
+        }
+        assert ensure_service("x.timer", user=user) is True
+        assert system.calls[-1] == ["systemctl", *scope, *call, "x.timer"]
+        assert (
+            capsys.readouterr().out == f"-> x.timer enabled and started (was {enabled}/{active})\n"
+        )
+        system.calls.clear()
+        system.answers = {
+            ("systemctl", *scope, "is-enabled", "x.timer"): (0, "enabled\n"),
+            ("systemctl", *scope, "is-active", "x.timer"): (0, "active\n"),
+        }
+        assert ensure_service("x.timer", user=user) is False
+        assert all(c[-2] in ("is-enabled", "is-active") for c in system.calls)
+
+
+def test_ensure_sysctl(system, capsys):
+    from dotfiles.engine import ensure_sysctl
+
+    system.answers[("sysctl", "-n", "vm.swappiness")] = (0, "60\n")
+    assert ensure_sysctl("vm.swappiness", 10) is True
+    assert ["sysctl", "-qw", "vm.swappiness=10"] in system.calls
+    conf = engine.SYSROOT / "etc/sysctl.d/99-dotfiles.conf"
+    assert conf.read_text() == "vm.swappiness = 10\n"
+    system.answers[("sysctl", "-n", "vm.swappiness")] = (0, "10\n")
+    system.calls.clear()
+    assert ensure_sysctl("vm.swappiness", 10) is False
+    assert system.calls == [["sysctl", "-n", "vm.swappiness"]]
+    assert capsys.readouterr().out == (
+        "-> /etc/sysctl.d/99-dotfiles.conf (missing)\n-> sysctl vm.swappiness = 10\n"
+    )
+
+
+def test_ensure_gsetting(system, capsys, monkeypatch):
+    from dotfiles.engine import ensure_gsetting
+
+    get = ("gsettings", "get", "org.gnome.desktop.interface", "color-scheme")
+    system.answers[get] = (0, "'default'\n")
+    assert ensure_gsetting("org.gnome.desktop.interface", "color-scheme", "'prefer-dark'")
+    assert system.calls[-1] == [
+        "gsettings",
+        "set",
+        "org.gnome.desktop.interface",
+        "color-scheme",
+        "'prefer-dark'",
+    ]
+    system.answers[get] = (0, "'prefer-dark'\n")
+    assert not ensure_gsetting("org.gnome.desktop.interface", "color-scheme", "'prefer-dark'")
+    monkeypatch.setattr(engine, "output", lambda *cmd: None)  # no gsettings installed
+    assert not ensure_gsetting("org.gnome.desktop.interface", "color-scheme", "'x'")
+    assert capsys.readouterr().out == (
+        "-> gsettings org.gnome.desktop.interface color-scheme = 'prefer-dark'\n"
+    )
+
+
+def test_ensure_group_member(system, capsys, monkeypatch):
+    import grp
+    import pwd
+
+    from dotfiles.engine import ensure_group_member
+
+    me = pwd.getpwuid(engine.os.geteuid()).pw_name
+    groups = {"docker": grp.struct_group(("docker", "x", 970, []))}
+
+    def getgrnam(name):
+        return groups[name]
+
+    monkeypatch.setattr(engine.grp, "getgrnam", getgrnam)
+    assert ensure_group_member("docker") is True
+    assert system.calls == [["usermod", "-aG", "docker", me]]
+    out = capsys.readouterr()
+    assert out.out == f"-> added {me} to group docker\n"
+    assert "log out and back in" in out.err and engine.notices
+    groups["docker"] = grp.struct_group(("docker", "x", 970, [me]))
+    assert ensure_group_member("docker") is False
+    with pytest.raises(Failed, match="^group nope does not exist$"):
+        ensure_group_member("nope")
