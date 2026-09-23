@@ -24,7 +24,8 @@ Out of scope: provisioning (features, packages, root files — `engine`,
 
 ## Tech Stack
 
-- Jinja2 ≥ 3.1 — second runtime dependency (Arch: `python-jinja`).
+- Jinja2 ≥ 3.1 — second runtime dependency, installed by uv from `uv.lock`
+  like `tomli-w` (no system Python packages).
 - Everything else stdlib: `tomllib`, `pathlib`, `os`, `re`, `tempfile`.
 
 ## Mapping from chezmoi
@@ -189,7 +190,11 @@ the message, comments on why.
 1. Manifest (`home.toml`) with real file names — or keep modes/gates in the
    file names like chezmoi (`private_`, `executable_`)? Recommended: the
    manifest; it also holds the gates, so a dotfile's rules are in one place.
-2. When a feature is turned off, leave its dotfiles in place (recommended,
-   as today) or remove what was deployed?
-3. Bootstrap: runtime deps as Arch packages, run from the checkout
-   (recommended) — or `uv tool install` with uv as a prerequisite?
+
+## Decisions
+
+1. A feature turned off leaves its dotfiles in place, as today. Removing
+   what was deployed can come later; it needs a record of what was written.
+2. Prerequisites on a fresh machine are git, python and uv. The tool runs
+   from the checkout with `uv run dotfiles …`; runtime dependencies come
+   from `uv.lock`, not from system packages.
