@@ -13,6 +13,7 @@ how a feature behaves today, never edit it.
 | Lint and format | `uv run ruff check . && uv run ruff format --check .` |
 | Every host resolves | `uv run dotfiles check` |
 | One host, with sources | `uv run dotfiles config --host <name> --explain` |
+| A host's home tree | `uv run dotfiles render --host <name> --out <empty dir>` |
 
 CI (`.github/workflows/ci.yml`) runs the first three on every push to
 master and every PR; uv is pinned there by version and sha256.
@@ -23,6 +24,8 @@ master and every PR; uv is pinned there by version and sha256.
   A feature is `features.<name>.enabled` plus its settings in the same table.
 - Profiles `profiles/`, machines `hosts/`; one namespace for `extends`.
 - Resolution, validation, merge, explain, check: `dotfiles/config.py`.
+- Dotfiles: `home/` (real names, `*.j2` templates), modes and gates in
+  `home.toml`, rendering in `dotfiles/render.py`.
 - Why: `docs/spec/SPEC-<module>.md`, then `docs/spec/CAPABILITY-MAP.md`.
 
 ## Commits and branches

@@ -1,10 +1,11 @@
 import argparse
 import socket
 import sys
+from pathlib import Path
 
 import tomli_w
 
-from dotfiles import config
+from dotfiles import config, render
 
 
 def main() -> int:
@@ -13,11 +14,15 @@ def main() -> int:
     p = sub.add_parser("config", help="print the resolved config of a host")
     p.add_argument("--host", default=socket.gethostname(), help="default: this machine")
     p.add_argument("--explain", action="store_true", help="one line per key, with its file")
-    sub.add_parser("check", help="resolve every host in hosts/ and one unknown host")
+    p = sub.add_parser("render", help="write a host's home tree into a directory")
+    p.add_argument("--host", default=socket.gethostname(), help="default: this machine")
+    p.add_argument("--out", type=Path, required=True, help="missing or empty directory")
+    p.add_argument("--current", type=Path, help="home whose files merged templates read")
+    sub.add_parser("check", help="resolve and render every host in hosts/ and one unknown host")
     args = parser.parse_args()
 
     if args.command == "check":
-        results = config.check()
+        results = render.check()
         for host, error in results.items():
             print(f"{host:<14} {'ok' if error is None else 'FAIL'}")
             if error is not None:
@@ -25,7 +30,9 @@ def main() -> int:
         return 1 if any(results.values()) else 0
 
     try:
-        if args.explain:
+        if args.command == "render":
+            render.render(args.host, args.out, current=args.current)
+        elif args.explain:
             sys.stdout.write(config.explain(args.host))
         else:
             sys.stdout.write(tomli_w.dumps(config.resolve(args.host)))
