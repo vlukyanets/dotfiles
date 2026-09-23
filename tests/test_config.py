@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from dotfiles.config import ROOT, ConfigError, chain, check, resolve
+from dotfiles.config import ROOT, ConfigError, chain, check, explain, resolve
 
 
 def write(root: Path, rel: str, text: str) -> None:
@@ -181,3 +181,21 @@ def test_check_reports_every_broken_host(root):
 
 def test_check_real_data():
     assert not any(check().values())
+
+
+def test_explain_names_the_file_of_each_value(root):
+    write(
+        root,
+        "defaults.toml",
+        '[features]\na = false\nb = false\nc = false\n[locale]\nlocales = ["en", "ru"]\n',
+    )
+    write(root, "profiles/p.toml", "[features]\nb = true\n")
+    write(root, "hosts/h.toml", 'extends = ["p"]\n[features]\nc = true\n')
+    text = explain("h", root)
+    assert text == (
+        "features.a = false  # defaults.toml\n"
+        "features.b = true  # profiles/p.toml\n"
+        "features.c = true  # hosts/h.toml\n"
+        'locale.locales = ["en", "ru"]  # defaults.toml\n'
+    )
+    assert tomllib.loads(text) == resolve("h", root)

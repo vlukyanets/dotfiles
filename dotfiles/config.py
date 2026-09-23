@@ -4,6 +4,8 @@ import copy
 import tomllib
 from pathlib import Path
 
+import tomli_w
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # TOML's names, so an error reads like the file the user is editing.
@@ -104,19 +106,50 @@ def chain(host: str, root: Path) -> list[tuple[str, dict]]:
     return order
 
 
-def resolve(host: str, root: Path = ROOT) -> dict:
-    """Merged config for HOST: the defaults, then every file in its chain."""
+def leaves(data: dict, prefix: str = ""):
+    """(dotted key, value) for every non-table value; arrays are leaves."""
+    for key, value in data.items():
+        if isinstance(value, dict):
+            yield from leaves(value, prefix + key + ".")
+        else:
+            yield prefix + key, value
+
+
+def resolve_with_sources(host: str, root: Path = ROOT) -> tuple[dict, dict[str, str]]:
+    """Merged config for HOST and, per dotted key, the file its value came from."""
     schema = load(root / "defaults.toml", root)
     config = copy.deepcopy(schema)
+    sources = {key: "defaults.toml" for key, _ in leaves(schema)}
     for where, data in chain(host, root):
         validate(data, schema, where)
         merge(config, data)
+        sources.update((key, where) for key, _ in leaves(data))
     if config.get("secrets", {}).get("backend", "none") not in SECRETS_BACKENDS:
         raise ConfigError(
             f"{host}: secrets.backend: must be one of {', '.join(SECRETS_BACKENDS)},"
             f" got {config['secrets']['backend']!r}"
         )
-    return config
+    return config, sources
+
+
+def resolve(host: str, root: Path = ROOT) -> dict:
+    """Merged config for HOST: the defaults, then every file in its chain."""
+    return resolve_with_sources(host, root)[0]
+
+
+def toml_value(value) -> str:
+    # Arrays joined by hand: tomli-w breaks long ones over several lines.
+    if isinstance(value, list):
+        return "[" + ", ".join(toml_value(v) for v in value) + "]"
+    return tomli_w.dumps({"v": value}).removeprefix("v = ").removesuffix("\n")
+
+
+def explain(host: str, root: Path = ROOT) -> str:
+    """One line per leaf, `key = value  # file`: valid TOML, and grep finds any key."""
+    config, sources = resolve_with_sources(host, root)
+    return "".join(
+        f"{key} = {toml_value(value)}  # {sources[key]}\n" for key, value in leaves(config)
+    )
 
 
 def check(root: Path = ROOT) -> dict[str, str | None]:
