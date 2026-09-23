@@ -1,0 +1,23 @@
+# A machine someone sits at: encrypted btrfs with snapshots and swap, the
+# power and firmware services, and the niri desktop.
+extends = ["base"]
+
+[features]
+# storage and power
+luks_discard = true
+swap         = true
+snapper      = true
+btrfs_scrub  = true
+zram         = true
+bluetooth    = true
+fwupd        = true
+# desktop
+niri         = true
+noctalia     = true
+greetd       = true
+fcitx5       = true
+fonts        = true
+nerd_font    = true
+audio        = true
+kitty        = true
+firefox      = true

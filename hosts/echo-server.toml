@@ -1,3 +1,5 @@
+extends = ["server"]
+
 [git]
 name  = "Valentin Lukyanets"
 email = "valikluks95@gmail.com"

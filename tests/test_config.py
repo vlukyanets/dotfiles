@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from dotfiles.config import ROOT, ConfigError, resolve
+from dotfiles.config import ROOT, ConfigError, chain, resolve
 
 
 def write(root: Path, rel: str, text: str) -> None:
@@ -149,3 +149,19 @@ def test_bad_inheritance(root, files, error):
     with pytest.raises(ConfigError) as e:
         resolve("h", root)
     assert str(e.value) == error
+
+
+def test_real_profiles():
+    assert [w for w, _ in chain("hyper-lin", ROOT)] == [
+        "profiles/base.toml",
+        "profiles/laptop.toml",
+        "hosts/hyper-lin.toml",
+    ]
+    assert [w for w, _ in chain("echo-server", ROOT)] == [
+        "profiles/base.toml",
+        "profiles/server.toml",
+        "hosts/echo-server.toml",
+    ]
+    echo = resolve("echo-server")
+    assert echo["features"]["sshd"] and echo["features"]["zsh"]
+    assert not echo["features"]["niri"]
