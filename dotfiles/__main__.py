@@ -18,6 +18,8 @@ def main() -> int:
     p.add_argument("--host", default=socket.gethostname(), help="default: this machine")
     p.add_argument("--out", type=Path, required=True, help="missing or empty directory")
     p.add_argument("--current", type=Path, help="home whose files merged templates read")
+    p = sub.add_parser("deploy", help="write this machine's dotfiles into $HOME where they differ")
+    p.add_argument("--dry-run", action="store_true", help="print what would change, write nothing")
     sub.add_parser("check", help="resolve and render every host in hosts/ and one unknown host")
     args = parser.parse_args()
 
@@ -30,7 +32,10 @@ def main() -> int:
         return 1 if any(results.values()) else 0
 
     try:
-        if args.command == "render":
+        if args.command == "deploy":
+            for line in render.deploy(socket.gethostname(), dry_run=args.dry_run):
+                print(line)
+        elif args.command == "render":
             render.render(args.host, args.out, current=args.current)
         elif args.explain:
             sys.stdout.write(config.explain(args.host))

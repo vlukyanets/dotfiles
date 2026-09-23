@@ -4,6 +4,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import tempfile
 import tomllib
 import traceback
@@ -205,3 +206,62 @@ def check(root: Path = ROOT) -> dict[str, str | None]:
                 except ConfigError as e:
                     results[host] = str(e)
     return results
+
+
+def _mode(path: Path) -> int:
+    return stat.S_IMODE(path.stat().st_mode)
+
+
+def deploy(
+    host: str, root: Path = ROOT, home: Path | None = None, dry_run: bool = False
+) -> list[str]:
+    """Bring HOME in line with HOST's rendered tree; returns one line per change.
+
+    Only what differs is written, file by file through a temp file and a
+    rename; nothing is ever deleted. Directories get their mode when they are
+    created, and later only when home.toml sets one. A clean HOME yields [].
+    """
+    home = home or Path.home()
+    real_home = home.resolve()
+    entries = manifest(root)
+    changes = []
+    with tempfile.TemporaryDirectory() as tmp:
+        staged = Path(tmp) / "home"
+        for rel in render(host, staged, root, current=home):
+            src, dst = staged / rel, home / rel
+            # A symlinked directory on the way must not lead out of HOME.
+            if not dst.parent.resolve().is_relative_to(real_home):
+                raise ConfigError(f"~/{rel}: {dst.parent} leads outside {home}")
+            want = _mode(src)
+            if src.is_dir():
+                if dst.is_dir():
+                    if "mode" not in entries.get(rel, {}) or _mode(dst) == want:
+                        continue
+                    why = f"mode {_mode(dst):o}"
+                elif dst.exists():
+                    raise ConfigError(f"~/{rel}: exists and is not a directory")
+                else:
+                    why = "missing"
+                if not dry_run:
+                    dst.mkdir(exist_ok=True)
+                    dst.chmod(want)
+            else:
+                if dst.is_dir():
+                    raise ConfigError(f"~/{rel}: is a directory")
+                content = src.read_bytes()
+                if not dst.exists():
+                    why = "missing"
+                elif dst.read_bytes() != content:
+                    why = "content differs"
+                elif _mode(dst) != want:
+                    why = f"mode {_mode(dst):o}"
+                else:
+                    continue
+                if not dry_run:
+                    fd, part = tempfile.mkstemp(dir=dst.parent, prefix=f".{dst.name}.")
+                    with os.fdopen(fd, "wb") as f:
+                        f.write(content)
+                    os.chmod(part, want)
+                    os.replace(part, dst)
+            changes.append(f"-> ~/{rel} ({why})")
+    return changes

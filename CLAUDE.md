@@ -14,6 +14,7 @@ how a feature behaves today, never edit it.
 | Every host resolves | `uv run dotfiles check` |
 | One host, with sources | `uv run dotfiles config --host <name> --explain` |
 | A host's home tree | `uv run dotfiles render --host <name> --out <empty dir>` |
+| Dotfiles into `$HOME` | `uv run dotfiles deploy --dry-run`, then without the flag |
 
 CI (`.github/workflows/ci.yml`) runs the first three on every push to
 master and every PR; uv is pinned there by version and sha256.

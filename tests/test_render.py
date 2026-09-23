@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from dotfiles.config import ConfigError
-from dotfiles.render import check, render
+from dotfiles.render import check, deploy, render
 
 
 def write(root: Path, rel: str, text: str) -> None:
@@ -186,3 +186,57 @@ def test_invalid_current_toml_names_the_template(root, tmp_path):
     write(tmp_path, "cur/s.toml", "not = [toml")
     with pytest.raises(ConfigError, match=r"^home/s.toml.j2:1: on: not valid TOML: "):
         render("on", tmp_path / "out", root, current=tmp_path / "cur")
+
+
+def test_deploy_writes_what_differs_then_nothing(root):
+    write(root, "home/.gitconfig.j2", "name = {{ git.name }}\n")
+    write(root, "home/.ssh/config", "Host *\n")
+    write(root, "home.toml", '[".ssh"]\nmode = "700"\n')
+    home = Path.home()  # the test's own temp home (conftest.py)
+    (home / "keep-me").write_text("mine")
+    assert deploy("on", root) == [
+        "-> ~/.gitconfig (missing)",
+        "-> ~/.ssh (missing)",
+        "-> ~/.ssh/config (missing)",
+    ]
+    assert (home / ".gitconfig").read_text() == "name = Ann\n"
+    assert oct((home / ".ssh").stat().st_mode & 0o777) == "0o700"
+    assert deploy("on", root) == []
+    assert (home / "keep-me").read_text() == "mine"  # never deletes
+    assert sorted(p.name for p in home.iterdir() if p.name.startswith(".gitconfig")) == [
+        ".gitconfig"
+    ]
+
+
+def test_deploy_repairs_content_and_modes(root):
+    write(root, "home/f", "right\n")
+    write(root, "home/d/g", "x\n")
+    write(root, "home.toml", '["d"]\nmode = "700"\n')
+    deploy("on", root)
+    home = Path.home()
+    (home / "f").write_text("wrong\n")
+    (home / "d/g").chmod(0o600)
+    (home / "d").chmod(0o755)
+    assert deploy("on", root) == [
+        "-> ~/d (mode 755)",
+        "-> ~/d/g (mode 600)",
+        "-> ~/f (content differs)",
+    ]
+    assert deploy("on", root) == []
+
+
+def test_dry_run_writes_nothing(root):
+    write(root, "home/sub/f", "x\n")
+    assert deploy("on", root, dry_run=True) == ["-> ~/sub (missing)", "-> ~/sub/f (missing)"]
+    assert not (Path.home() / "sub").exists()
+
+
+def test_deploy_refuses_a_symlink_out_of_home(root, tmp_path):
+    write(root, "home/.config/app/f", "x\n")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (Path.home() / ".config").mkdir(exist_ok=True)
+    (Path.home() / ".config/app").symlink_to(outside)
+    with pytest.raises(ConfigError, match=r"^~/.config/app/f: .* leads outside "):
+        deploy("on", root)
+    assert not (outside / "f").exists()

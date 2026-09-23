@@ -197,3 +197,11 @@ def test_noctalia_settings_merge(homes, tmp_path):
         (tmp_path / "out/.local/state/noctalia/settings.toml").read_text(),
     )
     assert again == (tmp_path / "out/.local/state/noctalia/settings.toml").read_text()
+
+
+def test_deploy_hyper_lin_twice_is_silent_the_second_time():
+    from dotfiles.render import deploy
+
+    first = deploy("hyper-lin")
+    assert "-> ~/.zshrc (missing)" in first and "-> ~/.ssh (missing)" in first
+    assert deploy("hyper-lin") == []
