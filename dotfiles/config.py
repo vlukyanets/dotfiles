@@ -117,3 +117,15 @@ def resolve(host: str, root: Path = ROOT) -> dict:
             f" got {config['secrets']['backend']!r}"
         )
     return config
+
+
+def check(root: Path = ROOT) -> dict[str, str | None]:
+    """Resolve every host in hosts/ and one that is not there: host -> error or None."""
+    results: dict[str, str | None] = {}
+    for host in sorted(p.stem for p in (root / "hosts").glob("*.toml")) + ["unknown-host"]:
+        try:
+            resolve(host, root)
+            results[host] = None
+        except ConfigError as e:
+            results[host] = str(e)
+    return results

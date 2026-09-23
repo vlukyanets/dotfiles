@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from dotfiles.config import ROOT, ConfigError, chain, resolve
+from dotfiles.config import ROOT, ConfigError, chain, check, resolve
 
 
 def write(root: Path, rel: str, text: str) -> None:
@@ -165,3 +165,19 @@ def test_real_profiles():
     echo = resolve("echo-server")
     assert echo["features"]["sshd"] and echo["features"]["zsh"]
     assert not echo["features"]["niri"]
+
+
+def test_check_reports_every_broken_host(root):
+    write(root, "hosts/good.toml", "[features]\na = true\n")
+    write(root, "hosts/bad1.toml", "[features]\nc = true\n")
+    write(root, "hosts/bad2.toml", 'extends = ["nope"]\n')
+    assert check(root) == {
+        "bad1": "hosts/bad1.toml: features.c: unknown key",
+        "bad2": "hosts/bad2.toml: extends: no profile or host 'nope'",
+        "good": None,
+        "unknown-host": None,
+    }
+
+
+def test_check_real_data():
+    assert not any(check().values())
