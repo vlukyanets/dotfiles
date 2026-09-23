@@ -96,3 +96,6 @@ mode = "600"
 
 [".local/share/fcitx5"]
 when = "features.fcitx5.enabled"
+
+[".local/state/noctalia"]
+when = "features.noctalia.enabled"

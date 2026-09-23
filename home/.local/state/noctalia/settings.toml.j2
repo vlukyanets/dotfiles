@@ -1,0 +1,27 @@
+{#
+  noctalia rewrites this file whenever a setting changes in its UI (plugins
+  it enabled, the last wallpaper, per-output widgets), so a plain template
+  would drop all of that on every deploy. The keys below are merged over the
+  current file and everything else passes through. The layout is tomli-w's,
+  not noctalia's: after a UI change one deploy rewrites the file into this
+  layout with every key kept, then it is stable.
+#}
+{% set theme = {"source": features.noctalia.theme_source, "mode": features.noctalia.theme_mode} %}
+{% if features.noctalia.theme_name %}
+{% set key = {"community": "community_palette", "wallpaper": "wallpaper_scheme"}.get(features.noctalia.theme_source, "builtin") %}
+{% set _ = theme.update({key: features.noctalia.theme_name}) %}
+{% endif %}
+{% set want = {
+  "config_version": 14,
+  "bar": {"default": {
+    "start": ["launcher", "workspaces"],
+    "end": ["keyboard_layout", "media", "tray", "notifications", "clipboard", "network",
+            "bluetooth", "volume", "brightness", "battery", "control-center", "session"],
+    "font_scale": 1.1,
+    "margin_ends": 0,
+  }},
+  "shell": {"font_family": features.noctalia.font},
+  "theme": theme,
+  "control_center": {"calendar": {"show_week_numbers": true}},
+} %}
+{{ want | merge_over(current | from_toml) | to_toml | trim }}

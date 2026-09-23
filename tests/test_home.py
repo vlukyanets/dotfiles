@@ -2,6 +2,7 @@
 logic produce, pinned."""
 
 import tempfile
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -139,3 +140,60 @@ def test_fcitx5(homes):
     assert oct((conf / "pinyin.conf").stat().st_mode & 0o777) == "0o600"
     theme = homes["hyper-lin"] / ".local/share/fcitx5/themes/FluentDark-solid/panel.png"
     assert theme.read_bytes().startswith(b"\x89PNG")
+
+
+def render_with_current(tmp_path, rel, text):
+    current = tmp_path / "current"
+    (current / rel).parent.mkdir(parents=True)
+    (current / rel).write_text(text)
+    render("hyper-lin", tmp_path / "out", current=current)
+    return (tmp_path / "out" / rel).read_text()
+
+
+def test_fcitx5_profile(homes, tmp_path):
+    fresh = text(homes, "hyper-lin", ".config/fcitx5/profile")
+    assert "DefaultIM=keyboard-us\n\n[Groups/0/Items/0]\n" in fresh
+    assert "[Groups/0/Items/3]\n# Name\nName=pinyin\n# Layout\n# Layout=\n\n[GroupOrder]\n" in fresh
+    assert fresh.endswith("[GroupOrder]\n0=Default\n")
+    # What fcitx5 saved is kept while it is still listed...
+    kept = render_with_current(
+        tmp_path / "a",
+        ".config/fcitx5/profile",
+        fresh.replace("DefaultIM=keyboard-us", "DefaultIM=pinyin"),
+    )
+    assert kept == fresh.replace("DefaultIM=keyboard-us", "DefaultIM=pinyin")
+    # ...and reset when it is not.
+    reset = render_with_current(
+        tmp_path / "b", ".config/fcitx5/profile", "[Groups/0]\nDefaultIM=mozc\n"
+    )
+    assert reset == fresh
+
+
+def test_noctalia_settings_merge(homes, tmp_path):
+    fresh = tomllib.loads(text(homes, "hyper-lin", ".local/state/noctalia/settings.toml"))
+    assert fresh["shell"] == {"font_family": "FiraCode Nerd Font Propo"}
+    assert fresh["theme"] == {
+        "source": "community",
+        "mode": "dark",
+        "community_palette": "Cyberpunk",
+    }
+    assert fresh["bar"]["default"]["font_scale"] == 1.1
+    current = (
+        'config_version = 12\nwallpaper = "/tmp/w.png"\n'
+        '[shell]\nfont_family = "Mono"\nanimation = false\n'
+        '[plugins]\nenabled = ["clock"]\n'
+    )
+    merged = tomllib.loads(
+        render_with_current(tmp_path, ".local/state/noctalia/settings.toml", current)
+    )
+    assert merged["config_version"] == 14  # the repo's keys win
+    assert merged["shell"] == {"font_family": "FiraCode Nerd Font Propo", "animation": False}
+    assert merged["wallpaper"] == "/tmp/w.png"  # noctalia's own keys survive
+    assert merged["plugins"] == {"enabled": ["clock"]}
+    # Deploying again over our own output changes nothing.
+    again = render_with_current(
+        tmp_path / "again",
+        ".local/state/noctalia/settings.toml",
+        (tmp_path / "out/.local/state/noctalia/settings.toml").read_text(),
+    )
+    assert again == (tmp_path / "out/.local/state/noctalia/settings.toml").read_text()
