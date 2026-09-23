@@ -1,0 +1,6 @@
+# A machine reached over the network: sshd and tailscale on top of base.
+extends = ["base"]
+
+[features]
+sshd.enabled      = true
+tailscale.enabled = true

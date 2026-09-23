@@ -1,0 +1,21 @@
+# What every Arch host gets: the package manager, locale, the shell, the
+# everyday CLI and the SSH agent. Values that depend on where or what the
+# machine is (timezone, mirrors, hardware) belong to the host.
+
+[features]
+pacman.enabled    = true
+makepkg.enabled   = true
+reflector.enabled = true
+aur.enabled       = true
+paccache.enabled  = true
+pkgfile.enabled   = true
+locale.enabled    = true
+nobeep.enabled    = true
+oomd.enabled      = true
+timesyncd.enabled = true
+zsh.enabled       = true
+cli_tools.enabled = true
+neovim.enabled    = true
+htop.enabled      = true
+btop.enabled      = true
+ssh_agent.enabled = true

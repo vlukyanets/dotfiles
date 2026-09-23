@@ -1,0 +1,192 @@
+# Every key a host or profile may set, with its default value.
+#
+# This file is the schema. profiles/*.toml and hosts/*.toml override it, and
+# a key that is not here — or has a different type here — fails naming the
+# file and the key. Feature flags are booleans and default to off, so a host
+# without a file in hosts/ gets dotfiles and nothing else.
+
+[git]
+name  = ""
+email = ""
+
+[secrets]
+# "none" or "rbw". With rbw, the package and ~/.config/rbw/config.json are
+# provisioned; logging in is the user's.
+backend = "none"
+
+[ssh]
+# Generate an ed25519 key on first apply if ~/.ssh has none. Prompted once
+# on a host that hosts/ does not list.
+generate_key    = true
+# Protect the generated key with a passphrase, asked by ssh-keygen itself
+# (never by this tool) and so only on an apply with a terminal. False: the
+# key has no passphrase and is made without asking.
+passphrase      = false
+# Machines that may log in here, by name from the ssh-keys registry.
+# Empty leaves ~/.ssh/authorized_keys unmanaged.
+authorized_keys = []
+
+[features]
+# packages
+pacman       = false  # /etc/pacman.conf.d drop-ins
+makepkg      = false  # /etc/makepkg.conf.d drop-in
+reflector    = false  # mirrorlist refresh on a timer
+aur          = false  # paru, built from the AUR once
+# system
+locale       = false  # locales, LANG, keymap, console font, timezone
+nobeep       = false  # blacklist pcspkr
+oomd         = false  # systemd-oomd pressure tuning + the service
+bluetooth    = false  # bluez + bluetooth.service
+fwupd        = false  # fwupd + fwupd-refresh.timer
+timesyncd    = false  # systemd-timesyncd
+btrfs_scrub  = false  # btrfs-progs + btrfs-scrub@-.timer
+paccache     = false  # pacman-contrib + paccache.timer
+pkgfile      = false  # pkgfile + pkgfile-update.timer
+sshd         = false  # openssh, sshd.service, hardening drop-in
+resolved     = false  # systemd-resolved + NetworkManager handoff
+tailscale    = false  # tailscale, tailscaled.service, user as operator
+luks_discard = false  # rd.luks.options=<uuid>:discard in /etc/kernel/cmdline
+swap         = false  # swap file on its own btrfs subvolume
+snapper      = false  # snapper config, snap-pac, one snapshot pair per apply
+zram         = false  # zram-generator + vm sysctls
+thp          = false  # transparent hugepage mode, optional static reservation
+nvidia       = false  # driver for the detected GPU + nvtop
+plymouth     = false  # boot splash
+# shell
+zsh          = false  # zsh as login shell, oh-my-zsh, p10k, plugins
+cli_tools    = false  # the everyday CLI set (list in the script)
+neovim       = false
+docker       = false
+libvirt      = false
+uv           = false  # + a default CPython
+fnm          = false  # + LTS node, pnpm
+go           = false
+android      = false  # android-tools, adbusers group
+rustup       = false  # + stable toolchain
+sccache      = false  # + cargo rustc-wrapper
+gh           = false
+cpp_gcc      = false
+cpp_clang    = false
+jdk          = false
+dotnet       = false
+kotlin       = false
+sqlite       = false
+tracing      = false  # valgrind, strace, ltrace, perf
+nmap         = false
+mtr          = false
+dig          = false
+tcpdump      = false
+claude_code  = false  # AUR
+veracrypt    = false
+htop         = false
+btop         = false
+iotop        = false
+yubikey      = false  # ykman, pcscd.socket
+ssh_agent    = false  # owned by secrets-ssh; .zshrc reads it
+# desktop
+niri              = false  # compositor + portal, GTK dark theme, ~/.config/niri, mimeapps.list
+noctalia          = false  # shell on niri; [noctalia] below
+greetd            = false  # greetd + [greetd].greeter, /etc/greetd/config.toml
+fcitx5            = false  # input methods for locale.languages
+fonts             = false  # emoji + CJK fallbacks
+nerd_font         = false  # FiraCode Nerd Font + symbols; nvim reads it
+audio             = false  # pipewire-pulse/alsa/jack, wireplumber, playerctl, brightnessctl
+kitty             = false
+firefox           = false  # + policies.json
+onlyoffice        = false  # AUR
+evince            = false
+vscode            = false  # AUR + profiles from .chezmoidata/vscode.json
+wireshark         = false  # + wireshark group
+claude_desktop    = false  # AUR
+sqlitebrowser     = false
+vlc               = false
+termusic          = false  # TUI
+loupe             = false
+feh               = false
+discord           = false
+telegram          = false
+qbittorrent       = false
+yazi              = false  # TUI
+doublecmd         = false
+mission_center    = false
+obs_studio        = false
+gaming            = false  # steam, gamemode, mangohud; needs pacman.multilib
+
+[pacman]
+parallel_downloads = 5
+multilib           = false
+
+[makepkg]
+# "4", "20%" (of nproc, at least 1) or any shell expression, written into
+# makepkg.conf verbatim so it is evaluated at every build.
+jobs    = "$(nproc)"
+# Extra OPTIONS+=(...) entries, e.g. ["ccache", "!debug"].
+options = []
+
+[reflector]
+country            = []        # empty: every country
+protocol           = "https"
+latest             = 20
+sort               = "rate"
+age                = 12        # hours
+download_timeout   = 5         # seconds
+completion_percent = 100       # minimum completion percent a mirror must have
+on_calendar        = "weekly"  # reflector.timer overrides
+on_boot_sec        = "15min"
+
+[locale]
+lang     = "en_US.UTF-8"
+locales  = ["en_US.UTF-8 UTF-8"]
+keymap   = "us"
+timezone = "UTC"
+# Names from .chezmoidata/languages.toml, in keyboard-layout order; niri,
+# fcitx5 and switch-layout.sh read the same list.
+languages = ["english"]
+
+[console]
+font     = ""  # a file in /usr/share/kbd/consolefonts, e.g. "ter-v20n"
+packages = []  # what ships it, e.g. ["terminus-font"]
+
+[sshd]
+password_auth     = true
+permit_root_login = "prohibit-password"
+
+[swap]
+size = ""  # btrfs mkswapfile size, e.g. "20g"; required when the feature is on
+
+[snapper]
+timeline               = false
+number_limit           = 10
+number_limit_important = 5
+important_packages     = []  # a transaction touching one of these marks the pair important
+important_commands     = []  # snap-pac's own rule for terminal runs
+
+[zram]
+size                   = "min(ram / 2, 4096)"
+algorithm              = "zstd"
+priority               = 100
+swappiness             = 0  # 0: leave the kernel default
+watermark_scale_factor = 0  # 0: leave the kernel default
+
+[thp]
+mode    = "always"
+reserve = 0  # vm.nr_hugepages; 0: none
+
+[noctalia]
+font         = "sans-serif"
+theme_source = "builtin"  # "builtin", "community" or "wallpaper"
+theme_name   = ""         # palette name; empty: noctalia's default
+theme_mode   = "dark"
+
+[greetd]
+greeter = "tuigreet"  # or "noctalia-greeter" (AUR)
+session = ""          # noctalia-greeter only: force this session
+user    = ""          # noctalia-greeter only: skip the user list
+
+[fcitx5]
+cloudpinyin         = false
+cloudpinyin_backend = "GoogleCN"  # or "Google", "Baidu"
+
+[sccache]
+cache_size = ""  # e.g. "20G"; empty: sccache's default
+cache_dir  = ""  # empty: sccache's default (~/.cache/sccache)

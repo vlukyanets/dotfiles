@@ -1,0 +1,109 @@
+extends = ["laptop"]
+
+[git]
+name  = "Valentin Lukyanets"
+email = "valikluks95@gmail.com"
+
+[features]
+# network and hardware
+sshd.enabled           = true
+resolved.enabled       = true
+tailscale.enabled      = true
+thp.enabled            = true
+nvidia.enabled         = true
+yubikey.enabled        = true
+# development
+docker.enabled         = true
+libvirt.enabled        = true
+uv.enabled             = true
+fnm.enabled            = true
+go.enabled             = true
+android.enabled        = true
+rustup.enabled         = true
+gh.enabled             = true
+cpp_gcc.enabled        = true
+cpp_clang.enabled      = true
+jdk.enabled            = true
+dotnet.enabled         = true
+kotlin.enabled         = true
+sqlite.enabled         = true
+tracing.enabled        = true
+nmap.enabled           = true
+mtr.enabled            = true
+dig.enabled            = true
+tcpdump.enabled        = true
+claude_code.enabled    = true
+iotop.enabled          = true
+# apps
+veracrypt.enabled      = true
+onlyoffice.enabled     = true
+evince.enabled         = true
+vscode.enabled         = true
+wireshark.enabled      = true
+claude_desktop.enabled = true
+sqlitebrowser.enabled  = true
+vlc.enabled            = true
+termusic.enabled       = true
+loupe.enabled          = true
+feh.enabled            = true
+discord.enabled        = true
+telegram.enabled       = true
+qbittorrent.enabled    = true
+yazi.enabled           = true
+doublecmd.enabled      = true
+mission_center.enabled = true
+obs_studio.enabled     = true
+gaming.enabled         = true
+
+[ssh]
+authorized_keys = ["nova-win", "nova-win-work"]
+
+[secrets]
+backend = "rbw"
+
+[features.sccache]
+enabled    = true
+cache_size = "20G"
+
+[features.noctalia]
+font         = "FiraCode Nerd Font Propo"
+theme_source = "community"
+theme_name   = "Cyberpunk"
+
+# noctalia-greeter comes from the AUR.
+[features.greetd]
+greeter = "noctalia-greeter"
+
+[features.fcitx5]
+cloudpinyin         = true
+cloudpinyin_backend = "Google"
+
+[features.locale]
+locales   = ["en_US.UTF-8 UTF-8", "ru_RU.UTF-8 UTF-8"]
+languages = ["english", "russian", "ukrainian", "chinese"]
+timezone  = "Europe/Kyiv"
+
+[features.locale.console]
+font     = "ter-v20n"
+packages = ["terminus-font"]
+
+[features.swap]
+size = "20g"
+
+[features.snapper]
+important_packages = ["linux-zen", "linux-zen-headers", "nvidia-580xx-dkms", "systemd", "pacman"]
+important_commands = ["pacman -Syu", "paru -Syu"]
+
+[features.zram]
+swappiness             = 100
+watermark_scale_factor = 125
+
+[features.pacman]
+parallel_downloads = 2
+multilib           = true
+
+[features.makepkg]
+jobs = "20%"
+
+[features.reflector]
+country = ["Ukraine", "Poland", "Slovakia", "Germany", "Hungary", "Czechia"]
