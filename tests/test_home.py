@@ -103,3 +103,39 @@ def test_gates_and_modes(homes):
     assert oct((homes["hyper-lin"] / ".ssh").stat().st_mode & 0o777) == "0o700"
     assert ".config/rbw/config.json" in hyper
     assert ".config/rbw/config.json" not in files("echo-server")
+
+
+def test_authorized_keys(homes):
+    keys = text(homes, "hyper-lin", ".ssh/authorized_keys").splitlines()[2:]
+    assert [line.split()[-1] for line in keys] == ["nova-win", "nova-win-work"]
+    assert all(line.startswith("ssh-ed25519 AAAA") for line in keys)
+    assert not (homes["echo-server"] / ".ssh/authorized_keys").exists()
+
+
+def test_niri_and_layouts(homes):
+    niri = text(homes, "hyper-lin", ".config/niri/config.kdl")
+    assert niri.startswith("environment {\n")
+    assert '    QT_QPA_PLATFORM "wayland"\n    // No GTK_IM_MODULE' in niri
+    assert '    XMODIFIERS "@im=fcitx"\n    WAYLAND_DISPLAY' in niri
+    assert 'layout "us,ru,ua,cn"' in niri
+    assert 'spawn-at-startup "fcitx5" "-d"\n\nhotkey-overlay' in niri
+    switch = homes["hyper-lin"] / ".config/niri/switch-layout.sh"
+    assert 'FCITX5_IMS=("keyboard-us" "keyboard-ru" "keyboard-ua" "pinyin")\n' in switch.read_text()
+    assert oct(switch.stat().st_mode & 0o777) == "0o755"
+    assert not (homes["echo-server"] / ".config/niri").exists()
+
+
+def test_mimeapps(homes):
+    mime = text(homes, "hyper-lin", ".config/mimeapps.list")
+    assert "\n[Default Applications]\nx-scheme-handler/http=firefox.desktop\n" in mime
+    assert "image/png=org.gnome.Loupe.desktop;feh.desktop\n" in mime
+    assert mime.endswith("x-scheme-handler/claude-cli=claude-code-url-handler.desktop\n")
+
+
+def test_fcitx5(homes):
+    conf = homes["hyper-lin"] / ".config/fcitx5/conf"
+    assert "\nBackend=Google\n" in (conf / "cloudpinyin.conf").read_text()
+    assert "\nCloudPinyinEnabled=True\n" in (conf / "pinyin.conf").read_text()
+    assert oct((conf / "pinyin.conf").stat().st_mode & 0o777) == "0o600"
+    theme = homes["hyper-lin"] / ".local/share/fcitx5/themes/FluentDark-solid/panel.png"
+    assert theme.read_bytes().startswith(b"\x89PNG")

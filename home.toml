@@ -66,6 +66,33 @@ when = "features.termusic.enabled"
 [".ssh"]
 mode = "700"
 
+[".ssh/authorized_keys"]
+when = "ssh.authorized_keys"
+
 # Only keeps config.d in git; chezmoi never created empty files either.
 [".ssh/config.d/.keep"]
 when = "false"
+
+[".config/niri"]
+when = "features.niri.enabled"
+
+[".config/niri/lock-screen.sh"]
+mode = "755"
+
+[".config/niri/switch-layout.sh"]
+mode = "755"
+
+[".config/mimeapps.list"]
+when = "features.niri.enabled"
+
+[".config/fcitx5"]
+when = "features.fcitx5.enabled"
+
+[".config/fcitx5/conf/pinyin.conf"]
+mode = "600"
+
+[".config/fcitx5/conf/cloudpinyin.conf"]
+mode = "600"
+
+[".local/share/fcitx5"]
+when = "features.fcitx5.enabled"
