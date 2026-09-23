@@ -1,6 +1,6 @@
 # Spec: `render` — dotfiles as Jinja2 templates
 
-Status: draft 2026-09-23, awaiting review. Module of the
+Status: approved 2026-09-23. Module of the
 [capability map](CAPABILITY-MAP.md); depends on `config`.
 
 ## Objective
@@ -185,12 +185,6 @@ the message, comments on why.
    at most the noctalia line; after one `deploy`, nothing.
 3. `check`, pytest, ruff green locally and in CI.
 
-## Open Questions
-
-1. Manifest (`home.toml`) with real file names — or keep modes/gates in the
-   file names like chezmoi (`private_`, `executable_`)? Recommended: the
-   manifest; it also holds the gates, so a dotfile's rules are in one place.
-
 ## Decisions
 
 1. A feature turned off leaves its dotfiles in place, as today. Removing
@@ -198,3 +192,7 @@ the message, comments on why.
 2. Prerequisites on a fresh machine are git, python and uv. The tool runs
    from the checkout with `uv run dotfiles …`; runtime dependencies come
    from `uv.lock`, not from system packages.
+3. Modes and gates live in the `home.toml` manifest; files keep their real
+   names. Chosen over chezmoi-style name attributes (two mechanisms, a name
+   parser) and over one directory per feature (commits `features` to a
+   layout before its spec).
