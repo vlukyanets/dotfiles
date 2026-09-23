@@ -37,6 +37,8 @@ def environment(home: Path) -> jinja2.Environment:
     # Go's %q, which chezmoi's templates used: a double-quoted string that is
     # also valid TOML and JSON.
     env.filters["quote"] = lambda s: json.dumps(str(s), ensure_ascii=False)
+    # Ansible's extract: names | map("extract", registry) looks each name up.
+    env.filters["extract"] = lambda key, container: container[key]
     return env
 
 
@@ -63,6 +65,25 @@ def manifest(root: Path) -> dict[str, dict]:
     return entries
 
 
+# Registry in data/ -> the config key whose names must all be in it.
+REFERENCES = {"languages": "features.locale.languages", "ssh_keys": "ssh.authorized_keys"}
+
+
+def registries(host: str, cfg: dict, root: Path) -> dict:
+    """data/*.toml merged, after checking every name CFG takes from them."""
+    merged = {}
+    for path in sorted((root / "data").glob("*.toml")):
+        merged |= config.load(path, root)
+    for registry, dotted in REFERENCES.items():
+        names = cfg
+        for key in dotted.split("."):
+            names = names.get(key, {})
+        for name in names or []:
+            if name not in merged.get(registry, {}):
+                raise ConfigError(f"{host}: {dotted}: {name!r} is not in data/ ({registry})")
+    return merged
+
+
 def _error(e: Exception, template: str, host: str) -> ConfigError:
     """The template's name and line, and the host, for any error raised while rendering."""
     line = getattr(e, "lineno", None)
@@ -87,11 +108,16 @@ def render(host: str, out: Path, root: Path = ROOT, current: Path | None = None)
         return []
     entries = manifest(root)
     env = environment(home)
-    context = config.resolve(host, root) | {
-        "host": host,
-        "home": str(Path.home()),
-        "uid": os.getuid(),
-    }
+    cfg = config.resolve(host, root)
+    context = (
+        cfg
+        | registries(host, cfg, root)
+        | {
+            "host": host,
+            "home": str(Path.home()),
+            "uid": os.getuid(),
+        }
+    )
 
     def enabled(rel: Path) -> bool:
         # A gate on a directory covers everything under it.

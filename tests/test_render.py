@@ -139,3 +139,30 @@ def test_out_must_be_empty(root, tmp_path):
 def test_check_renders_every_host(root):
     write(root, "home/f.j2", "{{ git.name or fail('no name') }}")
     assert check(root) == {"on": None, "unknown-host": "home/f.j2:1: unknown-host: no name"}
+
+
+def test_registries_reach_templates_and_names_are_checked(root, tmp_path):
+    write(
+        root,
+        "defaults.toml",
+        '[git]\nname = ""\n[features.zsh]\nenabled = false\n'
+        '[features.locale]\nlanguages = ["en"]\n',
+    )
+    write(root, "hosts/bad.toml", '[features.locale]\nlanguages = ["en", "xx"]\n')
+    write(root, "data/languages.toml", '[languages.en]\nxkb = "us"\n')
+    write(
+        root,
+        "home/kb.j2",
+        '{{ features.locale.languages | map("extract", languages) | map(attribute="xkb") | join(",") }}\n',
+    )
+    render("on", tmp_path / "out", root)
+    assert (tmp_path / "out/kb").read_text() == "us\n"
+    with pytest.raises(ConfigError) as e:
+        render("bad", tmp_path / "bad", root)
+    assert str(e.value) == "bad: features.locale.languages: 'xx' is not in data/ (languages)"
+
+
+def test_quote_and_inline_if(root, tmp_path):
+    write(root, "home/f.j2", '{{ git.name | quote }} {{ "on" if features.zsh.enabled else "" }}|\n')
+    render("on", tmp_path / "out", root)
+    assert (tmp_path / "out/f").read_text() == '"Ann" on|\n'

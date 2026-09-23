@@ -26,6 +26,9 @@ master and every PR; uv is pinned there by version and sha256.
 - Resolution, validation, merge, explain, check: `dotfiles/config.py`.
 - Dotfiles: `home/` (real names, `*.j2` templates), modes and gates in
   `home.toml`, rendering in `dotfiles/render.py`.
+- Registries: `data/*.toml` (ssh keys, languages), merged into the template
+  context; the names a host takes from them are checked in
+  `render.registries` (`REFERENCES`).
 - Why: `docs/spec/SPEC-<module>.md`, then `docs/spec/CAPABILITY-MAP.md`.
 
 ## Commits and branches
