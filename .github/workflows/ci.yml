@@ -4,7 +4,7 @@
 # Everything is pinned: the action by commit SHA, uv by version and sha256,
 # the Python packages by uv.lock. To bump uv, change the version and the hash
 # together.
-name: CI
+name: CI Dotfiles
 
 on:
   push:
@@ -13,7 +13,7 @@ on:
 
 # One run at a time; a newer run waits instead of cancelling the current one.
 concurrency:
-  group: ci
+  group: ci-dotfiles
   cancel-in-progress: false
 
 permissions:
