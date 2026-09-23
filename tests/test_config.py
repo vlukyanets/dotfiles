@@ -217,3 +217,11 @@ def test_explain_names_the_file_of_each_value(root):
         'locale.locales = ["en", "ru"]  # defaults.toml\n'
     )
     assert tomllib.loads(text) == resolve("h", root)
+
+
+def test_tests_run_isolated(isolated):
+    import os
+
+    assert Path.home() == isolated / "home"
+    assert os.environ["XDG_RUNTIME_DIR"] == str(isolated / "run")
+    assert os.environ["SUDO_CMD"] == "false"

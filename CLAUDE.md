@@ -38,3 +38,7 @@ how a feature behaves today, never edit it.
   purpose means updating the fixture in the same commit.
 - `type(v) is type(want)`, not `isinstance`: TOML `true` would pass as an
   integer otherwise.
+- Every test runs with `HOME` and the XDG directories in pytest's temp dir
+  and `SUDO_CMD=false` (`tests/conftest.py`, autouse). Code that goes to
+  root must read `SUDO_CMD` (default `sudo`), as `lib.sh` did, so a test
+  can never prompt for a password or change the machine.
