@@ -2,12 +2,15 @@
 
 import json
 import os
+import re
 import shutil
 import tempfile
+import tomllib
 import traceback
 from pathlib import Path
 
 import jinja2
+import tomli_w
 
 from dotfiles import config
 from dotfiles.config import ROOT, ConfigError
@@ -22,6 +25,30 @@ class TemplateFail(Exception):
 
 def fail(message: str):
     raise TemplateFail(message)
+
+
+def from_toml(text: str) -> dict:
+    try:
+        return tomllib.loads(text)
+    except tomllib.TOMLDecodeError as e:
+        raise TemplateFail(f"not valid TOML: {e}") from None
+
+
+def merge_over(want: dict, base: dict) -> dict:
+    """BASE with WANT's keys on top, tables merged recursively: what an
+    application wrote survives unless the repo sets that key."""
+    out = dict(base)
+    for key, value in want.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            value = merge_over(value, base[key])
+        out[key] = value
+    return out
+
+
+def regex_search(text: str, pattern: str) -> str:
+    """The first group of the first match (the whole match without groups), or ""."""
+    m = re.search(pattern, text)
+    return "" if m is None else m.group(1 if m.groups() else 0)
 
 
 def environment(home: Path) -> jinja2.Environment:
@@ -39,6 +66,11 @@ def environment(home: Path) -> jinja2.Environment:
     env.filters["quote"] = lambda s: json.dumps(str(s), ensure_ascii=False)
     # Ansible's extract: names | map("extract", registry) looks each name up.
     env.filters["extract"] = lambda key, container: container[key]
+    # For files an application rewrites itself: merge with `current`.
+    env.filters["from_toml"] = from_toml
+    env.filters["to_toml"] = tomli_w.dumps
+    env.filters["merge_over"] = merge_over
+    env.filters["regex_search"] = regex_search
     return env
 
 

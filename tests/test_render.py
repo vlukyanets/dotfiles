@@ -166,3 +166,23 @@ def test_quote_and_inline_if(root, tmp_path):
     write(root, "home/f.j2", '{{ git.name | quote }} {{ "on" if features.zsh.enabled else "" }}|\n')
     render("on", tmp_path / "out", root)
     assert (tmp_path / "out/f").read_text() == '"Ann" on|\n'
+
+
+def test_merge_filters():
+    from dotfiles.render import merge_over, regex_search
+
+    assert merge_over({"a": {"x": 1}, "b": 2}, {"a": {"x": 0, "y": 0}, "c": 3}) == {
+        "a": {"x": 1, "y": 0},
+        "c": 3,
+        "b": 2,
+    }
+    assert merge_over({"a": 1}, {"a": {"x": 0}}) == {"a": 1}
+    assert regex_search("k=v\nDefaultIM=pinyin\n", r"(?m)^DefaultIM=(\S+)") == "pinyin"
+    assert regex_search("nothing", r"x(\d)") == ""
+
+
+def test_invalid_current_toml_names_the_template(root, tmp_path):
+    write(root, "home/s.toml.j2", "{{ current | from_toml }}")
+    write(tmp_path, "cur/s.toml", "not = [toml")
+    with pytest.raises(ConfigError, match=r"^home/s.toml.j2:1: on: not valid TOML: "):
+        render("on", tmp_path / "out", root, current=tmp_path / "cur")
