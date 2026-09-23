@@ -57,14 +57,59 @@ def merge(into: dict, data: dict) -> None:
             into[key] = value
 
 
+def names(root: Path) -> dict[str, Path]:
+    """Every profile and host by name. One namespace, so `extends` needs no prefix."""
+    found: dict[str, Path] = {}
+    paths = sorted((root / "profiles").glob("*.toml")) + sorted((root / "hosts").glob("*.toml"))
+    for path in paths:
+        if path.stem in found:
+            other = found[path.stem].relative_to(root)
+            raise ConfigError(f"{path.relative_to(root)}: {path.stem!r} is also {other}")
+        found[path.stem] = path
+    return found
+
+
+def chain(host: str, root: Path) -> list[tuple[str, dict]]:
+    """(file, data) for HOST and every file it extends, parents first.
+
+    Depth-first, post-order, each file once: a shared ancestor is merged at
+    its first position, so a later parent does not reset what an earlier one
+    set on top of it.
+    """
+    known = names(root)
+    order: list[tuple[str, dict]] = []
+    done: set[str] = set()
+
+    def visit(name: str, stack: list[str]) -> None:
+        if name in stack:
+            raise ConfigError(f"extends: cycle {' → '.join(stack[stack.index(name) :] + [name])}")
+        if name in done:
+            return
+        where = str(known[name].relative_to(root))
+        data = load(known[name], root)
+        parents = data.pop("extends", [])
+        if not isinstance(parents, list) or not all(isinstance(p, str) for p in parents):
+            raise ConfigError(f"{where}: extends: must be an array of strings")
+        for parent in parents:
+            if parent not in known:
+                raise ConfigError(f"{where}: extends: no profile or host {parent!r}")
+            visit(parent, stack + [name])
+        done.add(name)
+        order.append((where, data))
+
+    # The host itself only comes from hosts/: a machine called "server" does
+    # not pick up the server profile by accident.
+    if host in known and known[host].parent.name == "hosts":
+        visit(host, [])
+    return order
+
+
 def resolve(host: str, root: Path = ROOT) -> dict:
-    """Merged config for HOST: the defaults, then its file in hosts/ if it has one."""
+    """Merged config for HOST: the defaults, then every file in its chain."""
     schema = load(root / "defaults.toml", root)
     config = copy.deepcopy(schema)
-    path = root / "hosts" / f"{host}.toml"
-    if path in (root / "hosts").glob("*.toml"):
-        data = load(path, root)
-        validate(data, schema, str(path.relative_to(root)))
+    for where, data in chain(host, root):
+        validate(data, schema, where)
         merge(config, data)
     if config.get("secrets", {}).get("backend", "none") not in SECRETS_BACKENDS:
         raise ConfigError(

@@ -83,3 +83,69 @@ def test_hyper_lin_matches_the_chezmoi_repo():
     for table, values in old.items():
         expected[table].update(values)
     assert resolve("hyper-lin") == expected
+
+
+def test_host_extends_profile_and_overrides_it(root):
+    write(root, "profiles/p.toml", "[features]\na = true\nb = true\n")
+    write(root, "hosts/h.toml", 'extends = ["p"]\n[features]\nb = false\n')
+    assert resolve("h", root) == {"features": {"a": True, "b": False}}
+
+
+def test_parents_merge_left_to_right(root):
+    write(root, "profiles/p.toml", "[features]\na = true\n")
+    write(root, "profiles/q.toml", "[features]\na = false\nb = true\n")
+    write(root, "hosts/h.toml", 'extends = ["p", "q"]\n')
+    assert resolve("h", root) == {"features": {"a": False, "b": True}}
+
+
+def test_shared_ancestor_is_merged_once(root):
+    write(root, "profiles/base.toml", "[features]\na = false\nb = false\n")
+    write(root, "profiles/p.toml", 'extends = ["base"]\n[features]\na = true\n')
+    write(root, "profiles/q.toml", 'extends = ["base"]\n[features]\nb = true\n')
+    write(root, "hosts/h.toml", 'extends = ["p", "q"]\n')
+    # q re-merging base would reset a.
+    assert resolve("h", root) == {"features": {"a": True, "b": True}}
+
+
+def test_host_extends_host(root):
+    write(root, "hosts/one.toml", "[features]\na = true\n")
+    write(root, "hosts/two.toml", 'extends = ["one"]\n')
+    assert resolve("two", root) == {"features": {"a": True, "b": False}}
+
+
+def test_hostname_does_not_pick_up_a_profile(root):
+    write(root, "profiles/server.toml", "[features]\na = true\n")
+    assert resolve("server", root) == {"features": {"a": False, "b": False}}
+
+
+@pytest.mark.parametrize(
+    ("files", "error"),
+    [
+        (
+            {"hosts/h.toml": 'extends = ["p"]\n', "profiles/p.toml": 'extends = ["h"]\n'},
+            "extends: cycle h → p → h",
+        ),
+        ({"hosts/h.toml": 'extends = ["h"]\n'}, "extends: cycle h → h"),
+        (
+            {"hosts/h.toml": 'extends = ["nope"]\n'},
+            "hosts/h.toml: extends: no profile or host 'nope'",
+        ),
+        ({"hosts/h.toml": 'extends = "p"\n'}, "hosts/h.toml: extends: must be an array of strings"),
+        ({"hosts/h.toml": "extends = [1]\n"}, "hosts/h.toml: extends: must be an array of strings"),
+        ({"hosts/h.toml": "", "profiles/h.toml": ""}, "hosts/h.toml: 'h' is also profiles/h.toml"),
+        (
+            {"hosts/h.toml": 'extends = ["p"]\n', "profiles/p.toml": "[features]\nc = 1\n"},
+            "profiles/p.toml: features.c: unknown key",
+        ),
+        (
+            {"hosts/h.toml": '[features]\nextends = ["p"]\n'},
+            "hosts/h.toml: features.extends: unknown key",
+        ),
+    ],
+)
+def test_bad_inheritance(root, files, error):
+    for rel, text in files.items():
+        write(root, rel, text)
+    with pytest.raises(ConfigError) as e:
+        resolve("h", root)
+    assert str(e.value) == error
