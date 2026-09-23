@@ -14,6 +14,9 @@ how a feature behaves today, never edit it.
 | Every host resolves | `uv run dotfiles check` |
 | One host, with sources | `uv run dotfiles config --host <name> --explain` |
 
+CI (`.github/workflows/ci.yml`) runs the first three on every push to
+master and every PR; uv is pinned there by version and sha256.
+
 ## Navigation
 
 - Keys and defaults: `defaults.toml` — the schema; a new key goes here first.
@@ -32,9 +35,9 @@ how a feature behaves today, never edit it.
 
 ## Pitfalls
 
-- `tests/test_config.py::test_hyper_lin_matches_the_chezmoi_repo` pins
-  hyper-lin to the old repo's data (`tests/fixtures/old-*.toml`, in the
-  old layout, converted by `to_features_layout`). Changing hyper-lin on
-  purpose means updating the fixture in the same commit.
 - `type(v) is type(want)`, not `isinstance`: TOML `true` would pass as an
   integer otherwise.
+- Every test runs with `HOME` and the XDG directories in pytest's temp dir
+  and `SUDO_CMD=false` (`tests/conftest.py`, autouse). Code that goes to
+  root must read `SUDO_CMD` (default `sudo`), as `lib.sh` did, so a test
+  can never prompt for a password or change the machine.

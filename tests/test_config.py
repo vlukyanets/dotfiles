@@ -74,35 +74,6 @@ def test_secrets_backend_is_checked(root):
         resolve("h", root)
 
 
-def to_features_layout(old: dict) -> dict:
-    """The chezmoi repo's layout ([features] booleans, one table per feature's
-    settings) in this repo's: features.<name>.enabled plus the settings."""
-    new = {key: old[key] for key in ("git", "secrets", "ssh")}
-    new["features"] = {name: {"enabled": on} for name, on in old["features"].items()}
-    for table, values in old.items():
-        if table == "console":
-            new["features"]["locale"]["console"] = values
-        elif table not in new:
-            new["features"][table].update(values)
-    return new
-
-
-def test_hyper_lin_matches_the_chezmoi_repo():
-    """Parity with ../__dotfiles: its defaults.toml merged with its .hosts.toml table."""
-    with (ROOT / "tests/fixtures/old-hosts.toml").open("rb") as f:
-        host = tomllib.load(f)["hyper-lin"]
-    with (ROOT / "tests/fixtures/old-defaults.toml").open("rb") as f:
-        old = tomllib.load(f)
-    for table, values in host.items():
-        old[table].update(values)
-    assert resolve("hyper-lin") == to_features_layout(old)
-
-
-def test_defaults_match_the_chezmoi_repo():
-    with (ROOT / "tests/fixtures/old-defaults.toml").open("rb") as f:
-        assert resolve("unknown-host") == to_features_layout(tomllib.load(f))
-
-
 def test_host_extends_profile_and_overrides_it(root):
     write(root, "profiles/p.toml", "[features]\na = true\nb = true\n")
     write(root, "hosts/h.toml", 'extends = ["p"]\n[features]\nb = false\n')
@@ -217,3 +188,11 @@ def test_explain_names_the_file_of_each_value(root):
         'locale.locales = ["en", "ru"]  # defaults.toml\n'
     )
     assert tomllib.loads(text) == resolve("h", root)
+
+
+def test_tests_run_isolated(isolated):
+    import os
+
+    assert Path.home() == isolated / "home"
+    assert os.environ["XDG_RUNTIME_DIR"] == str(isolated / "run")
+    assert os.environ["SUDO_CMD"] == "false"

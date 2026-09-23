@@ -117,7 +117,7 @@ dotfiles/config.py       load, chain, validate, merge — pure functions over di
 defaults.toml            schema (from ../__dotfiles/.chezmoidata/defaults.toml)
 profiles/                base, server, laptop
 hosts/                   hyper-lin (extends laptop), echo-server (extends server)
-tests/test_config.py     unit tests on tmp_path fixtures + parity test on the real data
+tests/test_config.py     unit tests on tmp_path fixtures + checks on the real data
 docs/spec/               capability map, module specs
 ```
 
@@ -159,11 +159,6 @@ def resolve(root: Path, host: str) -> dict:
   = defaults; `secrets.backend` enum.
 - `--explain` names the right file for a value set in defaults, a profile
   and the host.
-- **Parity test:** for `hyper-lin` and for an unknown host, the resolved
-  config equals the old repo's `defaults.toml` deep-merged with the host's
-  table from its `.hosts.toml`, moved into the `features.<name>` layout
-  (fixture copies of both files in `tests/fixtures/`, so the test does not
-  depend on the old checkout).
 - `uv run dotfiles check` passes on the real data.
 
 ## Boundaries
@@ -179,7 +174,8 @@ def resolve(root: Path, host: str) -> dict:
 ## Success Criteria
 
 1. `uv run dotfiles config --host hyper-lin` prints TOML equal to the old
-   repo's merged `[data]` for that host, minus `config_hash` (parity test).
+   repo's merged `[data]` for that host, minus `config_hash` (checked once
+   when the data was ported; no test keeps the old files).
 2. `hosts/hyper-lin.toml` extends `laptop` and holds only what differs from
    it; `echo-server` extends `server`; `laptop` and `server` extend `base`.
 3. `uv run dotfiles check` exits 0 on the repo data and 1 on each broken
@@ -191,8 +187,7 @@ def resolve(root: Path, host: str) -> dict:
 ## Decisions (were open questions)
 
 1. Output is TOML (`tomli-w`), not JSON.
-2. `echo-server` extends `server` and gains its features; it leaves the
-   parity test.
+2. `echo-server` extends `server` and gains its features.
 3. `config --explain` is in this iteration.
 4. Profiles: `base` = package manager, locale, zsh, CLI tools, ssh agent;
    `server` = base + sshd, tailscale; `laptop` = base + luks_discard, swap,
@@ -201,3 +196,5 @@ def resolve(root: Path, host: str) -> dict:
 5. Every feature is a table under `features` with `enabled` and its own
    settings (was: `[features]` booleans plus a top-level table per
    feature's settings).
+6. No test depends on the old repo's TOML files: the parity tests and their
+   fixtures were removed once the data was ported.
