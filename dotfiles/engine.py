@@ -5,15 +5,23 @@ helper, `run` or `as_root`, and each of them does nothing on a dry run. That
 is what keeps a clean apply silent and free of sudo prompts.
 """
 
+import grp
 import os
 import platform
+import pwd
+import re
 import shlex
+import stat
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
 from time import sleep
 
 # Set by `dotfiles apply --dry-run`: check and report, never mutate.
 DRY_RUN = False
+# Prefixed to every path a helper touches; tests point it at a temp dir.
+SYSROOT = Path("/")
 # Notices of this apply, replayed at the end by print_notices().
 notices: list[str] = []
 
@@ -129,3 +137,99 @@ def retry(fn, *args) -> bool:
             warn(f"{what} failed (attempt {attempt}/3), retrying in {attempt * 10}s")
             sleep(attempt * 10)
             attempt += 1
+
+
+def _path(path) -> Path:
+    return SYSROOT / str(path).lstrip("/")
+
+
+def _writable(path: Path) -> bool:
+    """The current user may create or replace PATH: the file itself, when it
+    is one, and the nearest existing directory above it (install and ln
+    replace the entry, a dangling symlink included)."""
+    if path.is_file() and not path.is_symlink() and not os.access(path, os.W_OK):
+        return False
+    parent = path.parent
+    while not parent.exists():
+        parent = parent.parent
+    return os.access(parent, os.W_OK)
+
+
+def _owner(path: Path) -> str:
+    """PATH's owner as user:group, numbers where a name is unknown."""
+    st = path.stat()
+    try:
+        user = pwd.getpwuid(st.st_uid).pw_name
+    except KeyError:
+        user = str(st.st_uid)
+    try:
+        group = grp.getgrgid(st.st_gid).gr_name
+    except KeyError:
+        group = str(st.st_gid)
+    return f"{user}:{group}"
+
+
+def ensure_file(dst, content: str | bytes, mode: int = 0o644, owner: str | None = None) -> bool:
+    """DST has CONTENT, MODE and OWNER ("user:group" or "user"). Compared
+    without root; written with root only when the user cannot."""
+    real = _path(dst)
+    data = content.encode() if isinstance(content, str) else content
+    user, _, group = (owner or "").partition(":")
+    group = group or user
+    try:
+        current = real.read_bytes()
+    except FileNotFoundError:
+        current = None
+    except OSError:  # unreadable without root: looks different every time
+        current = b""
+    if current is None:
+        why = "missing"
+    elif current != data:
+        why = "content differs"
+    elif stat.S_IMODE(real.stat().st_mode) != mode:
+        why = f"mode {stat.S_IMODE(real.stat().st_mode):o}"
+    elif owner and _owner(real) != f"{user}:{group}":
+        why = f"owner {_owner(real)}"
+    else:
+        return False
+    if not DRY_RUN:
+        me = pwd.getpwuid(os.geteuid()).pw_name
+        mutate = as_root if (owner and user != me) or not _writable(real) else run
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / "content"
+            src.write_bytes(data)
+            opts = ["-o", user, "-g", group] if owner else []
+            mutate("install", "-D", "-m", f"{mode:o}", *opts, str(src), str(real))
+    changed(f"{dst} ({why})")
+    return True
+
+
+def ensure_symlink(target, link) -> bool:
+    """LINK is a symlink to TARGET."""
+    real = _path(link)
+    try:
+        if os.readlink(real) == str(target):
+            return False
+    except OSError:
+        pass
+    mutate = run if _writable(real) else as_root
+    mutate("ln", "-sfn", str(target), str(real))
+    changed(f"{link} -> {target}")
+    return True
+
+
+def ensure_line(file, regex: str, line: str) -> bool:
+    """The first line of FILE matching REGEX becomes LINE, appended when
+    nothing matches. FILE's mode and owner are kept."""
+    real = _path(file)
+    if not real.exists():
+        return ensure_file(file, line + "\n")
+    lines, done = [], False
+    for old in real.read_text().splitlines():
+        if not done and re.search(regex, old):
+            old, done = line, True
+        lines.append(old)
+    if not done:
+        lines.append(line)
+    mode = stat.S_IMODE(real.stat().st_mode)
+    return ensure_file(file, "\n".join(lines) + "\n", mode, _owner(real))

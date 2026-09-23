@@ -122,3 +122,86 @@ def test_notices_now_and_at_the_end(capsys):
     assert capsys.readouterr().out == "\nNotices from this apply:\n    log out and back in\n"
     print_notices()
     assert capsys.readouterr().out == ""
+
+
+def me() -> str:
+    return engine._owner(engine.SYSROOT.parent)
+
+
+def test_ensure_file_changes_once(capsys):
+    from dotfiles.engine import ensure_file
+
+    real = engine.SYSROOT / "etc/deep/er/f.conf"
+    assert ensure_file("/etc/deep/er/f.conf", "a\n", 0o600, owner=me()) is True
+    assert ensure_file("/etc/deep/er/f.conf", b"a\n", 0o600, owner=me()) is False
+    assert real.read_text() == "a\n" and oct(real.stat().st_mode & 0o777) == "0o600"
+    real.write_text("b\n")
+    assert ensure_file("/etc/deep/er/f.conf", "a\n", 0o600) is True
+    real.chmod(0o644)
+    assert ensure_file("/etc/deep/er/f.conf", "a\n", 0o600) is True
+    assert ensure_file("/etc/deep/er/f.conf", "a\n", 0o600) is False
+    assert capsys.readouterr().out == (
+        "-> /etc/deep/er/f.conf (missing)\n"
+        "-> /etc/deep/er/f.conf (content differs)\n"
+        "-> /etc/deep/er/f.conf (mode 644)\n"
+    )
+
+
+def test_ensure_file_goes_to_root_only_when_needed():
+    from dotfiles.engine import ensure_file
+
+    locked = engine.SYSROOT / "etc"
+    locked.mkdir(parents=True)
+    locked.chmod(0o555)
+    try:
+        with pytest.raises(subprocess.CalledProcessError) as e:  # SUDO_CMD=false
+            ensure_file("/etc/f", "x\n")
+        assert e.value.cmd[:2] == ["false", "install"]
+        with pytest.raises(subprocess.CalledProcessError):
+            ensure_file("/tmp-owned-by-root", "x\n", owner="root:root")
+    finally:
+        locked.chmod(0o755)
+
+
+def test_dry_run_reports_and_writes_nothing(monkeypatch, capsys):
+    from dotfiles.engine import ensure_file, ensure_line, ensure_symlink
+
+    monkeypatch.setattr(engine, "DRY_RUN", True)
+    assert ensure_file("/etc/f", "x\n", owner="root:root") is True
+    assert ensure_line("/etc/g", "^x=", "x=1") is True
+    assert ensure_symlink("/usr/share/zoneinfo/UTC", "/etc/localtime") is True
+    assert not engine.SYSROOT.exists()
+    assert capsys.readouterr().out == (
+        "-> /etc/f (missing)\n-> /etc/g (missing)\n-> /etc/localtime -> /usr/share/zoneinfo/UTC\n"
+    )
+
+
+def test_ensure_line():
+    from dotfiles.engine import ensure_line
+
+    conf = engine.SYSROOT / "etc/conf"
+    conf.parent.mkdir(parents=True)
+    conf.write_text("a=1\n#b=2\nc=3\n#b=9\n")
+    conf.chmod(0o600)
+    assert ensure_line("/etc/conf", "^#?b=", "b=2") is True
+    assert ensure_line("/etc/conf", "^#?b=", "b=2") is False
+    assert conf.read_text() == "a=1\nb=2\nc=3\n#b=9\n"
+    assert ensure_line("/etc/conf", "^d=", "d=4") is True
+    assert ensure_line("/etc/conf", "^d=", "d=4") is False
+    assert conf.read_text().endswith("#b=9\nd=4\n")
+    assert oct(conf.stat().st_mode & 0o777) == "0o600"
+    assert ensure_line("/etc/new", "^x=", "x=1") is True
+    assert ensure_line("/etc/new", "^x=", "x=1") is False
+    assert (engine.SYSROOT / "etc/new").read_text() == "x=1\n"
+
+
+def test_ensure_symlink():
+    from dotfiles.engine import ensure_symlink
+
+    (engine.SYSROOT / "etc").mkdir(parents=True)
+    assert ensure_symlink("/usr/share/zoneinfo/UTC", "/etc/localtime") is True
+    assert ensure_symlink("/usr/share/zoneinfo/UTC", "/etc/localtime") is False
+    assert ensure_symlink("/usr/share/zoneinfo/Europe/Berlin", "/etc/localtime") is True
+    assert (engine.SYSROOT / "etc/localtime").readlink().as_posix() == (
+        "/usr/share/zoneinfo/Europe/Berlin"
+    )

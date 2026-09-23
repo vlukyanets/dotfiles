@@ -31,11 +31,12 @@ def isolated_session(tmp_path_factory):
 @pytest.fixture(autouse=True)
 def isolated(tmp_path_factory, monkeypatch):
     """No test reaches the real home directory or root: every test gets its
-    own HOME and XDG directories in pytest's temp dir, and sudo is a command
-    that fails, so a mutation that would need root fails the test instead of
-    prompting."""
+    own HOME and XDG directories in pytest's temp dir, the engine's helpers
+    work under a temp SYSROOT, and sudo is a command that fails, so a
+    mutation that would need root fails the test instead of prompting."""
     base = tmp_path_factory.mktemp("isolated")
     isolate(monkeypatch, base)
     monkeypatch.setattr(engine, "DRY_RUN", False)
+    monkeypatch.setattr(engine, "SYSROOT", base / "sysroot")
     monkeypatch.setattr(engine, "notices", [])
     return base
