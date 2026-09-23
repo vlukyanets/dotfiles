@@ -1,7 +1,5 @@
 """The real home/ tree rendered for the real hosts: what the templates with
-logic produce, pinned. Expected text follows the Go templates they were
-ported from: a true {{- if }} drops only its tag lines, a false one drops
-everything from the if line to the end line."""
+logic produce, pinned."""
 
 import tempfile
 from pathlib import Path

@@ -44,9 +44,9 @@ master and every PR; uv is pinned there by version and sha256.
   and `SUDO_CMD=false` (`tests/conftest.py`, autouse). Code that goes to
   root must read `SUDO_CMD` (default `sudo`), as `lib.sh` did, so a test
   can never prompt for a password or change the machine.
-- Porting a Go template: `{{- tag }}` alone on a line becomes `{% tag %}`
-  alone on a line (trim_blocks and lstrip_blocks do the rest), **and** any
-  blank lines right above it go, since Go's `{{-` trimmed them too. Booleans
-  print as `True` in Jinja: write `{{ x | lower }}` where Go printed `true`.
+- Porting a Go template: write idiomatic Jinja2 with the same meaning, not
+  chezmoi's exact output. A tag alone on its line vanishes with its newline
+  (trim_blocks, lstrip_blocks). Booleans print as `True` in Jinja: write
+  `{{ x | lower }}` where the file needs `true`.
 - chezmoi never created an empty file; a `.keep` that only holds a directory
   in git is gated off with `when = "false"` in `home.toml`.

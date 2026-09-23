@@ -163,10 +163,10 @@ the message, comments on why.
   second run silent; mode drift fixed; `--dry-run` writes nothing; symlink
   escaping `$HOME` refused.
 - Real data: `check` renders hyper-lin, echo-server and an unknown host.
-- Porting is checked by reading: each template is translated from its Go
-  source in `../__dotfiles`, and tests pin the rendered output of the
-  templates with logic (loops, gates, registries) for hyper-lin. chezmoi is
-  not run.
+- Porting is checked by reading: each template is rewritten in idiomatic
+  Jinja2 from its Go source in `../__dotfiles`, and tests pin what the
+  templates with logic (loops, gates, registries) produce for the real
+  hosts. chezmoi is not run, and its exact output is not a goal.
 
 ## Boundaries
 
@@ -180,10 +180,11 @@ the message, comments on why.
 ## Success Criteria
 
 1. Every dotfile of `../__dotfiles` has its counterpart under `home/`, with
-   the same gate and mode, and templates translated line by line from
-   their Go source (same output for the same data).
-2. On hyper-lin, `dotfiles deploy --dry-run` right after a `chezmoi apply`
-   prints at most the noctalia line; after one `deploy`, nothing.
+   the same gate and mode; templates are idiomatic Jinja2 with the same
+   meaning as their Go source (what is included when, which values), not
+   chezmoi's exact whitespace.
+2. On hyper-lin the first `dotfiles deploy` may rewrite ported files once;
+   after it, `deploy --dry-run` prints nothing.
 3. `check`, pytest, ruff green locally and in CI.
 
 ## Decisions
@@ -197,3 +198,5 @@ the message, comments on why.
    names. Chosen over chezmoi-style name attributes (two mechanisms, a name
    parser) and over one directory per feature (commits `features` to a
    layout before its spec).
+4. Templates are idiomatic Jinja2; chezmoi's exact output (Go `{{-`
+   whitespace, blank-line quirks, header comments) is not reproduced.
