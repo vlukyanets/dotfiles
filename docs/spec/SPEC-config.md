@@ -106,14 +106,17 @@ Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
 
 ```
 pyproject.toml           project, [project.scripts] dotfiles = "dotfiles.__main__:main"
-src/dotfiles/__main__.py argparse CLI: config, check
-src/dotfiles/config.py   load, chain, validate, merge — pure functions over dicts and a root Path
+dotfiles/__main__.py     argparse CLI: config, check
+dotfiles/config.py       load, chain, validate, merge — pure functions over dicts and a root Path
 defaults.toml            schema (from ../__dotfiles/.chezmoidata/defaults.toml)
 profiles/                base, server, laptop
 hosts/                   hyper-lin (extends laptop), echo-server (extends server)
 tests/test_config.py     unit tests on tmp_path fixtures + parity test on the real data
 docs/spec/               capability map, module specs
 ```
+
+Flat layout (no `src/`), so `python -m dotfiles` runs from a checkout
+without installing the package.
 
 Registries (`ssh-keys.toml`, `languages.toml`, `firefox.toml`,
 `vscode.json`) are not host config and move with the module that first
