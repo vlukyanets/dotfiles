@@ -3,9 +3,9 @@
 A Python rework of [`vlukyanets/dotfiles`](https://github.com/vlukyanets/dotfiles)
 (chezmoi + bash): the same machine description, driven by a tool of its
 own with Jinja2 templates. Work in progress — today it resolves host
-configuration and renders and deploys the dotfiles in `home/`; provisioning
-(packages, system settings) comes next (see the
-[capability map](docs/spec/CAPABILITY-MAP.md)).
+configuration, renders and deploys the dotfiles in `home/`, and runs
+`dotfiles apply` with one feature ported (`nobeep`); packages and the other
+features come next (see the [capability map](docs/spec/CAPABILITY-MAP.md)).
 
 ## How a host is described
 
@@ -56,6 +56,8 @@ uv too.
     uv run dotfiles render --host hyper-lin --out DIR # a host's home tree, into an empty DIR
     uv run dotfiles deploy --dry-run                  # what would change in $HOME
     uv run dotfiles deploy                            # write it
+    uv run dotfiles apply --dry-run                   # features + dotfiles: what would change, no sudo
+    uv run dotfiles apply                             # this machine, silent when it already matches
     uv run dotfiles check                             # every host resolves and renders
     uv run pytest
     uv run ruff check . && uv run ruff format --check .
