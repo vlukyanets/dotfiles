@@ -11,7 +11,7 @@
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
--- Set from fonts.nerd_font in .hosts.toml — controls whether
+-- Set from features.nerd_font in hosts/ or profiles/ — controls whether
 -- mini.statusline/lazy.nvim's UI use icon glyphs or plain-ASCII fallbacks.
 vim.g.have_nerd_font = {{ features.nerd_font.enabled | lower }}
 
@@ -305,7 +305,7 @@ require('lazy').setup({
     -- feature toggles. Parsers are installed with install() (a no-op when
     -- present), and highlighting is Neovim's own vim.treesitter.start(),
     -- switched on per buffer below. Building a parser needs tree-sitter-cli
-    -- and a C compiler — see ide.neovim.packages in .hosts.toml.
+    -- and a C compiler — see the neovim feature.
     branch = 'main',
     lazy = false, -- the plugin doesn't support lazy-loading
     build = ':TSUpdate',

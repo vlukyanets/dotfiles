@@ -1,5 +1,4 @@
-## Managed by chezmoi — edit the template, not this file:
-##   chezmoi edit ~/.gitconfig
+## Managed by dotfiles — edit home/.gitconfig.j2 in the repo, not this file.
 
 [user]
     name  = {{ git.name }}
@@ -9,7 +8,7 @@
     defaultBranch = master
 [core]
     # core.editor intentionally unset: git already falls back to
-    # $GIT_EDITOR, then $VISUAL, then $EDITOR (set in dot_zshrc.tmpl), then vi.
+    # $GIT_EDITOR, then $VISUAL, then $EDITOR (set in ~/.zshrc), then vi.
 [pull]
     rebase = true
 [color]

@@ -1,7 +1,6 @@
-# Managed by chezmoi — edit the source, not this file:
-#   chezmoi edit ~/.config/gh/config.yml
+# Managed by dotfiles — edit home/.config/gh/config.yml in the repo, not this file.
 # gh rewrites this file on `gh config set`, dropping comments — make
-# changes in the chezmoi source and re-apply instead. Auth tokens live
+# changes in home/ of the dotfiles repo and deploy instead. Auth tokens live
 # in hosts.yml next to this file, which is deliberately left unmanaged.
 version: 1
 # Clone/push over SSH, matching the git remotes this repo itself uses.

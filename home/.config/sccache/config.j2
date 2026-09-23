@@ -1,6 +1,5 @@
-# Managed by chezmoi — edit the template, not this file:
-#   chezmoi edit ~/.config/sccache/config
-# Values come from [sccache] in the data; anything left empty is omitted
+# Managed by dotfiles — edit home/.config/sccache/config.j2 in the repo, not this file.
+# Values come from [features.sccache]; anything left empty is omitted
 # here so sccache's own default applies.
 {% set size = features.sccache.cache_size %}
 {% set dir = features.sccache.cache_dir %}

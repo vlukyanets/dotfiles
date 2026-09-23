@@ -1,5 +1,4 @@
-# Managed by chezmoi — edit the source, not this file:
-#   chezmoi edit ~/.config/tealdeer/config.toml
+# Managed by dotfiles — edit home/.config/tealdeer/config.toml in the repo, not this file.
 
 [updates]
 # Fetch the page cache on first run and refresh it when it's stale,

@@ -1,5 +1,4 @@
-# Managed by chezmoi — edit the source, not this file:
-#   chezmoi edit ~/.config/direnv/direnv.toml
+# Managed by dotfiles — edit home/.config/direnv/direnv.toml in the repo, not this file.
 
 [global]
 # Don't print the "export +FOO +BAR ~PATH" line on every directory change —
