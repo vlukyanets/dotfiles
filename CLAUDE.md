@@ -14,6 +14,9 @@ how a feature behaves today, never edit it.
 | Every host resolves | `uv run dotfiles check` |
 | One host, with sources | `uv run dotfiles config --host <name> --explain` |
 
+CI (`.github/workflows/ci.yml`) runs the first three on every push to
+master and every PR; uv is pinned there by version and sha256.
+
 ## Navigation
 
 - Keys and defaults: `defaults.toml` — the schema; a new key goes here first.

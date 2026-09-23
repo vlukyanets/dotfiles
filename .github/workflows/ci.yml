@@ -1,0 +1,53 @@
+# Lint, tests, and every host resolving; nothing here touches a real machine
+# (tests run with a temporary home and a sudo that fails, tests/conftest.py).
+#
+# Everything is pinned: the action by commit SHA, uv by version and sha256,
+# the Python packages by uv.lock. To bump uv, change the version and the hash
+# together.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# One run at a time; a newer run waits instead of cancelling the current one.
+concurrency:
+  group: ci
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: 0.12.18
+  UV_SHA256: 89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        run: |
+          set -euo pipefail; exec 2>&1
+          bin="$HOME/.local/bin"; mkdir -p "$bin"; cd "$(mktemp -d)"
+          f=uv-x86_64-unknown-linux-gnu.tar.gz
+          curl -fsSLO "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/$f"
+          echo "$UV_SHA256  $f" | sha256sum -c -
+          tar -xzf "$f" --strip-components=1 uv-x86_64-unknown-linux-gnu/uv && mv uv "$bin/"
+          echo "$bin" >> "$GITHUB_PATH"
+          "$bin/uv" --version
+
+      - name: Install the project
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check . && uv run ruff format --check .
+
+      - name: Tests
+        run: uv run pytest -q
+
+      - name: Every host resolves
+        run: uv run dotfiles check
