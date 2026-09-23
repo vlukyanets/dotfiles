@@ -5,7 +5,7 @@ from pathlib import Path
 
 import tomli_w
 
-from dotfiles import config, render
+from dotfiles import apply, config, render
 
 
 def main() -> int:
@@ -21,7 +21,11 @@ def main() -> int:
     p = sub.add_parser("deploy", help="write this machine's dotfiles into $HOME where they differ")
     p.add_argument("--dry-run", action="store_true", help="print what would change, write nothing")
     sub.add_parser("check", help="resolve and render every host in hosts/ and one unknown host")
+    p = sub.add_parser("apply", help="this machine: features, dotfiles, notices")
+    p.add_argument("--dry-run", action="store_true", help="print what would change, no sudo")
     args = parser.parse_args()
+    # The -> lines and the output of the commands they run, in order.
+    sys.stdout.reconfigure(line_buffering=True)
 
     if args.command == "check":
         results = render.check()
@@ -32,6 +36,8 @@ def main() -> int:
         return 1 if any(results.values()) else 0
 
     try:
+        if args.command == "apply":
+            return apply.apply(socket.gethostname(), dry_run=args.dry_run)
         if args.command == "deploy":
             for line in render.deploy(socket.gethostname(), dry_run=args.dry_run):
                 print(line)
@@ -44,6 +50,8 @@ def main() -> int:
     except config.ConfigError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        return 130
     return 0
 
 

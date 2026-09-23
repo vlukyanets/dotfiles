@@ -15,10 +15,11 @@ nothing and asks for no password.
 `dotfiles apply` does, for this machine:
 
 1. Resolve the config (no `init`, no `config_hash`: `check_config` is gone).
-2. Run the enabled `before` features in order.
-3. Deploy the dotfiles (`render.deploy`).
-4. Run the enabled `after` features.
-5. Print the notices collected along the way.
+2. Run the enabled steps in order: the features that provision (the old
+   `run_before_*`), the dotfiles (`render.deploy`), then the few that
+   need a deployed file or close what an earlier step opened (the old
+   `run_after_*`).
+3. Print the notices collected along the way.
 
 Out of scope: the package helpers (`ensure_pkg`, `ensure_aur`,
 `ensure_replaced`, `ensure_rustup` go to `packages`) and every feature but
@@ -120,27 +121,29 @@ run against an empty tree. It is not a command-line option.
 
 ```python
 class Step(NamedTuple):
-    module: str  # dotfiles/features/<module>.py
+    module: str  # dotfiles/features/<module>.py; "dotfiles" is the deploy
     gate: str | None  # runs only when features.<gate>.enabled
     needs: tuple[str, ...] = ()  # earlier steps that must not have failed
 
 
-BEFORE = [
+STEPS = [
     Step("nobeep", "nobeep"),
     ...,
     # e.g., in `packages`: Step("paru", "aur", needs=("makepkg",))
+    Step("dotfiles", None),
+    # e.g., in `features`: Step("ssh_agent", "ssh_agent", needs=("dotfiles",))
 ]
-AFTER = [...]
 ```
 
-- The order is this list. It keeps the old groups (core, packages,
-  system, shell, ssh, desktop) and order.
+- The order is this list, one list with the deploy as the step
+  `dotfiles`. It keeps the old groups (core, packages, system, shell,
+  ssh, desktop, then the after steps) and order.
 - A step with a gate runs only when `features.<gate>.enabled`. A disabled
   step is never imported, so it prints nothing and has no side effects.
   `None` is for the few modules that read several flags themselves (the
   old map scripts: services, tools, apps).
-- `needs` names earlier steps (in `BEFORE` or, for an `after` step, in
-  either list) that this one builds on. A test checks that every name
+- `needs` names earlier steps that this one builds on, `dotfiles`
+  included. A test checks that every name
   exists and comes earlier. The actual edges are decided per feature in
   `packages` and `features`; this module provides the mechanism.
 - A feature module is one function:
@@ -171,7 +174,7 @@ def apply(cfg: dict) -> None:
 - `Deferred` (`defer`): the feature ends, and its notice is kept.
 - Any other exception (`die`, a failed `as_root`, a bug): the step
   failed. The runner prints `error: <step>: <message>` to stderr and
-  continues with the next step, the deploy and the `after` steps.
+  continues with the next step.
 - A step whose `needs` include a failed step is not run and counts as
   failed itself, so what depends on it is not run either:
   `error: paru: not run, makepkg failed`. A need that is disabled,
@@ -193,7 +196,7 @@ Notices from this apply:
 
 ```
 uv run dotfiles apply --dry-run     # what would change; no sudo, no writes
-uv run dotfiles apply               # this machine: features, dotfiles, after steps, notices
+uv run dotfiles apply               # this machine: features, dotfiles, notices
 uv run pytest tests/test_engine.py tests/test_apply.py
 ```
 
@@ -203,7 +206,7 @@ uv run pytest tests/test_engine.py tests/test_apply.py
 
 ```
 dotfiles/engine.py        output, notices, as_root, retry/defer, os_guard, ensure_* helpers
-dotfiles/apply.py         BEFORE/AFTER, the runner, snapper env, notices at the end
+dotfiles/apply.py         STEPS, the runner, snapper env, notices at the end
 dotfiles/features/        one module per feature (nobeep only, in this module)
 tests/test_engine.py      helpers, twice each: one change, then none
 tests/test_apply.py       runner: order, gates, failures, notices, dry run
