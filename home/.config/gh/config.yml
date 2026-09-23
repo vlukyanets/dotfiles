@@ -1,0 +1,15 @@
+# Managed by chezmoi — edit the source, not this file:
+#   chezmoi edit ~/.config/gh/config.yml
+# gh rewrites this file on `gh config set`, dropping comments — make
+# changes in the chezmoi source and re-apply instead. Auth tokens live
+# in hosts.yml next to this file, which is deliberately left unmanaged.
+version: 1
+# Clone/push over SSH, matching the git remotes this repo itself uses.
+git_protocol: ssh
+# Blank: falls back to $EDITOR (nvim, set in .zshrc).
+editor:
+prompt: enabled
+# Blank: falls back to $PAGER, then less.
+pager:
+aliases:
+    co: pr checkout
