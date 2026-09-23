@@ -1,6 +1,6 @@
 # Capability Map: dotfiles (Python rework)
 
-Draft 2026-09-23, awaiting review. Successor of `vlukyanets/dotfiles`
+Approved 2026-09-23. Successor of `vlukyanets/dotfiles`
 (chezmoi + bash, checked out at `../__dotfiles`): the same machine
 description and the same check-before-apply contract, driven by a Python
 tool instead of chezmoi. Module ids are stable; specs, plans and commits
@@ -26,7 +26,7 @@ Build order: `config` → `render`, `engine`, `tooling` → `packages` → `feat
    `extends` profiles (`server`, `laptop`, …) and other hosts. "Profile" is
    the name used everywhere, so "template" means only a Jinja2 template.
 3. Python ≥ 3.11 (`tomllib` from the stdlib); dependencies are added only
-   when a module needs them (Jinja2 arrives with `render`).
+   when a module needs them (`tomli-w` with `config`, Jinja2 with `render`).
 4. Every apply reconciles live state; a clean apply prints nothing and asks
    for no password. Features are booleans; `false` never uninstalls.
 5. Specs live in `docs/spec/`, one `SPEC-<id>.md` per module.

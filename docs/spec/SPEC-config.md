@@ -1,6 +1,6 @@
 # Spec: `config` — host configuration with inheritance
 
-Status: draft 2026-09-23, awaiting review. Module of the
+Status: approved 2026-09-23. Module of the
 [capability map](CAPABILITY-MAP.md).
 
 ## Objective
@@ -25,9 +25,9 @@ User stories:
 
 ## Tech Stack
 
-- Python ≥ 3.11, stdlib only: `tomllib`, `json`, `argparse`, `socket`.
+- Python ≥ 3.11: `tomllib`, `argparse`, `socket` from the stdlib.
+- `tomli-w` for TOML output — the one runtime dependency (Arch: `python-tomli-w`, extra).
 - `uv` for the project and dev tools; dev dependencies `pytest`, `ruff`.
-- No runtime dependency in this module.
 
 ## Data model
 
@@ -83,15 +83,24 @@ The resolved config does not contain `extends`.
 ```
 uv sync                                           # venv + dev tools
 uv run dotfiles config                            # this machine (socket.gethostname())
-uv run dotfiles config --host hyper-lin           # any host, JSON on stdout
+uv run dotfiles config --host hyper-lin           # any host, TOML on stdout
+uv run dotfiles config --host hyper-lin --explain # every leaf as a dotted key, with the file it came from
 uv run dotfiles check                             # every host in hosts/ + one unknown host; exit 1 on any error, all errors listed
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
 python -m dotfiles config                         # same, without uv (bootstrap path)
 ```
 
-Output of `config` is JSON (stdlib, pipes into `jq`), sorted keys, 2-space
-indent. Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
+Output of `config` is TOML, the same shape as the input files. `--explain`
+prints one line per leaf, itself valid TOML:
+
+```
+features.docker = true  # hosts/hyper-lin.toml
+features.sshd = true  # profiles/server.toml
+swap.size = ""  # defaults.toml
+```
+
+Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
 
 ## Project Structure
 
@@ -101,7 +110,7 @@ src/dotfiles/__main__.py argparse CLI: config, check
 src/dotfiles/config.py   load, chain, validate, merge — pure functions over dicts and a root Path
 defaults.toml            schema (from ../__dotfiles/.chezmoidata/defaults.toml)
 profiles/                base, server, laptop
-hosts/                   hyper-lin, echo-server (from ../__dotfiles/.hosts.toml)
+hosts/                   hyper-lin (extends laptop), echo-server (extends server)
 tests/test_config.py     unit tests on tmp_path fixtures + parity test on the real data
 docs/spec/               capability map, module specs
 ```
@@ -139,8 +148,9 @@ def resolve(root: Path, host: str) -> dict:
   directories; unknown key at depth 1 and 2; wrong type incl. `bool` vs
   `int`; `extends` of wrong type; list replaced not appended; unknown host
   = defaults; `secrets.backend` enum.
-- **Parity test:** for `hyper-lin` and `echo-server`, the resolved config
-  equals `defaults.toml` deep-merged with that host's table from
+- `--explain` names the right file for a value set in defaults, a profile
+  and the host.
+- **Parity test:** for `hyper-lin`, the resolved config equals `defaults.toml` deep-merged with its table from
   `../__dotfiles/.hosts.toml` (a fixture copy in `tests/`, so the test does
   not depend on the old checkout).
 - `uv run dotfiles check` passes on the real data.
@@ -150,35 +160,30 @@ def resolve(root: Path, host: str) -> dict:
 - **Always:** validate every file before merging; name file + key path in
   errors; keep `defaults.toml` the single schema; run pytest and ruff
   before each commit; update the spec when a decision changes.
-- **Ask first:** any runtime dependency; changing the merge rule (e.g. list
-  append); attaching `echo-server` to the `server` profile (changes what
-  that host gets); moving the old repo's data in a lossy way.
+- **Ask first:** any runtime dependency beyond `tomli-w`; changing the merge
+  rule (e.g. list append); moving the old repo's data in a lossy way.
 - **Never:** touch `../__dotfiles`; push anything; write secrets; prompt
   interactively in this module.
 
 ## Success Criteria
 
-1. `uv run dotfiles config --host hyper-lin` prints JSON equal to the old
+1. `uv run dotfiles config --host hyper-lin` prints TOML equal to the old
    repo's merged `[data]` for that host, minus `config_hash` (parity test).
 2. `hosts/hyper-lin.toml` extends `laptop` and holds only what differs from
-   it; `laptop` and `server` extend `base`.
+   it; `echo-server` extends `server`; `laptop` and `server` extend `base`.
 3. `uv run dotfiles check` exits 0 on the repo data and 1 on each broken
    fixture from the test list, naming file and key.
 4. `uv run pytest` and `ruff` pass.
-5. Runs with `python -m dotfiles` from a checkout with no venv and no
-   third-party packages installed.
+5. Runs with `python -m dotfiles` from a checkout with no venv when
+   `python-tomli-w` is the only third-party package installed.
 
-## Open Questions
+## Decisions (were open questions)
 
-1. Dump format: JSON by default is assumed. TOML output would need
-   `tomli-w` (one dependency). Needed?
-2. Should `echo-server` extend `server` now (it would gain features), or
-   stay identity-only as today?
-3. Is a way to see *where* each value came from (`config --explain` →
-   `features.docker = true  # hosts/hyper-lin.toml`) worth having in this
-   iteration, or later?
-4. Profile split proposed for the plan: `base` = package manager, locale,
-   zsh, CLI tools, ssh agent; `server` = base + sshd, tailscale;
-   `laptop` = base + power/storage (luks_discard, swap, snapper, zram,
-   bluetooth, fwupd) + the desktop stack. Dev toolchains and personal apps
-   stay in `hyper-lin`. Right cut?
+1. Output is TOML (`tomli-w`), not JSON.
+2. `echo-server` extends `server` and gains its features; it leaves the
+   parity test.
+3. `config --explain` is in this iteration.
+4. Profiles: `base` = package manager, locale, zsh, CLI tools, ssh agent;
+   `server` = base + sshd, tailscale; `laptop` = base + luks_discard, swap,
+   snapper, zram, bluetooth, fwupd + the desktop stack. Dev toolchains and
+   personal apps stay in `hyper-lin`.
