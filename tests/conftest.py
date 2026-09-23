@@ -1,5 +1,7 @@
 import pytest
 
+from dotfiles import engine
+
 
 def isolate(monkeypatch, base):
     """HOME and the XDG directories inside BASE, and a sudo that fails."""
@@ -34,4 +36,6 @@ def isolated(tmp_path_factory, monkeypatch):
     prompting."""
     base = tmp_path_factory.mktemp("isolated")
     isolate(monkeypatch, base)
+    monkeypatch.setattr(engine, "DRY_RUN", False)
+    monkeypatch.setattr(engine, "notices", [])
     return base

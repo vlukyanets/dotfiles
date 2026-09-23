@@ -60,8 +60,9 @@ Stdlib only: `subprocess`, `shutil`, `os`, `pwd`/`grp`, `platform`
 | `_tmp`, traps | a `with` block per helper; `finally` in the runner | |
 
 For command output there is one more helper, `output(*cmd) -> str | None`:
-it returns stdout without the trailing newline, or `None` when the command
-is missing or fails. Checks use it; it never mutates anything.
+it returns stdout without the trailing newline whatever the exit status
+(`systemctl is-enabled` prints `disabled` and exits 1), or `None` when the
+command is not installed. Checks use it; it never mutates anything.
 
 ### Helper contracts
 
@@ -282,8 +283,7 @@ This replaces `ci/test-lib.sh`; its checks all carry over.
    feature after it; the steps that build on it (`needs`) are not run,
    so they do not fail again with a confusing second error.
 2. **Helpers return whether they changed something** instead of
-   features comparing a global counter. The counter stays for the
-   runner.
+   features comparing a global counter; there is no counter.
 3. **`ensure_group_member` reads the group database.** `id -nG` only
    sees the change after the next login, so every apply until then ran
    `usermod` again, printed a change and repeated the notice.
