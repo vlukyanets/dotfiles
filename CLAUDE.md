@@ -32,10 +32,6 @@ how a feature behaves today, never edit it.
 
 ## Pitfalls
 
-- `tests/test_config.py::test_hyper_lin_matches_the_chezmoi_repo` pins
-  hyper-lin to the old repo's data (`tests/fixtures/old-*.toml`, in the
-  old layout, converted by `to_features_layout`). Changing hyper-lin on
-  purpose means updating the fixture in the same commit.
 - `type(v) is type(want)`, not `isinstance`: TOML `true` would pass as an
   integer otherwise.
 - Every test runs with `HOME` and the XDG directories in pytest's temp dir
