@@ -42,5 +42,5 @@ file in `hosts/` gets the defaults. The rules in full:
     uv run pytest
     uv run ruff check . && uv run ruff format --check .
 
-Without uv: `python -m dotfiles config` from the checkout, with
-`python-tomli-w` installed.
+A fresh machine needs git, python and uv; `uv run` installs the rest from
+`uv.lock`.
