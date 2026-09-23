@@ -163,9 +163,10 @@ the message, comments on why.
   second run silent; mode drift fixed; `--dry-run` writes nothing; symlink
   escaping `$HOME` refused.
 - Real data: `check` renders hyper-lin, echo-server and an unknown host.
-- Parity with chezmoi (local, T7): a script diffs `chezmoi archive` of
-  `../__dotfiles` against `dotfiles render` per host; not a test, no old
-  files copied into this repo.
+- Porting is checked by reading: each template is translated from its Go
+  source in `../__dotfiles`, and tests pin the rendered output of the
+  templates with logic (loops, gates, registries) for hyper-lin. chezmoi is
+  not run.
 
 ## Boundaries
 
@@ -178,11 +179,11 @@ the message, comments on why.
 
 ## Success Criteria
 
-1. `dotfiles render` for hyper-lin, echo-server and an unknown host
-   produces the same tree (paths, content, modes) as `chezmoi archive` of
-   `../__dotfiles` for that host, except the noctalia file's TOML layout.
-2. On hyper-lin after a `chezmoi apply`, `dotfiles deploy --dry-run` prints
-   at most the noctalia line; after one `deploy`, nothing.
+1. Every dotfile of `../__dotfiles` has its counterpart under `home/`, with
+   the same gate and mode, and templates translated line by line from
+   their Go source (same output for the same data).
+2. On hyper-lin, `dotfiles deploy --dry-run` right after a `chezmoi apply`
+   prints at most the noctalia line; after one `deploy`, nothing.
 3. `check`, pytest, ruff green locally and in CI.
 
 ## Decisions
