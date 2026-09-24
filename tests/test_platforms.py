@@ -1,11 +1,16 @@
 import grp
+import os
 import pwd
+import shutil
+import subprocess
+import tomllib
+from pathlib import Path
 
 import pytest
 from conftest import Fake
 
 from dotfiles import engine, platforms
-from dotfiles.config import ConfigError
+from dotfiles.config import ROOT, ConfigError
 from dotfiles.engine import Failed
 from dotfiles.platforms import detect
 from dotfiles.platforms.arch import Arch
@@ -119,11 +124,69 @@ def test_arch_missing(system, arch):
     assert arch.missing(["bash"]) == []
 
 
+def si(*names: str) -> str:
+    """pacman -Si output for NAMES."""
+    return "\n".join(f"Repository      : extra\nName            : {n}\n" for n in names)
+
+
 def test_arch_install_is_one_transaction_as_root(system, arch, monkeypatch):
     monkeypatch.setenv("SUDO_CMD", "sudo")
     system.programs.add("sudo")
+    system.answers[("pacman", "-Si", "docker", "tmux")] = (0, si("docker", "tmux"))
     arch.install(["docker", "tmux"])
-    assert system.calls == [["sudo", "pacman", "-S", "--needed", "--noconfirm", "docker", "tmux"]]
+    assert system.calls[-1] == ["sudo", "pacman", "-S", "--needed", "--noconfirm", "docker", "tmux"]
+
+
+def test_arch_install_removes_what_it_replaces(system, arch, capsys):
+    system.answers[("pacman", "-Qq", "jack2")] = (0, "jack2\n")
+    system.answers[("pacman", "-Qq", "rust")] = (0, "rustup\n")  # only provides rust
+    system.answers[("pacman", "-Si", "pipewire-jack")] = (0, si("pipewire-jack"))
+    arch.install(["pipewire-jack"], ["jack2", "rust"])
+    assert [c for c in system.calls if c[1] != "-Qq" and c[1] != "-Si"] == [
+        ["pacman", "-Rdd", "--noconfirm", "jack2"],
+        ["pacman", "-S", "--needed", "--noconfirm", "pipewire-jack"],
+    ]
+    assert capsys.readouterr().out == "-> removed jack2, its replacement follows\n"
+
+
+def test_arch_install_takes_the_rest_from_the_aur(system, monkeypatch):
+    system.programs.add("paru")
+    system.answers[("pacman", "-Si", "tmux", "clock-rs-git")] = (0, si("tmux"))
+    system.answers[("paru", "--version")] = (0, "paru v2.1.0 - libalpm v16.0.1\n")
+    Arch(config(aur={})).install(["tmux", "clock-rs-git"])
+    assert [c for c in system.calls if c[1] in ("-S", "--version")] == [
+        ["pacman", "-S", "--needed", "--noconfirm", "tmux"],
+        ["paru", "--version"],
+        ["paru", "-S", "--needed", "--noconfirm", "clock-rs-git"],
+    ]
+    # paru's own sudo is SUDO_CMD, snapper's variables kept.
+    monkeypatch.setenv("SUDO_CMD", "false")
+    monkeypatch.setenv("DOTFILES_SNAPPER_STATE", "/run/x")
+    Arch(config(aur={})).install(["clock-rs-git"])
+    assert system.calls[-1] == [
+        "paru",
+        "--sudo",
+        "false",
+        "--sudoflags",
+        "--preserve-env=SNAP_PAC_SKIP,DOTFILES_SNAPPER_STATE",
+        *["-S", "--needed", "--noconfirm", "clock-rs-git"],
+    ]
+
+
+def test_arch_install_without_the_aur_fails_after_the_repositories(system):
+    system.answers[("pacman", "-Si", "tmux", "clock-rs-git")] = (0, si("tmux"))
+    with pytest.raises(Failed, match="not in the repositories: clock-rs-git — enable features.aur"):
+        Arch(config()).install(["tmux", "clock-rs-git"])
+    assert system.calls[-1] == ["pacman", "-S", "--needed", "--noconfirm", "tmux"]
+
+
+def test_arch_install_failure_names_the_stale_database(system, monkeypatch):
+    monkeypatch.setattr(engine, "sleep", lambda seconds: None)
+    system.answers[("pacman", "-Si", "tmux")] = (0, si("tmux"))
+    system.answers[("pacman", "-S", "--needed", "--noconfirm", "tmux")] = (1, "")
+    with pytest.raises(Failed, match="run pacman -Syu and apply again"):
+        Arch(config()).install(["tmux"])
+    assert system.calls.count(["pacman", "-S", "--needed", "--noconfirm", "tmux"]) == 3
 
 
 SI = """Repository      : extra
@@ -176,3 +239,211 @@ def test_detect(monkeypatch):
     release(ID="linuxmint", ID_LIKE="ubuntu debian")
     with pytest.raises(ConfigError, match="^no platform for linuxmint or ubuntu or debian$"):
         detect({})
+
+
+class AsRoot(Fake):
+    """Fakes every command, but carries out `install` as the test user, so
+    root's files land under SYSROOT; engine._owner then reads them as
+    root's (patched by the fixture)."""
+
+    def __call__(self, argv, check=False, **kwargs):
+        if argv[0] == "install":
+            dst = Path(argv[-1])
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(argv[-2], dst)
+            dst.chmod(int(argv[argv.index("-m") + 1], 8))
+        return super().__call__(argv, check, **kwargs)
+
+
+@pytest.fixture
+def root(monkeypatch) -> AsRoot:
+    fake = AsRoot()
+    monkeypatch.setattr(engine, "_run", fake)
+    monkeypatch.setattr(engine, "_owner", lambda path: "root:root")
+    monkeypatch.setenv("SUDO_CMD", "")
+    return fake
+
+
+def config(**features) -> dict:
+    """Every setup part off but FEATURES, with the defaults' settings."""
+    defaults = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())
+    for name, settings in features.items():
+        defaults["features"][name].update(enabled=True, **settings)
+    return defaults
+
+
+def test_setup_off_runs_nothing(root, capsys):
+    Arch(config()).setup()
+    assert root.calls == []
+    assert capsys.readouterr().out == ""
+
+
+def test_setup_pacman(root, capsys):
+    conf = engine.SYSROOT / "etc/pacman.conf"
+    conf.parent.mkdir(parents=True)
+    conf.write_text("[options]\nHoldPkg = pacman\n\n[core]\nInclude = /etc/pacman.d/mirrorlist\n")
+    arch = Arch(config(pacman={"parallel_downloads": 2}))
+    arch.setup()
+    assert conf.read_text() == (
+        "[options]\nHoldPkg = pacman\n\nInclude = /etc/pacman.conf.d/options.conf\n"
+        "[core]\nInclude = /etc/pacman.d/mirrorlist\n"
+    )
+    options = engine.SYSROOT / "etc/pacman.conf.d/options.conf"
+    assert options.read_text() == "ParallelDownloads = 2\n"
+    capsys.readouterr()
+    arch.setup()
+    assert capsys.readouterr().out == ""
+
+    arch = Arch(config(pacman={"multilib": True}))
+    arch.setup()
+    assert conf.read_text().endswith("\nInclude = /etc/pacman.conf.d/multilib.conf\n")
+    multilib = engine.SYSROOT / "etc/pacman.conf.d/multilib.conf"
+    assert multilib.read_text() == "[multilib]\nInclude = /etc/pacman.d/mirrorlist\n"
+    assert root.calls[-1] == ["pacman", "-Syu", "--noconfirm"]
+    assert capsys.readouterr().out.endswith("-> multilib database synced (pacman -Syu)\n")
+    # Until the database exists, every apply syncs again; then nothing.
+    db = engine.SYSROOT / "var/lib/pacman/sync/multilib.db"
+    db.parent.mkdir(parents=True)
+    db.touch()
+    root.calls.clear()
+    arch.setup()
+    assert capsys.readouterr().out == ""
+    assert not any(call[0] == "pacman" for call in root.calls)
+
+
+def test_setup_leaves_a_multilib_of_pacman_conf_alone(root):
+    conf = engine.SYSROOT / "etc/pacman.conf"
+    conf.parent.mkdir(parents=True)
+    conf.write_text("[options]\n[core]\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n")
+    Arch(config(pacman={"multilib": True})).setup()
+    assert not (engine.SYSROOT / "etc/pacman.conf.d/multilib.conf").exists()
+    assert "multilib.conf" not in conf.read_text()
+    assert not any(call[0] == "pacman" for call in root.calls)
+
+
+@pytest.mark.parametrize(
+    ("jobs", "options", "makeflags", "extra"),
+    [
+        ("20%", ["ccache", "!debug"], "-j3", "OPTIONS+=(ccache !debug)\n"),
+        ("1%", [], "-j1", ""),  # never below one job
+        ("$(nproc)", [], "-j$(nproc)", ""),  # evaluated by makepkg
+    ],
+)
+def test_setup_makepkg(root, monkeypatch, jobs, options, makeflags, extra):
+    monkeypatch.setattr(os, "cpu_count", lambda: 16)
+    cfg = config(makepkg={"jobs": jobs, "options": options})
+    cfg["git"].update(name="A B", email="a@b")
+    Arch(cfg).setup()
+    conf = engine.SYSROOT / "etc/makepkg.conf.d/dotfiles.conf"
+    assert conf.read_text() == f'MAKEFLAGS="{makeflags}"\n{extra}PACKAGER="A B <a@b>"\n'
+
+
+def test_setup_reflector(root, capsys):
+    arch = Arch(config(reflector={"country": ["Ukraine", "Poland"]}))
+    root.answers[("pacman", "-T", "reflector")] = (127, "reflector\n")
+    root.answers[("pacman", "-Si", "reflector")] = (0, si("reflector"))
+    arch.setup()
+    conf = engine.SYSROOT / "etc/xdg/reflector/reflector.conf"
+    assert conf.read_text() == (
+        "--save /etc/pacman.d/mirrorlist\n--country Ukraine,Poland\n--protocol https\n"
+        "--latest 20\n--sort rate\n--age 12\n--completion-percent 100\n--download-timeout 5\n"
+    )
+    override = engine.SYSROOT / "etc/systemd/system/reflector.timer.d/override.conf"
+    assert override.read_text() == (
+        "[Timer]\nOnCalendar=\nOnCalendar=weekly\nOnBootSec=\nOnBootSec=15min\n"
+    )
+    commands = [call for call in root.calls if call[0] != "install"]
+    assert commands[commands.index(["pacman", "-S", "--needed", "--noconfirm", "reflector"]) :] == [
+        ["pacman", "-S", "--needed", "--noconfirm", "reflector"],
+        ["systemctl", "daemon-reload"],
+        ["systemctl", "is-enabled", "reflector.timer"],
+        ["systemctl", "is-active", "reflector.timer"],
+        ["systemctl", "enable", "--now", "reflector.timer"],
+        ["systemctl", "start", "reflector.service"],
+    ]
+    out = capsys.readouterr().out
+    assert out.startswith("-> packages: reflector (missing)\n")
+    assert out.endswith("-> mirrorlist refreshed\n")
+
+    # In place: nothing started, nothing printed.
+    root.answers = {
+        ("systemctl", "is-enabled", "reflector.timer"): (0, "enabled\n"),
+        ("systemctl", "is-active", "reflector.timer"): (0, "active\n"),
+    }
+    root.calls.clear()
+    arch.setup()
+    assert capsys.readouterr().out == ""
+    assert ["systemctl", "start", "reflector.service"] not in root.calls
+    assert ["systemctl", "daemon-reload"] not in root.calls
+
+    # A new schedule: daemon-reload and a refresh; a failed refresh is a notice.
+    arch.cfg["features"]["reflector"]["on_calendar"] = "daily"
+    root.answers[("systemctl", "start", "reflector.service")] = (1, "")
+    arch.setup()
+    assert ["systemctl", "daemon-reload"] in root.calls
+    assert engine.notices[0].startswith("refreshing the mirrorlist failed (network?)")
+
+
+SRCINFO = """pkgbase = paru
+\tpkgver = 2.1.0
+\tmakedepends = cargo
+\tdepends = git
+\tdepends = pacman
+\tdepends = libalpm.so>=16
+pkgname = paru
+"""
+
+
+class Clone(Fake):
+    """git clone leaves a checkout with SRCINFO; makepkg --packagelist names
+    a file it creates."""
+
+    def __call__(self, argv, check=False, **kwargs):
+        if argv[:2] == ["git", "clone"]:
+            Path(argv[-1]).mkdir()
+            (Path(argv[-1]) / ".SRCINFO").write_text(SRCINFO)
+        if argv[:2] == ["makepkg", "--packagelist"]:
+            built = Path(kwargs["cwd"]) / "paru-2.1.0-1-x86_64.pkg.tar.zst"
+            built.touch()
+            return subprocess.CompletedProcess(argv, 0, f"{built}\n{built}.debug\n", "")
+        return super().__call__(argv, check, **kwargs)
+
+
+def test_ensure_paru(monkeypatch, capsys):
+    fake = Clone()
+    monkeypatch.setattr(engine, "_run", fake)
+    monkeypatch.setenv("SUDO_CMD", "")
+    fake.answers[("paru", "--version")] = (0, "paru v2.1.0 - libalpm v16.0.1\n")
+    arch = Arch(config(aur={}))
+    assert arch.ensure_paru() is False
+    assert fake.calls == [["paru", "--version"]]
+
+    # A paru that does not run is built: deps first, as root through pacman.
+    fake.answers = {
+        ("paru", "--version"): (127, ""),
+        ("pacman", "-T", "base-devel", "git"): (127, "base-devel\n"),
+        ("pacman", "-T", "cargo", "git", "libalpm.so", "pacman"): (127, "cargo\n"),
+        ("rustup", "default"): (1, ""),  # rustup without a toolchain
+    }
+    assert arch.ensure_paru() is True
+    mutations = [c for c in fake.calls if c[:2] not in (["pacman", "-T"], ["paru", "--version"])]
+    assert mutations[0] == ["pacman", "-S", "--needed", "--noconfirm", "base-devel"]
+    assert mutations[1][:5] == ["git", "clone", "--quiet", "--depth", "1"]
+    assert mutations[2:6] == [
+        ["pacman", "-S", "--needed", "--noconfirm", "--asdeps", "cargo"],
+        ["rustup", "default"],
+        ["rustup", "default", "stable"],
+        ["makepkg", "--noconfirm"],
+    ]
+    assert mutations[-1][:3] == ["pacman", "-U", "--noconfirm"]
+    assert mutations[-1][3].endswith("/paru-2.1.0-1-x86_64.pkg.tar.zst")
+    assert len(mutations[-1]) == 4  # the .debug file was not built
+    assert capsys.readouterr().out == "-> paru built from the AUR\n"
+
+
+def test_ensure_paru_dry_run(system, monkeypatch, capsys):
+    monkeypatch.setattr(engine, "DRY_RUN", True)
+    system.programs.add("paru")
+    assert Arch(config(aur={})).ensure_paru() is True
+    assert system.calls == [["paru", "--version"]]
+    assert capsys.readouterr().out == "-> paru built from the AUR\n"

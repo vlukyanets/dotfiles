@@ -34,7 +34,8 @@ master and every PR; uv is pinned there by version and sha256.
   `Linux` on `Platform`).
 - Features: `dotfiles/features/<name>.py`, one `Feature` subclass each; its
   nested classes (`Arch`, `Linux`, …) are the strategies `apply` receives,
-  with the packages for that platform. The name gates it; the order comes
+  with the packages for that platform (`packages()`, repository and AUR
+  alike) and the ones they replace (`replaces()`). The name gates it; the order comes
   from the package graph (`dotfiles/apply.py`). Nothing else is declared.
 - Why: `docs/spec/SPEC-<module>.md`, then `docs/spec/CAPABILITY-MAP.md`.
 

@@ -251,9 +251,10 @@ def ensure_symlink(target, link) -> bool:
     return True
 
 
-def ensure_line(file, regex: str, line: str) -> bool:
-    """The first line of FILE matching REGEX becomes LINE, appended when
-    nothing matches. FILE's mode and owner are kept."""
+def ensure_line(file, regex: str, line: str, before: str | None = None) -> bool:
+    """The first line of FILE matching REGEX becomes LINE; when nothing
+    matches, LINE goes before the first line matching BEFORE, else at the
+    end. FILE's mode and owner are kept."""
     real = _path(file)
     if not real.exists():
         return ensure_file(file, line + "\n")
@@ -263,6 +264,7 @@ def ensure_line(file, regex: str, line: str) -> bool:
             old, done = line, True
         lines.append(old)
     if not done:
-        lines.append(line)
+        at = [i for i, old in enumerate(lines) if before and re.search(before, old)]
+        lines.insert(at[0] if at else len(lines), line)
     mode = stat.S_IMODE(real.stat().st_mode)
     return ensure_file(file, "\n".join(lines) + "\n", mode, _owner(real))
