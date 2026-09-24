@@ -1,5 +1,7 @@
 """The base class of every feature and the lookup of its strategy."""
 
+from contextlib import AbstractContextManager, nullcontext
+
 from dotfiles.platforms import Platform
 
 
@@ -13,6 +15,12 @@ class Feature:
 
     def apply(self, strategy: Platform) -> None:
         """What this feature does, through STRATEGY for what is platform's."""
+
+    def session(self, system: Platform) -> AbstractContextManager:
+        """A context around the whole apply of an enabled feature: entered
+        before the platform's setup, left after the last feature, after a
+        failure or Ctrl-C too. Nothing by default."""
+        return nullcontext()
 
     def strategy(self, system: Platform) -> Platform | None:
         """The nested class for SYSTEM's platform, walking up its class

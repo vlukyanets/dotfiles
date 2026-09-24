@@ -22,11 +22,10 @@ def isolate(monkeypatch, base):
         path.mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv(var, str(path))
     monkeypatch.setenv("SUDO_CMD", "false")
-    # dotfiles apply sets these for a host with snapper; setenv first so the
-    # monkeypatch removes them again even when they were not set before.
-    for var in ("SNAP_PAC_SKIP", "DOTFILES_SNAPPER_STATE"):
-        monkeypatch.setenv(var, "")
-        monkeypatch.delenv(var)
+    # features.snapper sets it for an apply; setenv first so the monkeypatch
+    # removes it again even when it was not set before.
+    monkeypatch.setenv("SNAP_PAC_SKIP", "")
+    monkeypatch.delenv("SNAP_PAC_SKIP")
 
 
 @pytest.fixture(scope="session", autouse=True)

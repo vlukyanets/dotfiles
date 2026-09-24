@@ -345,3 +345,37 @@ def test_dry_run_on_a_real_host_never_calls_sudo(arch, monkeypatch, capsys):
     assert "-> /etc/modprobe.d/nobeep.conf (missing)\n" in out
     assert "-> ~/.zshrc (missing)\n" in out
     assert not (Path.home() / ".zshrc").exists()
+
+
+SESSION = """
+from contextlib import contextmanager
+
+LOG = []
+
+
+class Snap(Feature):
+    @contextmanager
+    def session(self, system):
+        LOG.append("enter")
+        try:
+            yield
+        finally:
+            LOG.append("exit")
+
+    def apply(self, strategy):
+        LOG.append("apply")
+        die("broken")
+
+    class Linux:
+        pass
+"""
+
+
+def test_a_session_wraps_the_whole_apply(root, system, tmp_path, monkeypatch):
+    package = make_package(tmp_path, monkeypatch, {"on": SESSION, "off": SESSION})
+    monkeypatch.setattr(
+        FakeArch, "setup", lambda self: sys.modules[f"{package}.on"].LOG.append("setup")
+    )
+    assert apply("h", root, package=package) == 1
+    assert sys.modules[f"{package}.on"].LOG == ["enter", "setup", "apply", "exit"]
+    assert f"{package}.off" not in sys.modules  # a disabled feature is not even imported

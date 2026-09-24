@@ -9,10 +9,35 @@ import importlib
 import importlib.util
 import platform
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
+from contextvars import ContextVar
 
+from dotfiles import engine
 from dotfiles.config import ConfigError
 
 PACKAGE = "dotfiles.platforms"
+# Set inside `with watching(hook):`; run by transaction().
+_hooks: ContextVar[tuple] = ContextVar("hooks", default=())
+
+
+@contextmanager
+def watching(hook):
+    """HOOK() runs right before every package change inside the block, from
+    any platform instance: the system or a feature's strategy."""
+    token = _hooks.set((*_hooks.get(), hook))
+    try:
+        yield
+    finally:
+        _hooks.reset(token)
+
+
+def transaction() -> None:
+    """Packages are about to change: what watches runs first. A platform
+    calls it before each command that installs, upgrades or removes a
+    package; nothing on a dry run, which changes none."""
+    if not engine.DRY_RUN:
+        for hook in _hooks.get():
+            hook()
 
 
 class Platform(ABC):

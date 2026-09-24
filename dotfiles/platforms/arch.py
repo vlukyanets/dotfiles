@@ -20,6 +20,7 @@ from dotfiles.engine import (
     retrying,
     run,
 )
+from dotfiles.platforms import transaction
 from dotfiles.platforms.linux import Linux
 
 # pacman's field names are translated; the parser reads the English ones.
@@ -63,6 +64,7 @@ class Arch(Linux):
         # Keyed on the database, not the line just added, so a sync the network
         # cut off is redone. -Syu, not -Sy: -Sy then -S is a partial upgrade.
         if not engine.path("/var/lib/pacman/sync/multilib.db").exists():
+            transaction()
             for attempt in retrying():
                 with attempt, as_root():
                     run("pacman", "-Syu", "--noconfirm")
@@ -124,6 +126,7 @@ class Arch(Linux):
         for name in replaces:
             # -Qq also answers for a package that only provides NAME (rustup for rust).
             if output("pacman", "-Qq", name) == name:
+                transaction()
                 with as_root():
                     run("pacman", "-Rdd", "--noconfirm", name)
                 changed(f"removed {name}, its replacement follows")
@@ -142,6 +145,7 @@ class Arch(Linux):
         flags = ["--sudo", sudo[0]] if sudo else []
         if sudo[1:]:
             flags += ["--sudoflags", " ".join(sudo[1:])]
+        transaction()
         try:
             for attempt in retrying():
                 with attempt:
@@ -176,6 +180,7 @@ class Arch(Linux):
             # makepkg as the user (it refuses root), the install as root.
             run("makepkg", "--noconfirm", cwd=src)
             built = (output("makepkg", "--packagelist", cwd=src) or "").split()
+            transaction()
             with as_root():
                 run("pacman", "-U", "--noconfirm", *[f for f in built if Path(f).exists()])
         changed("paru built from the AUR")
@@ -185,6 +190,7 @@ class Arch(Linux):
         """NAMES from the repositories, as root, retried; nothing when empty."""
         if not names:
             return
+        transaction()
         try:
             for attempt in retrying():
                 with attempt, as_root():

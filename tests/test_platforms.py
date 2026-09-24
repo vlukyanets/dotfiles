@@ -163,16 +163,16 @@ def test_arch_install_takes_the_rest_from_the_aur(system, monkeypatch):
         ["paru", "--version"],
         ["paru", "-S", "--needed", "--noconfirm", "clock-rs-git"],
     ]
-    # paru's own sudo is SUDO_CMD, snapper's variables kept.
+    # paru's own sudo is SUDO_CMD, snap-pac's skip kept.
     monkeypatch.setenv("SUDO_CMD", "false")
-    monkeypatch.setenv("DOTFILES_SNAPPER_STATE", "/run/x")
+    monkeypatch.setenv("SNAP_PAC_SKIP", "y")
     Arch(config(aur={})).install(["clock-rs-git"])
     assert system.calls[-1] == [
         "paru",
         "--sudo",
         "false",
         "--sudoflags",
-        "--preserve-env=SNAP_PAC_SKIP,DOTFILES_SNAPPER_STATE",
+        "--preserve-env=SNAP_PAC_SKIP",
         *["-S", "--needed", "--noconfirm", "clock-rs-git"],
     ]
 
@@ -433,3 +433,24 @@ def test_ensure_paru_dry_run(system, monkeypatch, capsys):
     assert Arch(config(aur={})).ensure_paru() is True
     assert system.calls == [["paru", "--version"]]
     assert capsys.readouterr().out == "-> paru built from the AUR\n"
+
+
+def test_watching_runs_before_each_package_change(system, monkeypatch):
+    seen = []
+    system.answers[("pacman", "-Si", "tmux")] = (0, si("tmux"))
+    system.answers[("pacman", "-Qq", "jack2")] = (0, "jack2\n")
+
+    def hook():
+        seen.append(len(system.calls))
+
+    arch = Arch(config())
+    with platforms.watching(hook):
+        arch.install(["tmux"], ["jack2"])
+    # Before -Rdd (after the -Qq check) and before -S (after the -Si query).
+    assert [system.calls[i][1] for i in seen] == ["-Rdd", "-S"]
+    arch.install(["tmux"])  # outside the block: not watched
+    assert len(seen) == 2
+    monkeypatch.setattr(engine, "DRY_RUN", True)
+    with platforms.watching(hook):
+        arch.install(["tmux"])  # a dry run changes nothing
+    assert len(seen) == 2

@@ -3,9 +3,9 @@ dotfiles, then the features in the order their packages need each other,
 and the notices at the end."""
 
 import importlib
-import os
 import pkgutil
 import sys
+from contextlib import ExitStack
 from pathlib import Path
 from typing import NamedTuple
 
@@ -88,6 +88,56 @@ def _error(name: str, msg) -> None:
     print(f"error: {name}: {msg}", file=sys.stderr)
 
 
+def _phases(host: str, root: Path, system: Platform, found: list[Step], failed: set[str]) -> None:
+    """Setup, packages, dotfiles, features; FAILED collects what failed."""
+    wanted = sorted(set().union(*(step.packages for step in found)))
+    replaced = sorted(set().union(*(step.replaces for step in found)))
+
+    try:
+        system.setup()
+        ready = True
+    except Exception as e:  # noqa: BLE001 — what needs no install still runs
+        failed.add("platform")
+        _error("platform", e)
+        ready = False
+    missing = system.missing(wanted)
+    if missing:
+        engine.changed(f"packages: {' '.join(missing)} (missing)")
+        try:
+            if ready and not engine.DRY_RUN:
+                system.install(missing, replaced)
+        except Exception as e:  # noqa: BLE001 — the features without them still run
+            failed.add("packages")
+            _error("packages", e)
+        if not engine.DRY_RUN:
+            missing = system.missing(wanted)
+
+    try:
+        _deploy(host, root)
+    except Exception as e:  # noqa: BLE001 — the features still run
+        failed.add("dotfiles")
+        _error("dotfiles", e)
+
+    for step, after in order(found, system.depends(wanted) if wanted else {}):
+        if not engine.DRY_RUN and step.packages & set(missing):
+            failed.add(step.name)
+            gone = " ".join(sorted(step.packages & set(missing)))
+            _error(step.name, f"not run, packages missing: {gone}")
+            continue
+        blocked = [name for name in after if name in failed]
+        if blocked:
+            failed.add(step.name)
+            _error(step.name, f"not run, {', '.join(blocked)} failed")
+            continue
+        try:
+            step.feature.apply(step.strategy)
+        except engine.Deferred as e:
+            engine.notice(f"{e} (network?) — the next apply retries")
+        except Exception as e:  # noqa: BLE001 — any failure ends only this feature
+            failed.add(step.name)
+            _error(step.name, e)
+
+
 def apply(
     host: str,
     root: Path = ROOT,
@@ -99,62 +149,14 @@ def apply(
     or was not run."""
     cfg = config.resolve(host, root)
     engine.DRY_RUN = dry_run
-    if cfg["features"].get("snapper", {}).get("enabled"):
-        # For every command of this apply: the pacman hook takes one
-        # snapshot pair per apply, not one per transaction (features.snapper).
-        runtime = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
-        os.environ["SNAP_PAC_SKIP"] = "y"
-        os.environ["DOTFILES_SNAPPER_STATE"] = f"{runtime}/dotfiles-snapper"
     failed: set[str] = set()
     try:
         system = platforms.detect(cfg, platform_package)
         found = steps(cfg, system, package)
-        wanted = sorted(set().union(*(step.packages for step in found)))
-        replaced = sorted(set().union(*(step.replaces for step in found)))
-
-        try:
-            system.setup()
-            ready = True
-        except Exception as e:  # noqa: BLE001 — what needs no install still runs
-            failed.add("platform")
-            _error("platform", e)
-            ready = False
-        missing = system.missing(wanted)
-        if missing:
-            engine.changed(f"packages: {' '.join(missing)} (missing)")
-            try:
-                if ready and not engine.DRY_RUN:
-                    system.install(missing, replaced)
-            except Exception as e:  # noqa: BLE001 — the features without them still run
-                failed.add("packages")
-                _error("packages", e)
-            if not engine.DRY_RUN:
-                missing = system.missing(wanted)
-
-        try:
-            _deploy(host, root)
-        except Exception as e:  # noqa: BLE001 — the features still run
-            failed.add("dotfiles")
-            _error("dotfiles", e)
-
-        for step, after in order(found, system.depends(wanted) if wanted else {}):
-            if not engine.DRY_RUN and step.packages & set(missing):
-                failed.add(step.name)
-                gone = " ".join(sorted(step.packages & set(missing)))
-                _error(step.name, f"not run, packages missing: {gone}")
-                continue
-            blocked = [name for name in after if name in failed]
-            if blocked:
-                failed.add(step.name)
-                _error(step.name, f"not run, {', '.join(blocked)} failed")
-                continue
-            try:
-                step.feature.apply(step.strategy)
-            except engine.Deferred as e:
-                engine.notice(f"{e} (network?) — the next apply retries")
-            except Exception as e:  # noqa: BLE001 — any failure ends only this feature
-                failed.add(step.name)
-                _error(step.name, e)
+        with ExitStack() as sessions:  # left after a failure and on Ctrl-C too
+            for step in found:
+                sessions.enter_context(step.feature.session(system))
+            _phases(host, root, system, found, failed)
     finally:  # after a failure and on Ctrl-C too
         engine.print_notices()
     return 1 if failed else 0

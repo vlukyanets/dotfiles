@@ -111,10 +111,10 @@ def _sudo() -> list[str]:
     if os.geteuid() == 0:
         return []
     sudo = shlex.split(os.environ.get("SUDO_CMD", "sudo"))
-    # During a snapper-wrapped apply the pacman hook needs these two; a
-    # sudoers rule matching ALL implies SETENV.
-    if sudo and os.environ.get("DOTFILES_SNAPPER_STATE"):
-        sudo.append("--preserve-env=SNAP_PAC_SKIP,DOTFILES_SNAPPER_STATE")
+    # Set by features.snapper for the apply, so snap-pac's hooks under the
+    # root pacman skip their snapshots; a sudoers rule matching ALL implies SETENV.
+    if sudo and os.environ.get("SNAP_PAC_SKIP"):
+        sudo.append("--preserve-env=SNAP_PAC_SKIP")
     return sudo
 
 
