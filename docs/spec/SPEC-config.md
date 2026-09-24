@@ -123,9 +123,9 @@ docs/spec/               capability map, module specs
 Flat layout (no `src/`), so `python -m dotfiles` runs from a checkout
 without installing the package.
 
-Registries (`ssh-keys.toml`, `languages.toml`, `firefox.toml`,
-`vscode.json`) are not host config; each lands in `data/` with the module
-that first reads it.
+Registries (`ssh-pubkeys-collection.toml`, `fcitx5-languages-config.toml`,
+`firefox-privacy-config.toml`, `vscode-extensions.toml`) are not host config;
+each lands in `data/` with the module that first reads it.
 
 ## Code Style
 

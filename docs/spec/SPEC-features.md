@@ -332,7 +332,7 @@ feature configures it after the install), so that apply takes no pair.
     only with a terminal (otherwise a notice with the command);
   - without it: `-N ""`.
 
-  Then a notice with the public key for `data/ssh-keys.toml`.
+  Then a notice with the public key for `data/ssh-pubkeys-collection.toml`.
 - **`ssh_agent`**
   - `ssh-agent.socket` as a user service.
   - Without a systemd user session: a notice with the command.
@@ -361,14 +361,14 @@ feature configures it after the install), so that apply takes no pair.
 - **`firefox`**
   - firefox.
   - `/usr/lib/firefox/distribution/policies.json`: every pref of
-    `data/firefox.toml` as `{"Value": v, "Status": "default"}` under
+    `data/firefox-privacy-config.toml` as `{"Value": v, "Status": "default"}` under
     `policies.Preferences`, written with `json.dumps(indent=2)`. A new
     default, nothing locked.
 
 ### VS Code (batch 7)
 
 `vscode`: visual-studio-code-bin (AUR); profiles and extensions from
-`data/vscode.toml` (`extensions`, `excluded`, `profiles.<name>.extensions`
+`data/vscode-extensions.toml` (`extensions`, `excluded`, `profiles.<name>.extensions`
 / `.settings`).
 
 - **Profiles.** Each profile is registered in
@@ -398,7 +398,7 @@ feature configures it after the install), so that apply takes no pair.
 
 A branch and a PR per batch, in the order above, each stacked on the
 previous one until it merges. A batch is one or a few commits; each
-feature has its test. `data/firefox.toml` and `data/vscode.toml` come with
+feature has its test. `data/firefox-privacy-config.toml` and `data/vscode-extensions.toml` come with
 their batches (the second as TOML, like every other registry).
 
 ## Testing Strategy
@@ -473,5 +473,5 @@ their batches (the second as TOML, like every other registry).
    no pacman hook of our own.
 4. **nvidia reads the GPU from sysfs and pci.ids**, so the driver is
    chosen on the first apply, without pciutils.
-5. **The VS Code registry becomes `data/vscode.toml`**, like every other
+5. **The VS Code registry becomes `data/vscode-extensions.toml`**, like every other
    registry.

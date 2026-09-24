@@ -149,7 +149,7 @@ def test_registries_reach_templates_and_names_are_checked(root, tmp_path):
         '[features.locale]\nlanguages = ["en"]\n',
     )
     write(root, "hosts/bad.toml", '[features.locale]\nlanguages = ["en", "xx"]\n')
-    write(root, "data/languages.toml", '[languages.en]\nxkb = "us"\n')
+    write(root, "data/fcitx5-languages-config.toml", '[languages.en]\nxkb = "us"\n')
     write(
         root,
         "home/kb.j2",

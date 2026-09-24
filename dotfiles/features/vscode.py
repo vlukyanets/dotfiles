@@ -1,5 +1,5 @@
-"""VS Code with the profiles of data/vscode.toml. `code --profile` only uses
-a profile that exists and creating one is UI-only, so each is registered in
+"""VS Code with the profiles of data/vscode-extensions.toml. `code
+--profile` only uses a profile that exists and creating one is UI-only, so each is registered in
 VS Code's storage.json first, then its extensions come through the CLI.
 The shared list goes into the Default profile, flagged the way the UI's
 "Apply Extension to all Profiles" does it."""
@@ -32,7 +32,7 @@ MARKETPLACE = RetryPolicy(attempts=5, delay=30, backoff=1.5, max_delay=120)
 
 class Vscode(Feature):
     def apply(self, strategy):
-        vscode = config.load(ROOT / "data/vscode.toml", ROOT)["vscode"]
+        vscode = config.load(ROOT / "data/vscode-extensions.toml", ROOT)["vscode"]
         self.user = Path.home() / ".config/Code/User"
         self.running = _running(Path.home() / ".config/Code/SingletonLock")
         self.failed: list[str] = []

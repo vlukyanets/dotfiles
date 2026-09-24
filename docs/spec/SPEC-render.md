@@ -19,7 +19,7 @@ Two commands:
 
 Out of scope: provisioning (features, packages, root files — `engine`,
 `features`), removing files, the registries only features read
-(`firefox.toml`, `vscode.json` come with their features).
+(`firefox-privacy-config.toml`, `vscode-extensions.toml` come with their features).
 
 ## Tech Stack
 
@@ -37,7 +37,7 @@ Out of scope: provisioning (features, packages, root files — `engine`,
 | an executable | `mode = "755"` in `home.toml` |
 | a file only some hosts get | `when = "<jinja expression>"` in `home.toml` |
 | a file an application also rewrites | an ordinary `.j2` that reads `current` (the file as it is in `$HOME`) |
-| a lookup table | `data/ssh-keys.toml`, `data/languages.toml` |
+| a lookup table | `data/ssh-pubkeys-collection.toml`, `data/fcitx5-languages-config.toml` |
 | the home directory, the user id | `home`, `uid` |
 | a template error | `{{ fail("…") }}` (a global that raises) |
 | TOML in and out, deep merge, regex | filters `from_toml`, `to_toml`, `merge_over`, `regex_search` |
@@ -77,7 +77,7 @@ mode = "755"
 features, git, ssh, secrets    the resolved config (config.resolve)
 host                           the host name
 home, uid                      target home directory and user id
-languages, ssh_keys            data/languages.toml, data/ssh-keys.toml
+languages, ssh_keys            data/fcitx5-languages-config.toml, data/ssh-pubkeys-collection.toml
 current                        the target file's current text, "" if absent
 ```
 
@@ -134,7 +134,7 @@ uv run dotfiles check        # now also renders every host into a temp dir
 ```
 home/                  the dotfiles, real names, *.j2 for templates
 home.toml              modes and gates
-data/                  ssh-keys.toml, languages.toml
+data/                  ssh-pubkeys-collection.toml, fcitx5-languages-config.toml
 dotfiles/render.py     context, Jinja2 env and filters, render(), deploy()
 tests/test_render.py   fixture trees in tmp_path; deploy against the tmp HOME
 ```
