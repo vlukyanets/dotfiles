@@ -760,3 +760,100 @@ def test_firefox(machine, capsys):
     capsys.readouterr()
     apply("firefox")
     assert capsys.readouterr().out == ""
+
+
+# Batch 7: VS Code, with the real data/vscode.toml.
+
+VSCODE = tomllib.loads((ROOT / "data/vscode.toml").read_text())["vscode"]
+PACK = "ms-vscode-remote.vscode-remote-extensionpack"
+
+
+def home(name: str) -> Path:
+    """NAME under the home directory, as the engine reads and writes it."""
+    return engine.path(Path.home() / name)
+
+
+@pytest.fixture
+def code(machine):
+    extensions = Path.home() / ".vscode/extensions"
+    entries = [
+        {"identifier": {"id": PACK}, "relativeLocation": f"{PACK}-0.26.0"},
+        {"identifier": {"id": "ms-vscode-remote.remote-ssh"}, "location": {"path": "/x/ssh-1"}},
+        {"identifier": {"id": "ms-vscode.azure-repos"}, "relativeLocation": "repos-1"},
+    ]
+    write(str(extensions / "extensions.json"), json.dumps(entries))
+    pack = {"extensionPack": ["ms-vscode-remote.remote-ssh", "ms-vscode.azure-repos"]}
+    write(str(extensions / f"{PACK}-0.26.0/package.json"), json.dumps(pack))
+    python = Path.home() / ".config/Code/User/profiles/python/extensions.json"
+    write(str(python), json.dumps([{"identifier": {"id": "EditorConfig.EditorConfig"}}]))
+    machine.answers[("code", "--list-extensions")] = (0, "ms-vscode.azure-repos\n")
+    return machine
+
+
+def settle(code) -> None:
+    """Every extension of the registry installed where it belongs."""
+    code.answers[("code", "--list-extensions")] = (0, "\n".join(VSCODE["extensions"]))
+    for name, profile in VSCODE["profiles"].items():
+        listed = "\n".join(profile["extensions"])
+        code.answers[("code", "--profile", name, "--list-extensions")] = (0, listed)
+
+
+def test_vscode(code, capsys):
+    apply("vscode")
+    storage = json.loads(home(".config/Code/User/globalStorage/storage.json").read_text())
+    profiles = {p["name"]: p for p in storage["userDataProfiles"]}
+    assert profiles["Node.JS"]["location"] == "node-js"
+    assert profiles[".NET"]["useDefaultFlags"]["settings"] is True  # no settings of its own
+    assert "settings" not in profiles["Python"]["useDefaultFlags"]
+
+    installs = [c for c in code.calls if "--install-extension" in c]
+    assert [c[2] if c[1] == "--profile" else "" for c in installs] == ["", *VSCODE["profiles"]]
+    assert ["code", "--uninstall-extension", "ms-vscode.azure-repos"] in code.calls
+
+    index = json.loads(home(".vscode/extensions/extensions.json").read_text())
+    scoped = {
+        e["identifier"]["id"] for e in index if e.get("metadata", {}).get("isApplicationScoped")
+    }
+    assert scoped == {
+        PACK,
+        "ms-vscode-remote.remote-ssh",
+    }  # the pack's member too, not the excluded
+    python = home(".config/Code/User/profiles/python")
+    assert json.loads((python / "extensions.json").read_text()) == []
+    settings = json.loads((python / "settings.json").read_text())
+    assert settings["[python]"] == {"editor.defaultFormatter": "charliermarsh.ruff"}
+    assert settings["editor.tabSize"] == 4  # the Default profile's settings underneath
+
+    settle(code)
+    capsys.readouterr()
+    code.calls.clear()
+    apply("vscode")
+    assert capsys.readouterr().out == ""
+    assert not [c for c in code.calls if "--list-extensions" not in c]
+
+
+def test_vscode_leaves_a_running_instance_alone(code):
+    lock = Path.home() / ".config/Code/SingletonLock"
+    lock.parent.mkdir(parents=True)
+    lock.symlink_to(f"host-{os.getpid()}")
+    with pytest.raises(engine.Failed, match="VS Code is running"):
+        apply("vscode")
+
+
+def test_vscode_defers_failed_extensions(code, monkeypatch):
+    monkeypatch.setattr(engine, "sleep", lambda seconds: None)
+    settle(code)
+    rust = VSCODE["profiles"]["Rust"]["extensions"]
+    code.answers[("code", "--profile", "Rust", "--list-extensions")] = (0, "")
+    install = [
+        "--install-extension",
+        rust[0],
+        "--install-extension",
+        rust[1],
+        "--install-extension",
+        rust[2],
+    ]
+    code.answers[("code", "--profile", "Rust", *install)] = (1, "")
+    with pytest.raises(engine.Deferred, match="failed for: Rust — profiles and settings"):
+        apply("vscode")
+    assert home(".config/Code/User/profiles/node-js/settings.json").exists()  # the rest went on
