@@ -2,3 +2,8 @@
 __pycache__/
 .claude/settings.local.json
 tasks/
+# Editor project state, at the root only: home/ holds real dotfiles.
+/.idea/
+/.vscode/
+/.zed/
+/.fleet/
