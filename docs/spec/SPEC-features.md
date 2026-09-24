@@ -411,8 +411,8 @@ their batches (the second as TOML, like every other registry).
 - **Packages-only features:** the lists are data, read in review against
   the table above. The packages that depend on settings are tested:
   `fcitx5`, `gaming`, `rbw`.
-- **Until the last batch** the consistency test skips the features of the
-  batches still to come (`NOT_YET`), and each batch shrinks that set.
+- **While the batches landed** the consistency test skipped the features
+  still to come; after batch 7 it requires a module for every feature.
 - **Each feature with an `apply`:**
   - a fake `_run` and a temp `SYSROOT`;
   - the first run makes the changes, a second run prints nothing;

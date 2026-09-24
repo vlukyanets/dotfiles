@@ -1,0 +1,73 @@
+# VS Code for features.vscode. `extensions` go into the Default profile and
+# are applied to every profile (the UI's "Apply Extension to all Profiles"),
+# extension packs with all their members; `excluded` are members of a pack
+# removed again. Each profile adds its own extensions and, optionally,
+# settings merged over home/.config/Code/User/settings.json.
+
+[vscode]
+extensions = [
+    "editorconfig.editorconfig",
+    "streetsidesoftware.code-spell-checker",
+    "tamasfe.even-better-toml",
+    "redhat.vscode-yaml",
+    "ms-azuretools.vscode-containers",
+    "github.remotehub",
+    "ms-vscode-remote.vscode-remote-extensionpack",
+]
+excluded = [
+    "ms-vscode.azure-repos",
+]
+
+[vscode.profiles.".NET"]
+extensions = [
+    "ms-dotnettools.csharp",
+]
+
+[vscode.profiles.Python]
+extensions = [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "charliermarsh.ruff",
+]
+
+[vscode.profiles.Python.settings."[python]"]
+"editor.defaultFormatter" = "charliermarsh.ruff"
+
+[vscode.profiles.Rust]
+extensions = [
+    "rust-lang.rust-analyzer",
+    "vadimcn.vscode-lldb",
+    "fill-labs.dependi",
+]
+
+[vscode.profiles.Rust.settings]
+"rust-analyzer.check.command" = "clippy"
+
+[vscode.profiles.Rust.settings."[rust]"]
+"editor.defaultFormatter" = "rust-lang.rust-analyzer"
+
+[vscode.profiles."Node.JS"]
+extensions = [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "christian-kohler.path-intellisense",
+]
+
+[vscode.profiles."Node.JS".settings."[javascript]"]
+"editor.defaultFormatter" = "esbenp.prettier-vscode"
+
+[vscode.profiles."Node.JS".settings."[javascriptreact]"]
+"editor.defaultFormatter" = "esbenp.prettier-vscode"
+
+[vscode.profiles."Node.JS".settings."[typescript]"]
+"editor.defaultFormatter" = "esbenp.prettier-vscode"
+
+[vscode.profiles."Node.JS".settings."[typescriptreact]"]
+"editor.defaultFormatter" = "esbenp.prettier-vscode"
+
+[vscode.profiles."Node.JS".settings."[json]"]
+"editor.defaultFormatter" = "esbenp.prettier-vscode"
+
+[vscode.profiles."Node.JS".settings."[jsonc]"]
+"editor.defaultFormatter" = "esbenp.prettier-vscode"

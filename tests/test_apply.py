@@ -273,10 +273,6 @@ def test_a_module_defines_one_feature(root, system, tmp_path, monkeypatch):
 UNSWITCHED = {"ssh_key", "rbw"}
 # Features without a module: Arch.setup() does them.
 SETUP = {"pacman", "makepkg", "reflector"}
-# Features of the batches still to come (SPEC-features); shrinks to nothing.
-NOT_YET = {
-    *("vscode",),  # batch 7
-}
 
 
 def test_real_features_are_consistent():
@@ -287,7 +283,7 @@ def test_real_features_are_consistent():
     for name, s in found.items():
         assert type(s.feature).__name__ == name.title().replace("_", ""), name
         assert name in cfg["features"] or name in UNSWITCHED, f"{name}: not in the schema"
-    missing = set(cfg["features"]) - set(found) - SETUP - NOT_YET
+    missing = set(cfg["features"]) - set(found) - SETUP
     assert not missing, f"features without a module: {sorted(missing)}"
 
 
