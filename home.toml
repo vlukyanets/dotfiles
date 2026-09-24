@@ -69,7 +69,7 @@ mode = "700"
 [".ssh/authorized_keys"]
 when = "ssh.authorized_keys"
 
-# Only keeps config.d in git; chezmoi never created empty files either.
+# Only keeps config.d in git; no empty file in $HOME.
 [".ssh/config.d/.keep"]
 when = "false"
 

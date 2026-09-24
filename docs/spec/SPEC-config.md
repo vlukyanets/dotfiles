@@ -32,9 +32,9 @@ User stories:
 ## Data model
 
 ```
-dotfiles/defaults.toml schema: every key, its type, its default (ported 1:1)
-profiles/<name>.toml   partial config + optional extends
-hosts/<hostname>.toml  partial config + optional extends
+dotfiles/defaults.toml  schema: every key, its type, its default
+profiles/<name>.toml    partial config + optional extends
+hosts/<hostname>.toml   partial config + optional extends
 ```
 
 A profile or host file:
@@ -69,18 +69,17 @@ Resolution for host `H`:
    a name present in both is an error. Unknown name → error.
    A cycle → error listing the cycle (`a → b → a`).
 3. **Validation, per file, before merging.** Every key must exist in
-   `dotfiles/defaults.toml` at the same path, at any depth, with the same type.
-   `bool` and `int` are different types; lists match any list; tables
-   recurse. `extends` is the only key not in the schema and must be a list
+   `dotfiles/defaults.toml` at the same path, at any depth, with the same
+   type. `bool` and `int` are different types; lists match any list;
+   tables recurse. `extends` is the only key not in the schema and must be a list
    of strings. Errors name the file and the dotted key path:
    `hosts/hyper-lin.toml: features.nvidai: unknown key`.
 4. **Merge.** Tables merge recursively; scalars and lists are replaced by
-   the later file (same as chezmoi's `mergeOverwrite` today, so lists never
-   append).
-5. **Value checks carried over:** `secrets.backend` ∈ {`none`, `rbw`},
+   the later file, so lists never append.
+5. **Value checks:** `secrets.backend` ∈ {`none`, `rbw`},
    checked on the merged result.
-6. **Unknown host** (no `hosts/<name>.toml`): the defaults alone, like
-   today. Not an error.
+6. **Unknown host** (no `hosts/<name>.toml`): the defaults alone. Not an
+   error.
 
 The resolved config does not contain `extends`.
 
@@ -114,7 +113,7 @@ Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
 pyproject.toml           project, [project.scripts] dotfiles = "dotfiles.__main__:main"
 dotfiles/__main__.py     argparse CLI: config, check
 dotfiles/config.py       load, chain, validate, merge — pure functions over dicts and a root Path
-dotfiles/defaults.toml   schema (from ../__dotfiles/.chezmoidata/defaults.toml)
+dotfiles/defaults.toml   schema
 profiles/                base, server, laptop
 hosts/                   hyper-lin (extends laptop), echo-server (extends server)
 tests/test_config.py     unit tests on tmp_path fixtures + checks on the real data
@@ -125,8 +124,8 @@ Flat layout (no `src/`), so `python -m dotfiles` runs from a checkout
 without installing the package.
 
 Registries (`ssh-keys.toml`, `languages.toml`, `firefox.toml`,
-`vscode.json`) are not host config and move with the module that first
-reads them.
+`vscode.json`) are not host config; each lands in `data/` with the module
+that first reads it.
 
 ## Code Style
 
@@ -147,7 +146,7 @@ def resolve(root: Path, host: str) -> dict:
 - Errors are `ConfigError(message)` raised at the first problem inside a
   file; `check` collects them across hosts.
 - Type hints on public functions; ruff defaults, line length 100.
-- Comments say why, not what, same density as `../__dotfiles`.
+- Comments say why, not what.
 
 ## Testing Strategy
 
@@ -164,18 +163,17 @@ def resolve(root: Path, host: str) -> dict:
 ## Boundaries
 
 - **Always:** validate every file before merging; name file + key path in
-  errors; keep `dotfiles/defaults.toml` the single schema; run pytest and ruff
-  before each commit; update the spec when a decision changes.
+  errors; keep `dotfiles/defaults.toml` the single schema; run pytest and
+  ruff before each commit; update the spec when a decision changes.
 - **Ask first:** any runtime dependency beyond `tomli-w`; changing the merge
-  rule (e.g. list append); moving the old repo's data in a lossy way.
-- **Never:** touch `../__dotfiles`; push anything; write secrets; prompt
+  rule (e.g. list append).
+- **Never:** push anything; write secrets; prompt
   interactively in this module.
 
 ## Success Criteria
 
-1. `uv run dotfiles config --host hyper-lin` prints TOML equal to the old
-   repo's merged `[data]` for that host, minus `config_hash` (checked once
-   when the data was ported; no test keeps the old files).
+1. `uv run dotfiles config --host hyper-lin` prints that machine's whole
+   configuration as TOML: every key of the schema, with its resolved value.
 2. `hosts/hyper-lin.toml` extends `laptop` and holds only what differs from
    it; `echo-server` extends `server`; `laptop` and `server` extend `base`.
 3. `uv run dotfiles check` exits 0 on the repo data and 1 on each broken
@@ -187,14 +185,11 @@ def resolve(root: Path, host: str) -> dict:
 ## Decisions (were open questions)
 
 1. Output is TOML (`tomli-w`), not JSON.
-2. `echo-server` extends `server` and gains its features.
+2. `echo-server` extends `server`, so it has every server feature.
 3. `config --explain` is in this iteration.
 4. Profiles: `base` = package manager, locale, zsh, CLI tools, ssh agent;
    `server` = base + sshd, tailscale; `laptop` = base + luks_discard, swap,
    snapper, zram, bluetooth, fwupd + the desktop stack. Dev toolchains and
    personal apps stay in `hyper-lin`.
 5. Every feature is a table under `features` with `enabled` and its own
-   settings (was: `[features]` booleans plus a top-level table per
-   feature's settings).
-6. No test depends on the old repo's TOML files: the parity tests and their
-   fixtures were removed once the data was ported.
+   settings, so a feature's switch and its settings sit in one place.

@@ -1,18 +1,20 @@
 # dotfiles
 
-A Python rework of [`vlukyanets/dotfiles`](https://github.com/vlukyanets/dotfiles)
-(chezmoi + bash): the same machine description, driven by a tool of its
-own with Jinja2 templates. Work in progress — today it resolves host
-configuration, renders and deploys the dotfiles in `home/`, and runs
-`dotfiles apply` on Arch with one feature (`nobeep`); packages and the other
-features come next (see the [capability map](docs/spec/CAPABILITY-MAP.md)).
+Takes an Arch Linux machine from a fresh install to a configured one. A
+machine is a short TOML file that inherits from profiles; dotfiles are
+Jinja2 templates rendered with that configuration; features are Python
+classes that check the live system and change only what differs. Work in
+progress: today it resolves host configuration, renders and deploys the
+dotfiles in `home/`, and runs `dotfiles apply` on Arch with one feature
+(`nobeep`); packages and the other features come next (see the
+[capability map](docs/spec/CAPABILITY-MAP.md)).
 
 ## How a host is described
 
 ```
-dotfiles/defaults.toml every key, its type and its default; every feature off
-profiles/<name>.toml   base, server, laptop
-hosts/<hostname>.toml  one file per machine
+dotfiles/defaults.toml  every key, its type and its default; every feature off
+profiles/<name>.toml    base, server, laptop
+hosts/<hostname>.toml   one file per machine
 ```
 
 A host or profile sets only what differs and may inherit:
@@ -29,9 +31,9 @@ size    = "20g"
 ```
 
 Tables merge; values and arrays are replaced. A shared ancestor is merged
-once. Every file is checked against `dotfiles/defaults.toml`: an unknown key or a
-value of another type fails naming the file and the key. A machine with no
-file in `hosts/` gets the defaults. The rules in full:
+once. Every file is checked against `dotfiles/defaults.toml`: an unknown
+key or a value of another type fails naming the file and the key. A machine
+with no file in `hosts/` gets the defaults. The rules in full:
 [SPEC-config](docs/spec/SPEC-config.md).
 
 ## Running it

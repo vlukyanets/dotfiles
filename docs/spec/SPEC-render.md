@@ -5,10 +5,9 @@ Status: approved 2026-09-23. Module of the
 
 ## Objective
 
-Replace chezmoi's part that writes files into `$HOME`: the dotfiles of
-`../__dotfiles` (plain files, Go templates, two `modify_` merges, gates in
-`.chezmoiignore.tmpl`) become a `home/` tree of plain files and Jinja2
-templates, rendered with the resolved host config.
+Write the dotfiles into `$HOME`: a `home/` tree of plain files and Jinja2
+templates, rendered with the resolved host config, with modes and gates in
+one manifest.
 
 Two commands:
 
@@ -19,8 +18,8 @@ Two commands:
   prints nothing when `$HOME` already matches.
 
 Out of scope: provisioning (features, packages, root files — `engine`,
-`features`), removing files, the registries only scripts read
-(`firefox.toml`, `vscode.json` move with their features).
+`features`), removing files, the registries only features read
+(`firefox.toml`, `vscode.json` come with their features).
 
 ## Tech Stack
 
@@ -28,20 +27,20 @@ Out of scope: provisioning (features, packages, root files — `engine`,
   like `tomli-w` (no system Python packages).
 - Everything else stdlib: `tomllib`, `pathlib`, `os`, `re`, `tempfile`.
 
-## Mapping from chezmoi
+## The home tree
 
-| chezmoi | here |
+| To get | write |
 |---|---|
-| `dot_foo`, `dot_config/` | real names: `home/.foo`, `home/.config/` |
-| `*.tmpl` (Go template) | `*.j2` (Jinja2); the suffix is dropped on output |
-| `private_` (0600 file / 0700 dir) | `mode = "600"` / `"700"` in `home.toml` |
-| `executable_` | `mode = "755"` in `home.toml` |
-| `.chezmoiignore.tmpl` gates | `when = "<jinja expression>"` in `home.toml` |
-| `modify_` + `chezmoi:modify-template` | an ordinary `.j2` that reads `current` (the file as it is in `$HOME`) |
-| `.chezmoidata/ssh-keys.toml`, `languages.toml` | `data/ssh-keys.toml`, `data/languages.toml` |
-| `.chezmoi.homeDir`, `.chezmoi.uid` | `home`, `uid` |
-| `fail "…"` in a template | `{{ fail("…") }}` (a global that raises) |
-| sprig `fromToml` / `toToml` / `merge` / `regexFind` | filters `from_toml`, `to_toml`, `merge_over`, `regex_search` |
+| a dotfile | the file at its real path: `home/.zshrc`, `home/.config/…` |
+| a template | `*.j2` (Jinja2); the suffix is dropped on output |
+| a private file or directory | `mode = "600"` / `"700"` in `home.toml` |
+| an executable | `mode = "755"` in `home.toml` |
+| a file only some hosts get | `when = "<jinja expression>"` in `home.toml` |
+| a file an application also rewrites | an ordinary `.j2` that reads `current` (the file as it is in `$HOME`) |
+| a lookup table | `data/ssh-keys.toml`, `data/languages.toml` |
+| the home directory, the user id | `home`, `uid` |
+| a template error | `{{ fail("…") }}` (a global that raises) |
+| TOML in and out, deep merge, regex | filters `from_toml`, `to_toml`, `merge_over`, `regex_search` |
 
 ## The manifest: `home.toml`
 
@@ -100,8 +99,8 @@ The two files an application rewrites itself stay templates; they read
 - `.config/fcitx5/profile.j2`: DefaultIM carried over from `current` when
   it is still one of the listed input methods.
 
-`to_toml` is tomli-w, not chezmoi's go-toml: the noctalia file is rewritten
-once into tomli-w's layout on the first deploy, then stable. Accepted.
+`to_toml` is tomli-w: the first deploy rewrites noctalia's file into
+tomli-w's layout once; from then on it is stable.
 
 ## Deploy
 
@@ -114,8 +113,7 @@ For each rendered path, in order:
    `-> ~/.zshrc (content differs)` / `(missing)` / `(mode 644)`.
 3. Otherwise nothing.
 
-- Never deletes. A gated-off path is left as it is (same as chezmoi with
-  `.chezmoiignore`).
+- Never deletes. A gated-off path is left as it is.
 - Never writes outside `$HOME`; a symlink on the way that leaves `$HOME`
   fails the deploy.
 - `--dry-run` prints the same lines and writes nothing.
@@ -136,7 +134,7 @@ uv run dotfiles check        # now also renders every host into a temp dir
 ```
 home/                  the dotfiles, real names, *.j2 for templates
 home.toml              modes and gates
-data/                  ssh-keys.toml, languages.toml (moved from .chezmoidata/)
+data/                  ssh-keys.toml, languages.toml
 dotfiles/render.py     context, Jinja2 env and filters, render(), deploy()
 tests/test_render.py   fixture trees in tmp_path; deploy against the tmp HOME
 ```
@@ -162,11 +160,9 @@ the message, comments on why.
 - Deploy (tmp `HOME` from `conftest.py`): first run writes and reports,
   second run silent; mode drift fixed; `--dry-run` writes nothing; symlink
   escaping `$HOME` refused.
-- Real data: `check` renders hyper-lin, echo-server and an unknown host.
-- Porting is checked by reading: each template is rewritten in idiomatic
-  Jinja2 from its Go source in `../__dotfiles`, and tests pin what the
-  templates with logic (loops, gates, registries) produce for the real
-  hosts. chezmoi is not run, and its exact output is not a goal.
+- Real data: `check` renders hyper-lin, echo-server and an unknown host;
+  tests pin what the templates with logic (loops, gates, registries)
+  produce for the real hosts.
 
 ## Boundaries
 
@@ -174,29 +170,26 @@ the message, comments on why.
   host (`check`); write via temp + rename.
 - **Ask first:** a third runtime dependency; deleting files on deploy;
   moving a file out of `home/` into a feature.
-- **Never:** write outside `$HOME`; touch `../__dotfiles`; follow a symlink
-  out of `$HOME`.
+- **Never:** write outside `$HOME`; follow a symlink out of `$HOME`.
 
 ## Success Criteria
 
-1. Every dotfile of `../__dotfiles` has its counterpart under `home/`, with
-   the same gate and mode; templates are idiomatic Jinja2 with the same
-   meaning as their Go source (what is included when, which values), not
-   chezmoi's exact whitespace.
-2. On hyper-lin the first `dotfiles deploy` may rewrite ported files once;
-   after it, `deploy --dry-run` prints nothing.
+1. Every file under `home/` renders for every host (`check`), with the
+   mode and gate `home.toml` gives it.
+2. On hyper-lin, after one `dotfiles deploy`, `deploy --dry-run` prints
+   nothing.
 3. `check`, pytest, ruff green locally and in CI.
 
 ## Decisions
 
-1. A feature turned off leaves its dotfiles in place, as today. Removing
+1. A feature turned off leaves its dotfiles in place. Removing
    what was deployed can come later; it needs a record of what was written.
 2. Prerequisites on a fresh machine are git, python and uv. The tool runs
    from the checkout with `uv run dotfiles …`; runtime dependencies come
    from `uv.lock`, not from system packages.
 3. Modes and gates live in the `home.toml` manifest; files keep their real
-   names. Chosen over chezmoi-style name attributes (two mechanisms, a name
+   names. Chosen over encoding them in file names (two mechanisms, a name
    parser) and over one directory per feature (commits `features` to a
    layout before its spec).
-4. Templates are idiomatic Jinja2; chezmoi's exact output (Go `{{-`
-   whitespace, blank-line quirks, header comments) is not reproduced.
+4. Whitespace is handled once, by `trim_blocks` and `lstrip_blocks`, not
+   with `{%-` on each tag: a template reads like the file it produces.

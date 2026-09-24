@@ -62,8 +62,7 @@ def environment(home: Path) -> jinja2.Environment:
         autoescape=False,
     )
     env.globals["fail"] = fail
-    # Go's %q, which chezmoi's templates used: a double-quoted string that is
-    # also valid TOML and JSON.
+    # A double-quoted string that is also valid TOML and JSON.
     env.filters["quote"] = lambda s: json.dumps(str(s), ensure_ascii=False)
     # Ansible's extract: names | map("extract", registry) looks each name up.
     env.filters["extract"] = lambda key, container: container[key]
