@@ -213,7 +213,8 @@ class Arch(Linux):  # arch.py
     gsettings.
   - `ensure_group_member`: read from the group database (`grp`), not
     `id -nG`, which changes only at the next login; adds a notice to log
-    out and back in.
+    out and back in. A group that does not exist is an error, except in
+    a dry run: its package, which a dry run does not install, brings it.
 - `Arch.depends` answers from the sync database without root and caches
   per apply.
 

@@ -114,6 +114,11 @@ def test_ensure_group_member(system, arch, capsys, monkeypatch):
     assert arch.ensure_group_member("docker") is False
     with pytest.raises(Failed, match="^group nope does not exist$"):
         arch.ensure_group_member("nope")
+    # A dry run installs nothing, so the package that brings the group has not yet.
+    monkeypatch.setattr(engine, "DRY_RUN", True)
+    capsys.readouterr()
+    assert arch.ensure_group_member("nope") is True
+    assert capsys.readouterr().out == f"-> added {me} to group nope\n"
 
 
 def test_arch_missing(system, arch):
