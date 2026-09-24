@@ -15,6 +15,7 @@ how a feature behaves today, never edit it.
 | One host, with sources | `uv run dotfiles config --host <name> --explain` |
 | A host's home tree | `uv run dotfiles render --host <name> --out <empty dir>` |
 | Dotfiles into `$HOME` | `uv run dotfiles deploy --dry-run`, then without the flag |
+| Features + dotfiles | `uv run dotfiles apply --dry-run`, then without the flag |
 
 CI (`.github/workflows/ci.yml`) runs the first three on every push to
 master and every PR; uv is pinned there by version and sha256.
@@ -30,6 +31,13 @@ master and every PR; uv is pinned there by version and sha256.
 - Registries: `data/*.toml` (ssh keys, languages), merged into the template
   context; the names a host takes from them are checked in
   `render.registries` (`REFERENCES`).
+- Helpers the same on every system: `dotfiles/engine.py`. What differs
+  between systems: `dotfiles/platforms/<os-release ID>.py` (`Arch` on
+  `Linux` on `Platform`).
+- Features: `dotfiles/features/<name>.py`, one `Feature` subclass each; its
+  nested classes (`Arch`, `Linux`, …) are the strategies `apply` receives,
+  with the packages for that platform. The name gates it; the order comes
+  from the package graph (`dotfiles/apply.py`). Nothing else is declared.
 - Why: `docs/spec/SPEC-<module>.md`, then `docs/spec/CAPABILITY-MAP.md`.
 
 ## Commits and branches
@@ -44,10 +52,14 @@ master and every PR; uv is pinned there by version and sha256.
 
 - `type(v) is type(want)`, not `isinstance`: TOML `true` would pass as an
   integer otherwise.
-- Every test runs with `HOME` and the XDG directories in pytest's temp dir
-  and `SUDO_CMD=false` (`tests/conftest.py`, autouse). Code that goes to
-  root must read `SUDO_CMD` (default `sudo`), as `lib.sh` did, so a test
-  can never prompt for a password or change the machine.
+- Every test runs with `HOME` and the XDG directories in pytest's temp dir,
+  `engine.SYSROOT` in a temp dir and `SUDO_CMD=false` (`tests/conftest.py`,
+  autouse). Root goes only through `run` inside `with as_root():`, which
+  reads `SUDO_CMD`, so a test can never prompt for a password or change
+  the machine.
+- A feature mutates only through an `ensure_*` helper, a platform method or
+  `run`: they respect dry run and `SYSROOT`. Commands are argv lists, never a
+  shell; tests fake commands by replacing `engine._run`, not with scripts.
 - Porting a Go template: write idiomatic Jinja2 with the same meaning, not
   chezmoi's exact output. A tag alone on its line vanishes with its newline
   (trim_blocks, lstrip_blocks). Booleans print as `True` in Jinja: write
