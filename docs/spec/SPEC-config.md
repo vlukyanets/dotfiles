@@ -1,6 +1,6 @@
 # Spec: `config` — host configuration with inheritance
 
-Status: approved 2026-09-23. Module of the
+Status: approved 2026-09-23; machine config approved 2026-09-24. Module of the
 [capability map](CAPABILITY-MAP.md).
 
 ## Objective
@@ -86,14 +86,53 @@ Resolution for host `H`:
 
 The resolved config does not contain `extends`.
 
+## Machine config
+
+A machine runs from its own copy of the resolved config, not from the
+repository's `hosts/`:
+
+- **Where:** `$XDG_CONFIG_HOME/dotfiles/config.toml`
+  (`~/.config/dotfiles/config.toml`).
+- **What:** effective values only. It is the full resolved config of one
+  host (every key of the schema, inherited and computed values included),
+  the same TOML `dotfiles config --host NAME` prints. There is no `extends`
+  in it, and no scripts, templates or registries: those stay in the checkout.
+- **Written by `dotfiles init [NAME]`**, which creates or overwrites the file
+  with the resolved config of host NAME (default: this machine's
+  hostname) from `hosts/` of the checkout, or of `--source PATH`. It prints
+  `-> ~/.config/dotfiles/config.toml (missing | content differs)`, or
+  `nothing to change` when the file already holds exactly that. A header
+  comment names the host and the checkout it came from.
+- **Read by `apply`, `deploy`, `config` and `render`.** The file is
+  validated against the schema like any host file (an unknown key or a
+  wrong type fails with the file and key named) and merged over
+  `defaults.toml`, so a key added to the schema later gets its default until
+  the next `init`.
+- **Missing file:** `error: no ~/.config/dotfiles/config.toml — run dotfiles
+  init <host>, or pass --source <checkout>`, exit 1. Nothing falls back to
+  defaults.
+- **`--source PATH`** (on `apply`, `deploy`, `config`, `render`, `init`,
+  `check`) reads the config from the checkout at PATH instead of
+  `~/.config/dotfiles`: `hosts/<name>.toml` there with everything it
+  extends, as before. The name is `--host` where the command has it,
+  else the hostname. `--host NAME` without `--source` means `--source`
+  of the checkout the tool runs from. Templates, `home.toml` and `data/`
+  always come from the checkout the tool runs from.
+- **`check`** resolves and renders every host in `hosts/` as before, plus
+  `~/.config/dotfiles/config.toml` when it exists (listed as `local`).
+- `hosts/` stays in the repository: it is what `init` reads, and CI checks it.
+
 ## Commands
 
 ```
 uv sync                                           # .venv/: runtime dependencies only
-uv run --exact dotfiles config                    # this machine (socket.gethostname())
-uv run --exact dotfiles config --host hyper-lin   # any host, TOML on stdout
+uv run --exact dotfiles init                      # ~/.config/dotfiles/config.toml from hosts/<hostname>.toml
+uv run --exact dotfiles init vm-box               # ... from hosts/vm-box.toml; overwrites the file
+uv run --exact dotfiles config                    # this machine, from ~/.config/dotfiles/config.toml
+uv run --exact dotfiles config --source .         # this machine, from hosts/<hostname>.toml of the checkout at .
+uv run --exact dotfiles config --host hyper-lin   # any host of this checkout, TOML on stdout
 uv run --exact dotfiles config --host hyper-lin --explain # every leaf as a dotted key, with the file it came from
-uv run --isolated dotfiles check                  # every host in hosts/ + one unknown host; exit 1 on any error, all errors listed
+uv run --isolated dotfiles check                  # every host in hosts/ + one unknown host (+ local); exit 1 on any error, all errors listed
 uv run --isolated --group dev pytest              # verification: a throwaway environment, .venv/ untouched
 uv run --isolated --group dev ruff check . && uv run --isolated --group dev ruff format --check .
 python -m dotfiles config                         # same, without uv (bootstrap path)
@@ -197,3 +236,8 @@ def resolve(root: Path, host: str) -> dict:
    personal apps stay in `hyper-lin`.
 5. Every feature is a table under `features` with `enabled` and its own
    settings, so a feature's switch and its settings sit in one place.
+6. **The machine keeps its own resolved config** in
+   `~/.config/dotfiles/config.toml`, written by `init`: a later change in
+   `hosts/` or `profiles/` reaches the machine only through the next `init`,
+   and what the machine runs with is one file to read. `--source PATH` reads
+   a checkout instead.
