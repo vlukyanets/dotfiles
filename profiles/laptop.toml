@@ -13,6 +13,7 @@ bluetooth.enabled    = true
 fwupd.enabled        = true
 # desktop
 niri.enabled         = true
+niri.numlock         = true
 noctalia.enabled     = true
 greetd.enabled       = true
 fcitx5.enabled       = true

@@ -345,6 +345,8 @@ feature configures it after the install), so that apply takes no pair.
     gnome-themes-extra.
   - gsettings `color-scheme 'prefer-dark'` and `gtk-theme
     'Adwaita-dark'`.
+  - `numlock`: `~/.config/niri/config.kdl` turns Num Lock on at login;
+    off by default, on in the `laptop` profile, off again in `vm`.
 - **`greetd`**
   - The greeter's packages:
     - `tuigreet` → greetd-tuigreet, command `tuigreet --remember

@@ -8,3 +8,4 @@ luks_discard.enabled = false
 bluetooth.enabled    = false
 fwupd.enabled        = false
 swap.enabled         = false
+niri.numlock         = false

@@ -119,6 +119,9 @@ def test_niri_and_layouts(homes):
     assert '    QT_QPA_PLATFORM "wayland"\n    // No GTK_IM_MODULE' in niri
     assert '    XMODIFIERS "@im=fcitx"\n    WAYLAND_DISPLAY' in niri
     assert 'layout "us,ru,ua,cn"' in niri
+    assert (
+        "        }\n\n        numlock\n    }\n\n    touchpad {" in niri
+    )  # laptop: features.niri.numlock
     assert 'spawn-at-startup "fcitx5" "-d"\n\nhotkey-overlay' in niri
     switch = homes["hyper-lin"] / ".config/niri/switch-layout.sh"
     assert 'FCITX5_IMS=("keyboard-us" "keyboard-ru" "keyboard-ua" "pinyin")\n' in switch.read_text()
