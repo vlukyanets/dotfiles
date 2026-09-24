@@ -122,11 +122,11 @@ For each rendered path, in order:
 ## Commands
 
 ```
-uv run dotfiles render --host hyper-lin --out /tmp/home-hyper-lin
-uv run dotfiles render --host hyper-lin --out DIR --current ~   # with merges from the real files
-uv run dotfiles deploy --dry-run
-uv run dotfiles deploy
-uv run dotfiles check        # now also renders every host into a temp dir
+uv run --exact dotfiles render --host hyper-lin --out /tmp/home-hyper-lin
+uv run --exact dotfiles render --host hyper-lin --out DIR --current ~   # with merges from the real files
+uv run --exact dotfiles deploy --dry-run
+uv run --exact dotfiles deploy
+uv run --isolated dotfiles check        # now also renders every host into a temp dir
 ```
 
 ## Project Structure

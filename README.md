@@ -44,23 +44,30 @@ system Python.
 
     git clone git@github.com:vlukyanets/dotfiles.git && cd dotfiles
     uv sync --locked            # creates .venv/ here, installs uv.lock into it
-    uv run dotfiles check
+    uv run --isolated dotfiles check
 
-`uv run` always uses the project's `.venv/` (creating and syncing it first
-when needed), with the system python only as the interpreter it was built
-from. `uv run --locked …` refuses to start if `uv.lock` is out of date
-instead of updating it. After `uv sync`, `.venv/bin/dotfiles` works without
-uv too.
+Two environments, both built by uv from `uv.lock`:
+
+- `.venv/` runs the tool and holds its runtime dependencies only (the dev
+  group is not a default one). `uv run --exact dotfiles …` syncs it first
+  and removes anything else found there. After `uv sync`,
+  `.venv/bin/dotfiles` works without uv too.
+- Verification (tests, lint, `check`) runs with `uv run --isolated`: a
+  throwaway environment per run, with the dev group added by
+  `--group dev`; `.venv/` is not touched.
+
+`uv run --locked …` refuses to start if `uv.lock` is out of date instead
+of updating it.
 
 ## Commands
 
-    uv run dotfiles config                            # this machine, as TOML
-    uv run dotfiles config --host hyper-lin --explain # each key with the file it came from
-    uv run dotfiles render --host hyper-lin --out DIR # a host's home tree, into an empty DIR
-    uv run dotfiles deploy --dry-run                  # what would change in $HOME
-    uv run dotfiles deploy                            # write it
-    uv run dotfiles apply --dry-run                   # features + dotfiles: what would change, no sudo
-    uv run dotfiles apply                             # this machine, silent when it already matches
-    uv run dotfiles check                             # every host resolves and renders
-    uv run pytest
-    uv run ruff check . && uv run ruff format --check .
+    uv run --exact dotfiles config                            # this machine, as TOML
+    uv run --exact dotfiles config --host hyper-lin --explain # each key with the file it came from
+    uv run --exact dotfiles render --host hyper-lin --out DIR # a host's home tree, into an empty DIR
+    uv run --exact dotfiles deploy --dry-run                  # what would change in $HOME
+    uv run --exact dotfiles deploy                            # write it
+    uv run --exact dotfiles apply --dry-run                   # features + dotfiles: what would change, no sudo
+    uv run --exact dotfiles apply                             # this machine, silent when it already matches
+    uv run --isolated dotfiles check                          # every host resolves and renders
+    uv run --isolated --group dev pytest
+    uv run --isolated --group dev ruff check . && uv run --isolated --group dev ruff format --check .

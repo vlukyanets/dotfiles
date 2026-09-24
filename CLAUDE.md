@@ -7,13 +7,13 @@ holds the capability map and the module specs that drive the work.
 
 | Task | Command |
 |---|---|
-| Tests | `uv run pytest` |
-| Lint and format | `uv run ruff check . && uv run ruff format --check .` |
-| Every host resolves | `uv run dotfiles check` |
-| One host, with sources | `uv run dotfiles config --host <name> --explain` |
-| A host's home tree | `uv run dotfiles render --host <name> --out <empty dir>` |
-| Dotfiles into `$HOME` | `uv run dotfiles deploy --dry-run`, then without the flag |
-| Features + dotfiles | `uv run dotfiles apply --dry-run`, then without the flag |
+| Tests | `uv run --isolated --group dev pytest` |
+| Lint and format | `uv run --isolated --group dev ruff check . && uv run --isolated --group dev ruff format --check .` |
+| Every host resolves | `uv run --isolated dotfiles check` |
+| One host, with sources | `uv run --exact dotfiles config --host <name> --explain` |
+| A host's home tree | `uv run --exact dotfiles render --host <name> --out <empty dir>` |
+| Dotfiles into `$HOME` | `uv run --exact dotfiles deploy --dry-run`, then without the flag |
+| Features + dotfiles | `uv run --exact dotfiles apply --dry-run`, then without the flag |
 
 CI (`.github/workflows/ci.yml`) runs the first three on every push to
 master and every PR; uv is pinned there by version and sha256.

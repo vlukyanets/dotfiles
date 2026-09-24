@@ -155,8 +155,8 @@ tests/test_apply.py          replaces reach install, only when something is miss
 ## Commands
 
 ```
-uv run pytest tests/test_platforms.py
-uv run dotfiles apply --dry-run     # on hyper-lin: setup's files and the missing packages, no sudo
+uv run --isolated --group dev pytest tests/test_platforms.py
+uv run --exact dotfiles apply --dry-run     # on hyper-lin: setup's files and the missing packages, no sudo
 ```
 
 ## Code Style
