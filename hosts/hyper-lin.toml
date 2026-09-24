@@ -70,10 +70,6 @@ font         = "FiraCode Nerd Font Propo"
 theme_source = "community"
 theme_name   = "Cyberpunk"
 
-# noctalia-greeter comes from the AUR.
-[features.greetd]
-greeter = "noctalia-greeter"
-
 [features.fcitx5]
 cloudpinyin         = true
 cloudpinyin_backend = "Google"

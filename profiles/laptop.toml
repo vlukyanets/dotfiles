@@ -16,6 +16,7 @@ niri.enabled         = true
 niri.numlock         = true
 noctalia.enabled     = true
 greetd.enabled       = true
+greetd.greeter       = "noctalia-greeter"  # AUR
 fcitx5.enabled       = true
 fonts.enabled        = true
 nerd_font.enabled    = true
