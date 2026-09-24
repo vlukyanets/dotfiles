@@ -6,15 +6,14 @@ from dotfiles import engine
 from dotfiles.engine import (
     Deferred,
     Failed,
-    Skip,
+    RetryPolicy,
     as_root,
     defer,
     die,
     notice,
-    os_guard,
     output,
     print_notices,
-    retry,
+    retrying,
     run,
 )
 
@@ -48,16 +47,31 @@ def fake(monkeypatch) -> Fake:
 
 def test_as_root_prefix(fake, monkeypatch):
     monkeypatch.setenv("SUDO_CMD", "sudo -n")
-    as_root("true")
+    run("true")
+    with as_root():
+        run("true")
+        with as_root():
+            run("true")
+        run("true", cwd="/")
+        output("check")  # checks never get root
+    run("true")
     monkeypatch.setenv("DOTFILES_SNAPPER_STATE", "/run/x")
-    as_root("true")
+    with as_root():
+        run("true")
     monkeypatch.setenv("SUDO_CMD", "")
-    as_root("true")
+    with as_root():
+        run("true")
     monkeypatch.setattr(engine.os, "geteuid", lambda: 0)
     monkeypatch.setenv("SUDO_CMD", "sudo")
-    as_root("true")
+    with as_root():
+        run("true")
     assert fake.calls == [
+        ["true"],
         ["sudo", "-n", "true"],
+        ["sudo", "-n", "true"],
+        ["sudo", "-n", "true"],
+        ["check"],
+        ["true"],
         ["sudo", "-n", "--preserve-env=SNAP_PAC_SKIP,DOTFILES_SNAPPER_STATE", "true"],
         ["true"],
         ["true"],
@@ -65,8 +79,8 @@ def test_as_root_prefix(fake, monkeypatch):
 
 
 def test_sudo_from_conftest_fails():
-    with pytest.raises(subprocess.CalledProcessError):
-        as_root("true")
+    with pytest.raises(subprocess.CalledProcessError), as_root():
+        run("true")
 
 
 def test_mutations_must_succeed(fake):
@@ -77,7 +91,8 @@ def test_mutations_must_succeed(fake):
 
 def test_dry_run_runs_nothing(fake, monkeypatch):
     monkeypatch.setattr(engine, "DRY_RUN", True)
-    as_root("rm", "-rf", "/")
+    with as_root():
+        run("rm", "-rf", "/")
     run("touch", "x")
     assert fake.calls == []
 
@@ -88,35 +103,47 @@ def test_output():
     assert output("no-such-command-here") is None
 
 
-def test_retry(monkeypatch, capsys):
+def test_retry_policy_waits():
+    assert [RetryPolicy().wait(n) for n in (1, 2, 3, 4)] == [10, 20, 40, 60]
+    assert RetryPolicy(delay=1, backoff=3, max_delay=5).wait(3) == 5
+
+
+def test_retrying_repeats_the_whole_block(fake, monkeypatch, capsys):
     slept = []
     monkeypatch.setattr(engine, "sleep", slept.append)
-    attempts = []
+    fake.answers[("git", "clone", "u")] = (1, "")
+    passes = []
+    with pytest.raises(subprocess.CalledProcessError):
+        for attempt in retrying():
+            with attempt:
+                passes.append("mktemp")
+                run("git", "clone", "u")
+    assert passes == ["mktemp"] * 3 and slept == [10, 20]
+    assert capsys.readouterr().err == (
+        "warning: git clone u failed (attempt 1/3), retrying in 10s\n"
+        "warning: git clone u failed (attempt 2/3), retrying in 20s\n"
+    )
 
-    def flaky(n):
-        attempts.append(n)
-        if len(attempts) < n:
-            raise subprocess.CalledProcessError(1, "x")
+    fake.calls.clear()
+    for attempt in retrying(RetryPolicy(attempts=5, delay=0)):
+        with attempt:
+            run("git", "clone", "u" if len(fake.calls) < 2 else "v")
+    assert fake.calls == [["git", "clone", "u"], ["git", "clone", "u"], ["git", "clone", "v"]]
 
-    assert retry(flaky, 2) is True
-    assert attempts == [2, 2] and slept == [10]
-    attempts.clear()
-    assert retry(flaky, 9) is False
-    assert len(attempts) == 3 and slept == [10, 10, 20]
-    assert "warning: 9 failed (attempt 2/3), retrying in 20s" in capsys.readouterr().err
+    passes.clear()
+    with pytest.raises(ValueError):  # not in retry_on: no second attempt
+        for attempt in retrying(RetryPolicy(delay=0)):
+            with attempt:
+                passes.append(1)
+                raise ValueError
+    assert passes == [1]
 
 
-def test_die_defer_os_guard(monkeypatch):
+def test_die_and_defer():
     with pytest.raises(Failed, match="^boom$"):
         die("boom")
     with pytest.raises(Deferred, match="^net$"):
         defer("net")
-    release = {"ID": "cachyos", "ID_LIKE": "arch"}
-    monkeypatch.setattr(engine.platform, "freedesktop_os_release", lambda: release)
-    os_guard("arch")
-    os_guard("darwin", "linux")
-    with pytest.raises(Skip):
-        os_guard("darwin", "debian")
 
 
 def test_notices_now_and_at_the_end(capsys):

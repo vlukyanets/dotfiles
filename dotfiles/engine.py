@@ -1,8 +1,9 @@
-"""The helpers features are written with: the port of the old lib.sh.
+"""The helpers features are written with.
 
 Every check reads live state without root; every mutation goes through a
-helper, `run` or `as_root`, and each of them does nothing on a dry run. That
-is what keeps a clean apply silent and free of sudo prompts.
+helper or `run` (as root inside `with as_root():`), and each of them does
+nothing on a dry run. That is what keeps a clean apply silent and free of
+sudo prompts.
 """
 
 import grp
@@ -15,6 +16,9 @@ import stat
 import subprocess
 import sys
 import tempfile
+from contextlib import contextmanager, nullcontext
+from contextvars import ContextVar
+from dataclasses import dataclass
 from pathlib import Path
 from time import sleep
 
@@ -98,10 +102,26 @@ def output(*cmd: str) -> str | None:
         return None
 
 
-def run(*cmd: str) -> None:
-    """A mutation as the current user; must succeed. Nothing on a dry run."""
+# Set inside `with as_root():`; read by run().
+_root: ContextVar[bool] = ContextVar("root", default=False)
+
+
+@contextmanager
+def as_root():
+    """Every run() in the block runs as root, through sudo, which prompts on
+    its own when its timestamp has expired. Checks (output()) never do."""
+    token = _root.set(True)
+    try:
+        yield
+    finally:
+        _root.reset(token)
+
+
+def run(*cmd: str, **kwargs) -> None:
+    """A mutation, as the user or inside as_root() as root; must succeed.
+    Nothing on a dry run."""
     if not DRY_RUN:
-        _run(list(cmd), check=True)
+        _run([*(_sudo() if _root.get() else []), *cmd], check=True, **kwargs)
 
 
 def _sudo() -> list[str]:
@@ -115,28 +135,58 @@ def _sudo() -> list[str]:
     return sudo
 
 
-def as_root(*cmd: str) -> None:
-    """A mutation as root, through sudo, which prompts on its own when its
-    timestamp has expired; must succeed. Nothing on a dry run."""
-    if not DRY_RUN:
-        _run([*_sudo(), *cmd], check=True)
+@dataclass(frozen=True)
+class RetryPolicy:
+    attempts: int = 3  # in total, the first one included
+    delay: float = 10  # seconds before the second attempt
+    backoff: float = 2  # each next delay is the previous one times this
+    max_delay: float = 60  # no single wait longer than this
+    retry_on: tuple[type[Exception], ...] = (subprocess.CalledProcessError, OSError)
+
+    def wait(self, attempt: int) -> float:
+        """Seconds to wait after failed attempt number ATTEMPT."""
+        return min(self.delay * self.backoff ** (attempt - 1), self.max_delay)
 
 
-def retry(fn, *args) -> bool:
-    """fn(*args) up to three times, 10 s and 20 s apart, for anything that
-    goes to the network. False when the last attempt fails too."""
-    attempt = 1
-    while True:
-        try:
-            fn(*args)
-            return True
-        except (subprocess.CalledProcessError, OSError):
-            if attempt == 3:
-                return False
-            what = " ".join(map(str, args))
-            warn(f"{what} failed (attempt {attempt}/3), retrying in {attempt * 10}s")
-            sleep(attempt * 10)
-            attempt += 1
+# For anything that goes to the network: 3 attempts, 10 s then 20 s apart.
+NETWORK = RetryPolicy()
+
+
+class Attempt:
+    """One pass of a retrying() loop: `with attempt:` swallows a failure
+    that POLICY retries, unless it is the last attempt."""
+
+    def __init__(self, policy: RetryPolicy, number: int):
+        self.policy = policy
+        self.number = number
+        self.failed = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, kind, error, traceback) -> bool:
+        if error is None or not isinstance(error, self.policy.retry_on):
+            return False
+        if self.number == self.policy.attempts:
+            return False
+        what = error.cmd if isinstance(error, subprocess.CalledProcessError) else None
+        what = " ".join(map(str, what)) if isinstance(what, list) else str(error)
+        wait = self.policy.wait(self.number)
+        warn(f"{what} failed (attempt {self.number}/{self.policy.attempts}), retrying in {wait:g}s")
+        sleep(wait)
+        self.failed = True
+        return True
+
+
+def retrying(policy: RetryPolicy = NETWORK):
+    """`for attempt in retrying(): with attempt: ...`: the block again, from
+    the top, until it succeeds or POLICY's attempts run out; the last
+    failure propagates. A with block runs once, hence the loop."""
+    for number in range(1, policy.attempts + 1):
+        attempt = Attempt(policy, number)
+        yield attempt
+        if not attempt.failed:
+            return
 
 
 def _path(path) -> Path:
@@ -194,12 +244,12 @@ def ensure_file(dst, content: str | bytes, mode: int = 0o644, owner: str | None 
         return False
     if not DRY_RUN:
         me = pwd.getpwuid(os.geteuid()).pw_name
-        mutate = as_root if (owner and user != me) or not _writable(real) else run
-        with tempfile.TemporaryDirectory() as tmp:
+        root = (owner and user != me) or not _writable(real)
+        with tempfile.TemporaryDirectory() as tmp, as_root() if root else nullcontext():
             src = Path(tmp) / "content"
             src.write_bytes(data)
             opts = ["-o", user, "-g", group] if owner else []
-            mutate("install", "-D", "-m", f"{mode:o}", *opts, str(src), str(real))
+            run("install", "-D", "-m", f"{mode:o}", *opts, str(src), str(real))
     changed(f"{dst} ({why})")
     return True
 
@@ -212,8 +262,8 @@ def ensure_symlink(target, link) -> bool:
             return False
     except OSError:
         pass
-    mutate = run if _writable(real) else as_root
-    mutate("ln", "-sfn", str(target), str(real))
+    with nullcontext() if _writable(real) else as_root():
+        run("ln", "-sfn", str(target), str(real))
     changed(f"{link} -> {target}")
     return True
 
@@ -239,15 +289,16 @@ def ensure_service(unit: str, user: bool = False) -> bool:
     """UNIT is enabled and active; static units (no [Install]) are only
     started. USER: the user's systemd, no root."""
     scope = ["--user"] if user else []
-    mutate = run if user else as_root
     enabled = output("systemctl", *scope, "is-enabled", unit) or ""
     active = output("systemctl", *scope, "is-active", unit) or ""
     if enabled in ("enabled", "static", "alias", "indirect"):
         if active == "active":
             return False
-        mutate("systemctl", *scope, "start", unit)
+        verb = ["start"]
     else:
-        mutate("systemctl", *scope, "enable", "--now", unit)
+        verb = ["enable", "--now"]
+    with nullcontext() if user else as_root():
+        run("systemctl", *scope, *verb, unit)
     changed(f"{unit} enabled and started (was {enabled}/{active})")
     return True
 
@@ -259,7 +310,8 @@ def ensure_sysctl(key: str, value) -> bool:
     )
     if output("sysctl", "-n", key) == str(value):
         return edited
-    as_root("sysctl", "-qw", f"{key}={value}")
+    with as_root():
+        run("sysctl", "-qw", f"{key}={value}")
     changed(f"sysctl {key} = {value}")
     return True
 
@@ -285,7 +337,8 @@ def ensure_group_member(group: str) -> bool:
         die(f"group {group} does not exist")
     if me.pw_name in entry.gr_mem or me.pw_gid == entry.gr_gid:
         return False
-    as_root("usermod", "-aG", group, me.pw_name)
+    with as_root():
+        run("usermod", "-aG", group, me.pw_name)
     changed(f"added {me.pw_name} to group {group}")
     notice(f"added to group {group} — log out and back in for it to take effect")
     return True
