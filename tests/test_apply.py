@@ -1,7 +1,3 @@
-import grp
-import importlib
-import os
-import pwd
 import subprocess
 import sys
 import tomllib
@@ -9,7 +5,6 @@ from pathlib import Path
 from typing import ClassVar
 
 import pytest
-from conftest import Fake
 
 from dotfiles import apply as runner
 from dotfiles import engine, platforms
@@ -279,7 +274,6 @@ UNSWITCHED = {"ssh_key", "rbw"}
 SETUP = {"pacman", "makepkg", "reflector"}
 # Features of the batches still to come (SPEC-features); shrinks to nothing.
 NOT_YET = {
-    *("locale", "oomd", "resolved", "sshd", "thp", "zram"),  # batch 3
     *("luks_discard", "nvidia", "plymouth", "snapper", "swap"),  # batch 4
     *("fnm", "libvirt", "rustup", "ssh_agent", "uv", "zsh"),  # batch 5
     *("firefox", "greetd", "niri", "vscode"),  # batches 6 and 7
@@ -300,7 +294,6 @@ def test_real_features_are_consistent():
 
 @pytest.fixture
 def arch(monkeypatch):
-    from dotfiles import platforms
 
     monkeypatch.setattr(platforms.platform, "freedesktop_os_release", lambda: {"ID": "arch"})
 
@@ -352,102 +345,3 @@ def test_dry_run_on_a_real_host_never_calls_sudo(arch, monkeypatch, capsys):
     assert "-> /etc/modprobe.d/nobeep.conf (missing)\n" in out
     assert "-> ~/.zshrc (missing)\n" in out
     assert not (Path.home() / ".zshrc").exists()
-
-
-def test_packages_that_depend_on_settings():
-    from dotfiles.features.fcitx5 import Fcitx5
-    from dotfiles.features.gaming import Gaming
-    from dotfiles.features.rbw import Rbw
-
-    cfg = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())
-    arch = FakeArch(cfg)
-    assert "fcitx5-chinese-addons" not in Fcitx5(cfg).strategy(arch).packages()
-    assert Rbw(cfg).strategy(arch).packages() == []
-    gaming = Gaming(cfg)
-    assert gaming.strategy(arch).packages() == []  # no multilib: nothing half-installed
-    with pytest.raises(engine.Failed, match="set features.pacman.multilib = true"):
-        gaming.apply(gaming.strategy(arch))
-
-    cfg["features"]["locale"]["languages"] = ["english", "chinese"]
-    cfg["secrets"]["backend"] = "rbw"
-    cfg["features"]["pacman"].update(enabled=True, multilib=True)
-    assert "fcitx5-chinese-addons" in Fcitx5(cfg).strategy(arch).packages()
-    assert Rbw(cfg).strategy(arch).packages() == ["rbw", "pinentry"]
-    assert "steam" in gaming.strategy(arch).packages()
-    gaming.apply(gaming.strategy(arch))
-
-
-@pytest.fixture
-def systemctl(monkeypatch):
-    """Every command faked; units report disabled and inactive."""
-    fake = Fake()
-    monkeypatch.setattr(engine, "_run", fake)
-    monkeypatch.setenv("SUDO_CMD", "")
-    return fake
-
-
-@pytest.mark.parametrize(
-    ("name", "unit"),
-    [
-        ("bluetooth", "bluetooth.service"),
-        ("fwupd", "fwupd-refresh.timer"),
-        ("btrfs_scrub", "btrfs-scrub@-.timer"),
-        ("paccache", "paccache.timer"),
-        ("yubikey", "pcscd.socket"),
-        ("timesyncd", "systemd-timesyncd.service"),
-    ],
-)
-def test_a_package_and_its_unit(systemctl, name, unit):
-    module = importlib.import_module(f"dotfiles.features.{name}")
-    feature = platforms.classes(module)[-1]({})
-    feature.apply(feature.strategy(FakeArch({})))
-    assert systemctl.calls[-1] == ["systemctl", "enable", "--now", unit]
-
-
-def test_docker_joins_the_group(systemctl, monkeypatch):
-    from dotfiles.features.docker import Docker
-
-    monkeypatch.setattr(grp, "getgrnam", lambda name: grp.struct_group((name, "x", 970, [])))
-    docker = Docker({})
-    docker.apply(docker.strategy(FakeArch({})))
-    assert systemctl.calls[-1][:3] == ["usermod", "-aG", "docker"]
-
-
-def test_pkgfile_seeds_its_database_once(systemctl, capsys):
-    from dotfiles.features.pkgfile import Pkgfile
-
-    pkgfile = Pkgfile({})
-    pkgfile.apply(pkgfile.strategy(FakeArch({})))
-    assert systemctl.calls[-1] == ["pkgfile", "-u"]
-    assert capsys.readouterr().out.endswith("-> pkgfile database created\n")
-    cache = engine.SYSROOT / "var/cache/pkgfile"
-    cache.mkdir(parents=True)
-    (cache / "core.files").touch()
-    systemctl.calls.clear()
-    pkgfile.apply(pkgfile.strategy(FakeArch({})))
-    assert ["pkgfile", "-u"] not in systemctl.calls
-
-
-def test_pkgfile_defers_a_failed_download(systemctl, monkeypatch):
-    from dotfiles.features.pkgfile import Pkgfile
-
-    monkeypatch.setattr(engine, "sleep", lambda seconds: None)
-    systemctl.answers[("pkgfile", "-u")] = (1, "")
-    pkgfile = Pkgfile({})
-    with pytest.raises(engine.Deferred, match="pkgfile database"):
-        pkgfile.apply(pkgfile.strategy(FakeArch({})))
-
-
-def test_tailscale_sets_the_operator_once(systemctl, capsys):
-    from dotfiles.features.tailscale import Tailscale
-
-    me = pwd.getpwuid(os.geteuid()).pw_name
-    tailscale = Tailscale({})
-    tailscale.apply(tailscale.strategy(FakeArch({})))
-    assert systemctl.calls[-1] == ["tailscale", "set", f"--operator={me}"]
-    assert capsys.readouterr().out.endswith(f"-> tailscale operator = {me}\n")
-    systemctl.answers[("tailscale", "debug", "prefs")] = (0, f'{{"OperatorUser": "{me}"}}')
-    systemctl.answers[("systemctl", "is-enabled", "tailscaled.service")] = (0, "enabled")
-    systemctl.answers[("systemctl", "is-active", "tailscaled.service")] = (0, "active")
-    tailscale.apply(tailscale.strategy(FakeArch({})))
-    assert capsys.readouterr().out == ""

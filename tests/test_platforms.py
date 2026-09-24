@@ -1,13 +1,12 @@
 import grp
 import os
 import pwd
-import shutil
 import subprocess
 import tomllib
 from pathlib import Path
 
 import pytest
-from conftest import Fake
+from conftest import AsRoot, Fake
 
 from dotfiles import engine, platforms
 from dotfiles.config import ROOT, ConfigError
@@ -246,27 +245,9 @@ def test_detect(monkeypatch):
         detect({})
 
 
-class AsRoot(Fake):
-    """Fakes every command, but carries out `install` as the test user, so
-    root's files land under SYSROOT; engine._owner then reads them as
-    root's (patched by the fixture)."""
-
-    def __call__(self, argv, check=False, **kwargs):
-        if argv[0] == "install":
-            dst = Path(argv[-1])
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(argv[-2], dst)
-            dst.chmod(int(argv[argv.index("-m") + 1], 8))
-        return super().__call__(argv, check, **kwargs)
-
-
 @pytest.fixture
-def root(monkeypatch) -> AsRoot:
-    fake = AsRoot()
-    monkeypatch.setattr(engine, "_run", fake)
-    monkeypatch.setattr(engine, "_owner", lambda path: "root:root")
-    monkeypatch.setenv("SUDO_CMD", "")
-    return fake
+def root(machine) -> AsRoot:
+    return machine
 
 
 def config(**features) -> dict:
