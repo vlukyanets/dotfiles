@@ -1,4 +1,4 @@
-"""Host configuration: defaults.toml, then the host's chain of profiles and hosts."""
+"""Host configuration: the defaults, then the host's chain of profiles and hosts."""
 
 import copy
 import tomllib
@@ -7,6 +7,8 @@ from pathlib import Path
 import tomli_w
 
 ROOT = Path(__file__).resolve().parent.parent
+# The schema: every key, its type and its default.
+DEFAULTS = "dotfiles/defaults.toml"
 
 # TOML's names, so an error reads like the file the user is editing.
 KINDS = {
@@ -117,9 +119,9 @@ def leaves(data: dict, prefix: str = ""):
 
 def resolve_with_sources(host: str, root: Path = ROOT) -> tuple[dict, dict[str, str]]:
     """Merged config for HOST and, per dotted key, the file its value came from."""
-    schema = load(root / "defaults.toml", root)
+    schema = load(root / DEFAULTS, root)
     config = copy.deepcopy(schema)
-    sources = {key: "defaults.toml" for key, _ in leaves(schema)}
+    sources = {key: DEFAULTS for key, _ in leaves(schema)}
     for where, data in chain(host, root):
         validate(data, schema, where)
         merge(config, data)

@@ -80,7 +80,10 @@ def make_package(tmp_path, monkeypatch, modules: dict[str, str]) -> str:
 def root(tmp_path) -> Path:
     root = tmp_path / "repo"
     (root / "hosts").mkdir(parents=True)
-    (root / "defaults.toml").write_text("[features]\non.enabled = true\noff.enabled = false\n")
+    (root / "dotfiles").mkdir()
+    (root / "dotfiles/defaults.toml").write_text(
+        "[features]\non.enabled = true\noff.enabled = false\n"
+    )
     (root / "hosts/h.toml").write_text("")
     return root
 
@@ -254,12 +257,12 @@ def test_a_module_defines_one_feature(root, system, tmp_path, monkeypatch):
 
 
 def test_real_features_are_consistent():
-    defaults = tomllib.loads((ROOT / "defaults.toml").read_text())["features"]
+    defaults = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())["features"]
     cfg = {"features": {name: {**table, "enabled": True} for name, table in defaults.items()}}
     found = steps(cfg, FakeArch(cfg))
     assert found, "no feature applies to Arch"
     for s in found:
-        assert s.name in defaults, f"{s.name}: not a feature in defaults.toml"
+        assert s.name in defaults, f"{s.name}: not a feature in dotfiles/defaults.toml"
 
 
 @pytest.fixture

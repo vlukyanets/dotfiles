@@ -1,9 +1,7 @@
 # CLAUDE.md
 
 Maintainer guide. `README.md` is the entry point for humans; `docs/spec/`
-holds the capability map and the module specs that drive the work. The
-chezmoi repo this replaces is checked out at `../__dotfiles` — read it for
-how a feature behaves today, never edit it.
+holds the capability map and the module specs that drive the work.
 
 ## Commands
 
@@ -22,7 +20,7 @@ master and every PR; uv is pinned there by version and sha256.
 
 ## Navigation
 
-- Keys and defaults: `defaults.toml` — the schema; a new key goes here first.
+- Keys and defaults: `dotfiles/defaults.toml` — the schema; a new key goes here first.
   A feature is `features.<name>.enabled` plus its settings in the same table.
 - Profiles `profiles/`, machines `hosts/`; one namespace for `extends`.
 - Resolution, validation, merge, explain, check: `dotfiles/config.py`.
@@ -60,9 +58,8 @@ master and every PR; uv is pinned there by version and sha256.
 - A feature mutates only through an `ensure_*` helper, a platform method or
   `run`: they respect dry run and `SYSROOT`. Commands are argv lists, never a
   shell; tests fake commands by replacing `engine._run`, not with scripts.
-- Porting a Go template: write idiomatic Jinja2 with the same meaning, not
-  chezmoi's exact output. A tag alone on its line vanishes with its newline
+- Templates: a tag alone on its line vanishes with its newline
   (trim_blocks, lstrip_blocks). Booleans print as `True` in Jinja: write
   `{{ x | lower }}` where the file needs `true`.
-- chezmoi never created an empty file; a `.keep` that only holds a directory
-  in git is gated off with `when = "false"` in `home.toml`.
+- A `.keep` that only holds a directory in git is gated off with
+  `when = "false"` in `home.toml`, so no empty file lands in `$HOME`.

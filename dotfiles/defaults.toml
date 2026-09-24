@@ -85,7 +85,7 @@ kitty.enabled          = false
 firefox.enabled        = false  # + policies.json
 onlyoffice.enabled     = false  # AUR
 evince.enabled         = false
-vscode.enabled         = false  # AUR + profiles from .chezmoidata/vscode.json
+vscode.enabled         = false  # AUR + extension profiles
 wireshark.enabled      = false  # + wireshark group
 claude_desktop.enabled = false  # AUR
 sqlitebrowser.enabled  = false
@@ -133,7 +133,7 @@ lang      = "en_US.UTF-8"
 locales   = ["en_US.UTF-8 UTF-8"]
 keymap    = "us"
 timezone  = "UTC"
-# Names from .chezmoidata/languages.toml, in keyboard-layout order; niri,
+# Names from data/languages.toml, in keyboard-layout order; niri,
 # fcitx5 and switch-layout.sh read the same list.
 languages = ["english"]
 
