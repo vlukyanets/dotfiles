@@ -268,13 +268,31 @@ def test_a_module_defines_one_feature(root, system, tmp_path, monkeypatch):
         steps({"features": {}}, FakeArch({}), package)
 
 
+# Modules that always run, switched by a setting outside [features].
+UNSWITCHED = {"ssh_key", "rbw"}
+# Features without a module: Arch.setup() does them.
+SETUP = {"pacman", "makepkg", "reflector"}
+# Features of the batches still to come (SPEC-features); shrinks to nothing.
+NOT_YET = {
+    *("bluetooth", "btrfs_scrub", "docker", "fwupd", "paccache", "pkgfile", "tailscale"),
+    *("timesyncd", "yubikey"),  # batch 2
+    *("locale", "oomd", "resolved", "sshd", "thp", "zram"),  # batch 3
+    *("luks_discard", "nvidia", "plymouth", "snapper", "swap"),  # batch 4
+    *("fnm", "libvirt", "rustup", "ssh_agent", "uv", "zsh"),  # batch 5
+    *("firefox", "greetd", "niri", "vscode"),  # batches 6 and 7
+}
+
+
 def test_real_features_are_consistent():
-    defaults = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())["features"]
-    cfg = {"features": {name: {**table, "enabled": True} for name, table in defaults.items()}}
-    found = steps(cfg, FakeArch(cfg))
-    assert found, "no feature applies to Arch"
-    for s in found:
-        assert s.name in defaults, f"{s.name}: not a feature in dotfiles/defaults.toml"
+    cfg = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())
+    for table in cfg["features"].values():
+        table["enabled"] = True
+    found = {s.name: s for s in steps(cfg, FakeArch(cfg))}
+    for name, s in found.items():
+        assert type(s.feature).__name__ == name.title().replace("_", ""), name
+        assert name in cfg["features"] or name in UNSWITCHED, f"{name}: not in the schema"
+    missing = set(cfg["features"]) - set(found) - SETUP - NOT_YET
+    assert not missing, f"features without a module: {sorted(missing)}"
 
 
 @pytest.fixture
@@ -331,3 +349,26 @@ def test_dry_run_on_a_real_host_never_calls_sudo(arch, monkeypatch, capsys):
     assert "-> /etc/modprobe.d/nobeep.conf (missing)\n" in out
     assert "-> ~/.zshrc (missing)\n" in out
     assert not (Path.home() / ".zshrc").exists()
+
+
+def test_packages_that_depend_on_settings():
+    from dotfiles.features.fcitx5 import Fcitx5
+    from dotfiles.features.gaming import Gaming
+    from dotfiles.features.rbw import Rbw
+
+    cfg = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())
+    arch = FakeArch(cfg)
+    assert "fcitx5-chinese-addons" not in Fcitx5(cfg).strategy(arch).packages()
+    assert Rbw(cfg).strategy(arch).packages() == []
+    gaming = Gaming(cfg)
+    assert gaming.strategy(arch).packages() == []  # no multilib: nothing half-installed
+    with pytest.raises(engine.Failed, match="set features.pacman.multilib = true"):
+        gaming.apply(gaming.strategy(arch))
+
+    cfg["features"]["locale"]["languages"] = ["english", "chinese"]
+    cfg["secrets"]["backend"] = "rbw"
+    cfg["features"]["pacman"].update(enabled=True, multilib=True)
+    assert "fcitx5-chinese-addons" in Fcitx5(cfg).strategy(arch).packages()
+    assert Rbw(cfg).strategy(arch).packages() == ["rbw", "pinentry"]
+    assert "steam" in gaming.strategy(arch).packages()
+    gaming.apply(gaming.strategy(arch))

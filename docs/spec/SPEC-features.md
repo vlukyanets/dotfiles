@@ -1,6 +1,6 @@
 # Spec: `features` — every feature of the schema
 
-Status: draft 2026-09-24. Module of the [capability map](CAPABILITY-MAP.md);
+Status: approved 2026-09-24. Module of the [capability map](CAPABILITY-MAP.md);
 depends on `packages` and `render`.
 
 ## Objective
@@ -403,9 +403,11 @@ their batches (the second as TOML, like every other registry).
   - the feature is in the schema, or is one of the three modules above;
   - every schema feature has a module, except the three that `Arch.setup`
     handles.
-- **Packages-only features:** one parametrized test over all of them
-  checks `packages()` against the table above, and `replaces()` where the
-  table says so.
+- **Packages-only features:** the lists are data, read in review against
+  the table above. The packages that depend on settings are tested:
+  `fcitx5`, `gaming`, `rbw`.
+- **Until the last batch** the consistency test skips the features of the
+  batches still to come (`NOT_YET`), and each batch shrinks that set.
 - **Each feature with an `apply`:**
   - a fake `_run` and a temp `SYSROOT`;
   - the first run makes the changes, a second run prints nothing;
