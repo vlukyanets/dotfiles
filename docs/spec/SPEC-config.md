@@ -32,7 +32,7 @@ User stories:
 ## Data model
 
 ```
-defaults.toml          schema: every key, its type, its default (ported 1:1)
+dotfiles/defaults.toml schema: every key, its type, its default (ported 1:1)
 profiles/<name>.toml   partial config + optional extends
 hosts/<hostname>.toml  partial config + optional extends
 ```
@@ -69,7 +69,7 @@ Resolution for host `H`:
    a name present in both is an error. Unknown name → error.
    A cycle → error listing the cycle (`a → b → a`).
 3. **Validation, per file, before merging.** Every key must exist in
-   `defaults.toml` at the same path, at any depth, with the same type.
+   `dotfiles/defaults.toml` at the same path, at any depth, with the same type.
    `bool` and `int` are different types; lists match any list; tables
    recurse. `extends` is the only key not in the schema and must be a list
    of strings. Errors name the file and the dotted key path:
@@ -103,7 +103,7 @@ prints one line per leaf, itself valid TOML:
 ```
 features.docker.enabled = true  # hosts/hyper-lin.toml
 features.sshd.enabled = true  # profiles/server.toml
-features.swap.size = ""  # defaults.toml
+features.swap.size = ""  # dotfiles/defaults.toml
 ```
 
 Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
@@ -114,7 +114,7 @@ Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
 pyproject.toml           project, [project.scripts] dotfiles = "dotfiles.__main__:main"
 dotfiles/__main__.py     argparse CLI: config, check
 dotfiles/config.py       load, chain, validate, merge — pure functions over dicts and a root Path
-defaults.toml            schema (from ../__dotfiles/.chezmoidata/defaults.toml)
+dotfiles/defaults.toml   schema (from ../__dotfiles/.chezmoidata/defaults.toml)
 profiles/                base, server, laptop
 hosts/                   hyper-lin (extends laptop), echo-server (extends server)
 tests/test_config.py     unit tests on tmp_path fixtures + checks on the real data
@@ -133,7 +133,7 @@ reads them.
 ```python
 def resolve(root: Path, host: str) -> dict:
     """Merged config for HOST: defaults, then every file in its chain."""
-    schema = load(root / "defaults.toml")
+    schema = load(root / DEFAULTS)
     config = copy.deepcopy(schema)
     for name, path in chain(root, host):
         data = load(path)
@@ -164,7 +164,7 @@ def resolve(root: Path, host: str) -> dict:
 ## Boundaries
 
 - **Always:** validate every file before merging; name file + key path in
-  errors; keep `defaults.toml` the single schema; run pytest and ruff
+  errors; keep `dotfiles/defaults.toml` the single schema; run pytest and ruff
   before each commit; update the spec when a decision changes.
 - **Ask first:** any runtime dependency beyond `tomli-w`; changing the merge
   rule (e.g. list append); moving the old repo's data in a lossy way.

@@ -22,7 +22,7 @@ master and every PR; uv is pinned there by version and sha256.
 
 ## Navigation
 
-- Keys and defaults: `defaults.toml` — the schema; a new key goes here first.
+- Keys and defaults: `dotfiles/defaults.toml` — the schema; a new key goes here first.
   A feature is `features.<name>.enabled` plus its settings in the same table.
 - Profiles `profiles/`, machines `hosts/`; one namespace for `extends`.
 - Resolution, validation, merge, explain, check: `dotfiles/config.py`.

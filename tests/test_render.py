@@ -14,7 +14,7 @@ def write(root: Path, rel: str, text: str) -> None:
 
 @pytest.fixture
 def root(tmp_path: Path) -> Path:
-    write(tmp_path, "defaults.toml", '[git]\nname = ""\n[features.zsh]\nenabled = false\n')
+    write(tmp_path, "dotfiles/defaults.toml", '[git]\nname = ""\n[features.zsh]\nenabled = false\n')
     write(tmp_path, "hosts/on.toml", '[git]\nname = "Ann"\n[features.zsh]\nenabled = true\n')
     return tmp_path
 
@@ -144,7 +144,7 @@ def test_check_renders_every_host(root):
 def test_registries_reach_templates_and_names_are_checked(root, tmp_path):
     write(
         root,
-        "defaults.toml",
+        "dotfiles/defaults.toml",
         '[git]\nname = ""\n[features.zsh]\nenabled = false\n'
         '[features.locale]\nlanguages = ["en"]\n',
     )

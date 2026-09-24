@@ -8,7 +8,7 @@ refer to work by them.
 
 | Module id | Responsibility | Depends on |
 |---|---|---|
-| `config` | Load `defaults.toml` (schema), `profiles/*.toml`, `hosts/*.toml`; resolve `extends` (host → profiles/hosts); validate every file against the schema; merge; dump the result; `check` every host | — |
+| `config` | Load `dotfiles/defaults.toml` (schema), `profiles/*.toml`, `hosts/*.toml`; resolve `extends` (host → profiles/hosts); validate every file against the schema; merge; dump the result; `check` every host | — |
 | `render` | Jinja2 templates for dotfiles under `home/`, rendered with the resolved config; feature gates; deploy to `$HOME` with check-before-write (content, mode) | `config` |
 | `engine` | The `lib.sh` port: `ensure_file/line/symlink/service/sysctl/...`, `as_root`, `retry`, `defer`, notices, change counting, ordered feature runner, silent clean apply | `config` |
 | `packages` | `pkg.sh` port: `ensure_pkg` / `ensure_aur` / `ensure_replaced`, pacman.conf drop-ins, reflector, paru bootstrap | `engine` |

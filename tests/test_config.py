@@ -14,7 +14,7 @@ def write(root: Path, rel: str, text: str) -> None:
 
 @pytest.fixture
 def root(tmp_path: Path) -> Path:
-    write(tmp_path, "defaults.toml", "[features]\na = false\nb = false\n")
+    write(tmp_path, "dotfiles/defaults.toml", "[features]\na = false\nb = false\n")
     return tmp_path
 
 
@@ -23,13 +23,13 @@ def test_unknown_host_gets_defaults(root):
 
 
 def test_broken_toml_names_file(root):
-    write(root, "defaults.toml", "[features\n")
-    with pytest.raises(ConfigError, match=r"^defaults\.toml: "):
+    write(root, "dotfiles/defaults.toml", "[features\n")
+    with pytest.raises(ConfigError, match=r"^dotfiles/defaults\.toml: "):
         resolve("nowhere", root)
 
 
 def test_real_defaults_parse():
-    with (ROOT / "defaults.toml").open("rb") as f:
+    with (ROOT / "dotfiles/defaults.toml").open("rb") as f:
         assert resolve("unknown-host") == tomllib.load(f)
 
 
@@ -55,20 +55,20 @@ def test_invalid_host_names_file_and_key(root, text, error):
 
 
 def test_int_is_not_bool(root):
-    write(root, "defaults.toml", "[zram]\npriority = 100\n")
+    write(root, "dotfiles/defaults.toml", "[zram]\npriority = 100\n")
     write(root, "hosts/h.toml", "[zram]\npriority = true\n")
     with pytest.raises(ConfigError, match="must be integer, got boolean"):
         resolve("h", root)
 
 
 def test_arrays_are_replaced(root):
-    write(root, "defaults.toml", '[locale]\nlocales = ["en_US.UTF-8 UTF-8"]\n')
+    write(root, "dotfiles/defaults.toml", '[locale]\nlocales = ["en_US.UTF-8 UTF-8"]\n')
     write(root, "hosts/h.toml", '[locale]\nlocales = ["ru_RU.UTF-8 UTF-8"]\n')
     assert resolve("h", root) == {"locale": {"locales": ["ru_RU.UTF-8 UTF-8"]}}
 
 
 def test_secrets_backend_is_checked(root):
-    write(root, "defaults.toml", '[secrets]\nbackend = "none"\n')
+    write(root, "dotfiles/defaults.toml", '[secrets]\nbackend = "none"\n')
     write(root, "hosts/h.toml", '[secrets]\nbackend = "pass"\n')
     with pytest.raises(ConfigError, match="^h: secrets.backend: must be one of none, rbw"):
         resolve("h", root)
@@ -175,17 +175,17 @@ def test_check_real_data():
 def test_explain_names_the_file_of_each_value(root):
     write(
         root,
-        "defaults.toml",
+        "dotfiles/defaults.toml",
         '[features]\na = false\nb = false\nc = false\n[locale]\nlocales = ["en", "ru"]\n',
     )
     write(root, "profiles/p.toml", "[features]\nb = true\n")
     write(root, "hosts/h.toml", 'extends = ["p"]\n[features]\nc = true\n')
     text = explain("h", root)
     assert text == (
-        "features.a = false  # defaults.toml\n"
+        "features.a = false  # dotfiles/defaults.toml\n"
         "features.b = true  # profiles/p.toml\n"
         "features.c = true  # hosts/h.toml\n"
-        'locale.locales = ["en", "ru"]  # defaults.toml\n'
+        'locale.locales = ["en", "ru"]  # dotfiles/defaults.toml\n'
     )
     assert tomllib.loads(text) == resolve("h", root)
 

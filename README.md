@@ -10,7 +10,7 @@ features come next (see the [capability map](docs/spec/CAPABILITY-MAP.md)).
 ## How a host is described
 
 ```
-defaults.toml          every key, its type and its default; every feature off
+dotfiles/defaults.toml every key, its type and its default; every feature off
 profiles/<name>.toml   base, server, laptop
 hosts/<hostname>.toml  one file per machine
 ```
@@ -29,7 +29,7 @@ size    = "20g"
 ```
 
 Tables merge; values and arrays are replaced. A shared ancestor is merged
-once. Every file is checked against `defaults.toml`: an unknown key or a
+once. Every file is checked against `dotfiles/defaults.toml`: an unknown key or a
 value of another type fails naming the file and the key. A machine with no
 file in `hosts/` gets the defaults. The rules in full:
 [SPEC-config](docs/spec/SPEC-config.md).
