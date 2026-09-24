@@ -275,7 +275,6 @@ UNSWITCHED = {"ssh_key", "rbw"}
 SETUP = {"pacman", "makepkg", "reflector"}
 # Features of the batches still to come (SPEC-features); shrinks to nothing.
 NOT_YET = {
-    *("fnm", "libvirt", "rustup", "ssh_agent", "uv", "zsh"),  # batch 5
     *("firefox", "greetd", "niri", "vscode"),  # batches 6 and 7
 }
 
