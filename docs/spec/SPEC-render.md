@@ -15,7 +15,7 @@ Two commands:
   host into DIR. Touches nothing else. CI renders every host this way.
 - `dotfiles deploy` renders for this machine and brings `$HOME` in line:
   compares, writes only what differs, prints one `->` line per change,
-  prints nothing when `$HOME` already matches.
+  prints `nothing to change` when `$HOME` already matches.
 
 Out of scope: provisioning (features, packages, root files — `engine`,
 `features`), removing files, the registries only features read
@@ -158,7 +158,7 @@ the message, comments on why.
 - Merges: noctalia with a captured settings file (unknown keys kept,
   desired keys win, missing file); fcitx5 DefaultIM kept / reset.
 - Deploy (tmp `HOME` from `conftest.py`): first run writes and reports,
-  second run silent; mode drift fixed; `--dry-run` writes nothing; symlink
+  second run changes nothing; mode drift fixed; `--dry-run` writes nothing; symlink
   escaping `$HOME` refused.
 - Real data: `check` renders hyper-lin, echo-server and an unknown host;
   tests pin what the templates with logic (loops, gates, registries)

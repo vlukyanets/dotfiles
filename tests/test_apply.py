@@ -115,7 +115,9 @@ def test_gates_and_platforms(root, system, tmp_path, monkeypatch, capsys):
         },
     )
     assert apply("h", root, package=package) == 0
-    assert capsys.readouterr() == ("always ran\narch ran ArchOnly.Arch\non ran\n", "")
+    # Fakes print directly, not through changed(): nothing counts as a change.
+    out = "always ran\narch ran ArchOnly.Arch\non ran\nnothing to change\n"
+    assert capsys.readouterr() == (out, "")
 
 
 def test_the_strategy_is_the_platform_plus_the_nested_class(system):
@@ -156,7 +158,7 @@ def test_one_install_then_silence(root, system, tmp_path, monkeypatch, capsys):
     assert capsys.readouterr().out == "-> packages: git postgres (missing)\n"
     assert apply("h", root, package=package) == 0
     assert system.installs == [["git", "postgres"]]
-    assert capsys.readouterr() == ("", "")
+    assert capsys.readouterr() == ("nothing to change\n", "")
 
 
 def test_dry_run_installs_nothing_and_runs_every_feature(
@@ -195,6 +197,12 @@ def test_order_breaks_a_cycle_by_name():
     graph = {"x": {"y"}, "y": {"x"}}
     got = [(s.name, after) for s, after in order([step("b", ["y"]), step("a", ["x"])], graph)]
     assert got == [("a", ["b"]), ("b", ["a"])]
+
+
+def test_a_failure_alone_is_not_nothing_to_change(root, system, tmp_path, monkeypatch, capsys):
+    package = make_package(tmp_path, monkeypatch, {"on": feature("On", 'die("broken")')})
+    assert apply("h", root, package=package) == 1
+    assert capsys.readouterr() == ("", "error: on: broken\n")
 
 
 def test_failures_block_what_builds_on_them(root, system, tmp_path, monkeypatch, capsys):

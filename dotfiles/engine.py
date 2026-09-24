@@ -2,8 +2,8 @@
 
 Every check reads live state without root; every mutation goes through a
 helper or `run` (as root inside `with as_root():`), and each of them does
-nothing on a dry run. That is what keeps a clean apply silent and free of
-sudo prompts.
+nothing on a dry run. That is what keeps a clean apply down to one
+"nothing to change" line, free of sudo prompts.
 """
 
 import grp
@@ -27,6 +27,8 @@ DRY_RUN = False
 SYSROOT = Path("/")
 # Notices of this apply, replayed at the end by print_notices().
 notices: list[str] = []
+# Whether this apply printed a change or a warning; if not, apply says so.
+printed = False
 
 
 class Failed(Exception):
@@ -38,6 +40,8 @@ class Deferred(Exception):
 
 
 def warn(msg: str) -> None:
+    global printed
+    printed = True
     print(f"warning: {msg}", file=sys.stderr)
 
 
@@ -47,6 +51,8 @@ def die(msg: str):
 
 def changed(msg: str) -> None:
     """A mutation: the only kind of line a clean apply never prints."""
+    global printed
+    printed = True
     print(f"-> {msg}")
 
 
