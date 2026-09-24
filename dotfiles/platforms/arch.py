@@ -9,6 +9,7 @@ from dotfiles import engine
 from dotfiles.engine import (
     as_root,
     changed,
+    die,
     ensure_file,
     ensure_line,
     notice,
@@ -21,6 +22,7 @@ from dotfiles.platforms.linux import Linux
 # pacman's field names are translated; the parser reads the English ones.
 C = {**os.environ, "LC_ALL": "C"}
 PACMAN_CONF = "/etc/pacman.conf"
+STALE = "if downloads returned 404 the sync databases are stale: run {} -Syu and apply again"
 
 
 class Arch(Linux):
@@ -114,10 +116,46 @@ class Arch(Linux):
         found = output("pacman", "-T", *names)  # prints exactly the ones not installed
         return list(names) if found is None else found.split()
 
-    def install(self, names: list[str]) -> None:
-        for attempt in retrying():
-            with attempt, as_root():
-                run("pacman", "-S", "--needed", "--noconfirm", *names)
+    def install(self, names: list[str], replaces: list[str] = ()) -> None:
+        for name in replaces:
+            # -Qq also answers for a package that only provides NAME (rustup for rust).
+            if output("pacman", "-Qq", name) == name:
+                with as_root():
+                    run("pacman", "-Rdd", "--noconfirm", name)
+                changed(f"removed {name}, its replacement follows")
+        known = _parse(output("pacman", "-Si", *names, env=C) or "") if names else {}
+        repo = [n for n in names if n in known]
+        aur = [n for n in names if n not in known]
+        if repo:
+            try:
+                for attempt in retrying():
+                    with attempt, as_root():
+                        run("pacman", "-S", "--needed", "--noconfirm", *repo)
+            except subprocess.CalledProcessError:
+                die(f"pacman -S failed; {STALE.format('pacman')}")
+        if not aur:
+            return
+        if not self.cfg["features"]["aur"]["enabled"]:
+            die(f"not in the repositories: {' '.join(aur)} — enable features.aur to build them")
+        self.ensure_paru()
+        # paru runs as the user and calls sudo itself: the same one run() would.
+        sudo = engine._sudo()
+        flags = ["--sudo", sudo[0]] if sudo else []
+        if sudo[1:]:
+            flags += ["--sudoflags", " ".join(sudo[1:])]
+        try:
+            for attempt in retrying():
+                with attempt:
+                    run("paru", *flags, "-S", "--needed", "--noconfirm", *aur)
+        except subprocess.CalledProcessError:
+            die(f"paru -S failed; {STALE.format('paru')}")
+
+    def ensure_paru(self) -> bool:
+        """paru runs. A paru left behind by a libalpm bump does not, so the
+        check is paru --version, not the package."""
+        if (output("paru", "--version") or "").startswith("paru "):
+            return False
+        die("paru does not run")
 
     def depends(self, names: list[str]) -> dict[str, set[str]]:
         todo = set(names)

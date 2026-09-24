@@ -22,6 +22,7 @@ class Step(NamedTuple):
     feature: Feature
     strategy: Platform
     packages: frozenset[str]
+    replaces: frozenset[str]
 
 
 def steps(cfg: dict, system: Platform, package: str = PACKAGE) -> list[Step]:
@@ -40,7 +41,8 @@ def steps(cfg: dict, system: Platform, package: str = PACKAGE) -> list[Step]:
         feature = classes[0](cfg)
         strategy = feature.strategy(system)
         if strategy is not None:  # none: the feature does not apply here
-            found.append(Step(name, feature, strategy, frozenset(strategy.packages())))
+            packages, replaces = frozenset(strategy.packages()), frozenset(strategy.replaces())
+            found.append(Step(name, feature, strategy, packages, replaces))
     return found
 
 
@@ -108,6 +110,7 @@ def apply(
         system = platforms.detect(cfg, platform_package)
         found = steps(cfg, system, package)
         wanted = sorted(set().union(*(step.packages for step in found)))
+        replaced = sorted(set().union(*(step.replaces for step in found)))
 
         try:
             system.setup()
@@ -121,7 +124,7 @@ def apply(
             engine.changed(f"packages: {' '.join(missing)} (missing)")
             try:
                 if ready and not engine.DRY_RUN:
-                    system.install(missing)
+                    system.install(missing, replaced)
             except Exception as e:  # noqa: BLE001 — the features without them still run
                 failed.add("packages")
                 _error("packages", e)

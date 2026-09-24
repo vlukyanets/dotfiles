@@ -23,13 +23,15 @@ class FakeLinux(Linux):
     installed: ClassVar[set[str]] = set()
     graph: ClassVar[dict[str, set[str]]] = {}  # package -> everything it needs
     installs: ClassVar[list[list[str]]] = []
+    replaced: ClassVar[list[list[str]]] = []  # REPLACES of each install
     broken = False  # install fails
 
     def missing(self, names):
         return [n for n in names if n not in self.installed]
 
-    def install(self, names):
+    def install(self, names, replaces=()):
         self.installs.append(names)
+        self.replaced.append(list(replaces))
         if self.broken:
             raise RuntimeError("mirror down")
         self.installed.update(names)
@@ -50,17 +52,25 @@ def system(monkeypatch) -> type[FakeLinux]:
     monkeypatch.setattr(FakeLinux, "installed", set())
     monkeypatch.setattr(FakeLinux, "graph", {})
     monkeypatch.setattr(FakeLinux, "installs", [])
+    monkeypatch.setattr(FakeLinux, "replaced", [])
     monkeypatch.setattr(FakeLinux, "broken", False)
     monkeypatch.setattr(runner.platforms, "detect", lambda cfg, package: FakeArch(cfg))
     return FakeLinux
 
 
-def feature(cls: str, apply: str = "pass", packages: list[str] | None = None, on="Linux") -> str:
+def feature(
+    cls: str,
+    apply: str = "pass",
+    packages: list[str] | None = None,
+    on="Linux",
+    replaces: list[str] | None = None,
+) -> str:
     """A feature module: class CLS whose apply runs APPLY, supported on ON
-    with PACKAGES."""
+    with PACKAGES, which replace REPLACES."""
     body = f"class {cls}(Feature):\n    def apply(self, strategy):\n        {apply}\n\n"
     body += f"    class {on}:\n"
     body += f"        def packages(self):\n            return {packages or []!r}\n"
+    body += f"        def replaces(self):\n            return {replaces or []!r}\n"
     return body
 
 
@@ -135,12 +145,13 @@ def test_one_install_then_silence(root, system, tmp_path, monkeypatch, capsys):
         {
             "db": feature("Db", packages=["postgres"]),
             "web": feature("Web", packages=["nginx", "git"]),
-            "tools": feature("Tools", packages=["git"]),
+            "tools": feature("Tools", packages=["git"], replaces=["git-git"]),
         },
     )
     system.installed = {"nginx"}
     assert apply("h", root, package=package) == 0
     assert system.installs == [["git", "postgres"]]
+    assert system.replaced == [["git-git"]]
     assert capsys.readouterr().out == "-> packages: git postgres (missing)\n"
     assert apply("h", root, package=package) == 0
     assert system.installs == [["git", "postgres"]]
@@ -157,7 +168,7 @@ def test_dry_run_installs_nothing_and_runs_every_feature(
 
 
 def step(name, packages=()):
-    return Step(name, None, None, frozenset(packages))
+    return Step(name, None, None, frozenset(packages), frozenset())
 
 
 def test_order_follows_the_package_graph():

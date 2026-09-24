@@ -26,13 +26,18 @@ class Platform(ABC):
         """A strategy's packages on this platform, in its own names."""
         return []
 
+    def replaces(self) -> list[str]:
+        """Installed packages a strategy's packages replace: removed just
+        before those are installed, where they would conflict."""
+        return []
+
     @abstractmethod
     def missing(self, names: list[str]) -> list[str]:
         """NAMES that are not installed. A check: no root, no change."""
 
     @abstractmethod
-    def install(self, names: list[str]) -> None:
-        """NAMES installed, in one transaction."""
+    def install(self, names: list[str], replaces: list[str] = ()) -> None:
+        """NAMES installed, in one transaction, REPLACES removed first."""
 
     @abstractmethod
     def depends(self, names: list[str]) -> dict[str, set[str]]:

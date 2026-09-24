@@ -123,11 +123,69 @@ def test_arch_missing(system, arch):
     assert arch.missing(["bash"]) == []
 
 
+def si(*names: str) -> str:
+    """pacman -Si output for NAMES."""
+    return "\n".join(f"Repository      : extra\nName            : {n}\n" for n in names)
+
+
 def test_arch_install_is_one_transaction_as_root(system, arch, monkeypatch):
     monkeypatch.setenv("SUDO_CMD", "sudo")
     system.programs.add("sudo")
+    system.answers[("pacman", "-Si", "docker", "tmux")] = (0, si("docker", "tmux"))
     arch.install(["docker", "tmux"])
-    assert system.calls == [["sudo", "pacman", "-S", "--needed", "--noconfirm", "docker", "tmux"]]
+    assert system.calls[-1] == ["sudo", "pacman", "-S", "--needed", "--noconfirm", "docker", "tmux"]
+
+
+def test_arch_install_removes_what_it_replaces(system, arch, capsys):
+    system.answers[("pacman", "-Qq", "jack2")] = (0, "jack2\n")
+    system.answers[("pacman", "-Qq", "rust")] = (0, "rustup\n")  # only provides rust
+    system.answers[("pacman", "-Si", "pipewire-jack")] = (0, si("pipewire-jack"))
+    arch.install(["pipewire-jack"], ["jack2", "rust"])
+    assert [c for c in system.calls if c[1] != "-Qq" and c[1] != "-Si"] == [
+        ["pacman", "-Rdd", "--noconfirm", "jack2"],
+        ["pacman", "-S", "--needed", "--noconfirm", "pipewire-jack"],
+    ]
+    assert capsys.readouterr().out == "-> removed jack2, its replacement follows\n"
+
+
+def test_arch_install_takes_the_rest_from_the_aur(system, monkeypatch):
+    system.programs.add("paru")
+    system.answers[("pacman", "-Si", "tmux", "clock-rs-git")] = (0, si("tmux"))
+    system.answers[("paru", "--version")] = (0, "paru v2.1.0 - libalpm v16.0.1\n")
+    Arch(config(aur={})).install(["tmux", "clock-rs-git"])
+    assert [c for c in system.calls if c[1] in ("-S", "--version")] == [
+        ["pacman", "-S", "--needed", "--noconfirm", "tmux"],
+        ["paru", "--version"],
+        ["paru", "-S", "--needed", "--noconfirm", "clock-rs-git"],
+    ]
+    # paru's own sudo is SUDO_CMD, snapper's variables kept.
+    monkeypatch.setenv("SUDO_CMD", "false")
+    monkeypatch.setenv("DOTFILES_SNAPPER_STATE", "/run/x")
+    Arch(config(aur={})).install(["clock-rs-git"])
+    assert system.calls[-1] == [
+        "paru",
+        "--sudo",
+        "false",
+        "--sudoflags",
+        "--preserve-env=SNAP_PAC_SKIP,DOTFILES_SNAPPER_STATE",
+        *["-S", "--needed", "--noconfirm", "clock-rs-git"],
+    ]
+
+
+def test_arch_install_without_the_aur_fails_after_the_repositories(system):
+    system.answers[("pacman", "-Si", "tmux", "clock-rs-git")] = (0, si("tmux"))
+    with pytest.raises(Failed, match="not in the repositories: clock-rs-git — enable features.aur"):
+        Arch(config()).install(["tmux", "clock-rs-git"])
+    assert system.calls[-1] == ["pacman", "-S", "--needed", "--noconfirm", "tmux"]
+
+
+def test_arch_install_failure_names_the_stale_database(system, monkeypatch):
+    monkeypatch.setattr(engine, "sleep", lambda seconds: None)
+    system.answers[("pacman", "-Si", "tmux")] = (0, si("tmux"))
+    system.answers[("pacman", "-S", "--needed", "--noconfirm", "tmux")] = (1, "")
+    with pytest.raises(Failed, match="run pacman -Syu and apply again"):
+        Arch(config()).install(["tmux"])
+    assert system.calls.count(["pacman", "-S", "--needed", "--noconfirm", "tmux"]) == 3
 
 
 SI = """Repository      : extra
@@ -282,6 +340,7 @@ def test_setup_makepkg(root, monkeypatch, jobs, options, makeflags, extra):
 def test_setup_reflector(root, capsys):
     arch = Arch(config(reflector={"country": ["Ukraine", "Poland"]}))
     root.answers[("pacman", "-T", "reflector")] = (127, "reflector\n")
+    root.answers[("pacman", "-Si", "reflector")] = (0, si("reflector"))
     arch.setup()
     conf = engine.SYSROOT / "etc/xdg/reflector/reflector.conf"
     assert conf.read_text() == (
