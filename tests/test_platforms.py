@@ -2,6 +2,7 @@ import grp
 import os
 import pwd
 import shutil
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -381,3 +382,68 @@ def test_setup_reflector(root, capsys):
     arch.setup()
     assert ["systemctl", "daemon-reload"] in root.calls
     assert engine.notices[0].startswith("refreshing the mirrorlist failed (network?)")
+
+
+SRCINFO = """pkgbase = paru
+\tpkgver = 2.1.0
+\tmakedepends = cargo
+\tdepends = git
+\tdepends = pacman
+\tdepends = libalpm.so>=16
+pkgname = paru
+"""
+
+
+class Clone(Fake):
+    """git clone leaves a checkout with SRCINFO; makepkg --packagelist names
+    a file it creates."""
+
+    def __call__(self, argv, check=False, **kwargs):
+        if argv[:2] == ["git", "clone"]:
+            Path(argv[-1]).mkdir()
+            (Path(argv[-1]) / ".SRCINFO").write_text(SRCINFO)
+        if argv[:2] == ["makepkg", "--packagelist"]:
+            built = Path(kwargs["cwd"]) / "paru-2.1.0-1-x86_64.pkg.tar.zst"
+            built.touch()
+            return subprocess.CompletedProcess(argv, 0, f"{built}\n{built}.debug\n", "")
+        return super().__call__(argv, check, **kwargs)
+
+
+def test_ensure_paru(monkeypatch, capsys):
+    fake = Clone()
+    monkeypatch.setattr(engine, "_run", fake)
+    monkeypatch.setenv("SUDO_CMD", "")
+    fake.answers[("paru", "--version")] = (0, "paru v2.1.0 - libalpm v16.0.1\n")
+    arch = Arch(config(aur={}))
+    assert arch.ensure_paru() is False
+    assert fake.calls == [["paru", "--version"]]
+
+    # A paru that does not run is built: deps first, as root through pacman.
+    fake.answers = {
+        ("paru", "--version"): (127, ""),
+        ("pacman", "-T", "base-devel", "git"): (127, "base-devel\n"),
+        ("pacman", "-T", "cargo", "git", "libalpm.so", "pacman"): (127, "cargo\n"),
+        ("rustup", "default"): (1, ""),  # rustup without a toolchain
+    }
+    assert arch.ensure_paru() is True
+    mutations = [c for c in fake.calls if c[:2] not in (["pacman", "-T"], ["paru", "--version"])]
+    assert mutations[0] == ["pacman", "-S", "--needed", "--noconfirm", "base-devel"]
+    assert mutations[1][:5] == ["git", "clone", "--quiet", "--depth", "1"]
+    assert mutations[2:6] == [
+        ["pacman", "-S", "--needed", "--noconfirm", "--asdeps", "cargo"],
+        ["rustup", "default"],
+        ["rustup", "default", "stable"],
+        ["makepkg", "--noconfirm"],
+    ]
+    assert mutations[-1][:3] == ["pacman", "-U", "--noconfirm"]
+    assert mutations[-1][3].endswith("/paru-2.1.0-1-x86_64.pkg.tar.zst")
+    assert len(mutations[-1]) == 4  # the .debug file was not built
+    assert capsys.readouterr().out == "-> paru built from the AUR\n"
+
+
+def test_ensure_paru_dry_run(system, monkeypatch, capsys):
+    monkeypatch.setattr(engine, "DRY_RUN", True)
+    system.programs.add("paru")
+    assert Arch(config(aur={})).ensure_paru() is True
+    assert system.calls == [["paru", "--version"]]
+    assert capsys.readouterr().out == "-> paru built from the AUR\n"

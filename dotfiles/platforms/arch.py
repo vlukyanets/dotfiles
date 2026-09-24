@@ -3,7 +3,10 @@ makepkg's build flags, fresh mirrors)."""
 
 import os
 import re
+import shutil
 import subprocess
+import tempfile
+from pathlib import Path
 
 from dotfiles import engine
 from dotfiles.engine import (
@@ -22,6 +25,7 @@ from dotfiles.platforms.linux import Linux
 # pacman's field names are translated; the parser reads the English ones.
 C = {**os.environ, "LC_ALL": "C"}
 PACMAN_CONF = "/etc/pacman.conf"
+PARU = "https://aur.archlinux.org/paru.git"
 STALE = "if downloads returned 404 the sync databases are stale: run {} -Syu and apply again"
 
 
@@ -127,12 +131,7 @@ class Arch(Linux):
         repo = [n for n in names if n in known]
         aur = [n for n in names if n not in known]
         if repo:
-            try:
-                for attempt in retrying():
-                    with attempt, as_root():
-                        run("pacman", "-S", "--needed", "--noconfirm", *repo)
-            except subprocess.CalledProcessError:
-                die(f"pacman -S failed; {STALE.format('pacman')}")
+            self._sync(repo)
         if not aur:
             return
         if not self.cfg["features"]["aur"]["enabled"]:
@@ -155,7 +154,43 @@ class Arch(Linux):
         check is paru --version, not the package."""
         if (output("paru", "--version") or "").startswith("paru "):
             return False
-        die("paru does not run")
+        if engine.DRY_RUN:  # nothing cloned to read the dependencies from
+            changed("paru built from the AUR")
+            return True
+        self._sync(self.missing(["base-devel", "git"]))
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / "paru"
+            for attempt in retrying():
+                with attempt:
+                    shutil.rmtree(src, ignore_errors=True)  # a clone cut off halfway
+                    run("git", "clone", "--quiet", "--depth", "1", PARU, str(src))
+            info = (src / ".SRCINFO").read_text()
+            deps = re.findall(r"^\s*(?:make)?depends = (\S+)$", info, re.MULTILINE)
+            self._sync(self.missing(sorted({re.split(r"[<>=]", d)[0] for d in deps})), "--asdeps")
+            # cargo through rustup runs only with a default toolchain, and the
+            # feature that sets one runs after the packages.
+            if output("rustup", "default") == "":
+                for attempt in retrying():
+                    with attempt:
+                        run("rustup", "default", "stable")
+            # makepkg as the user (it refuses root), the install as root.
+            run("makepkg", "--noconfirm", cwd=src)
+            built = (output("makepkg", "--packagelist", cwd=src) or "").split()
+            with as_root():
+                run("pacman", "-U", "--noconfirm", *[f for f in built if Path(f).exists()])
+        changed("paru built from the AUR")
+        return True
+
+    def _sync(self, names: list[str], *flags: str) -> None:
+        """NAMES from the repositories, as root, retried; nothing when empty."""
+        if not names:
+            return
+        try:
+            for attempt in retrying():
+                with attempt, as_root():
+                    run("pacman", "-S", "--needed", "--noconfirm", *flags, *names)
+        except subprocess.CalledProcessError:
+            die(f"pacman -S failed; {STALE.format('pacman')}")
 
     def depends(self, names: list[str]) -> dict[str, set[str]]:
         todo = set(names)
