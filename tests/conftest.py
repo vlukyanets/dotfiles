@@ -79,8 +79,8 @@ def fake(monkeypatch) -> Fake:
 
 
 class AsRoot(Fake):
-    """Fakes every command, but carries out `install` and `ln -sfn` as the
-    test user, so root's files land under SYSROOT; engine._owner then reads
+    """Fakes every command, but carries out `install`, `ln -sfn` and an
+    empty `git clone` as the test user, so root's files land under SYSROOT; engine._owner then reads
     them as root's (patched by the fixture)."""
 
     def __call__(self, argv, check=False, **kwargs):
@@ -89,6 +89,8 @@ class AsRoot(Fake):
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(argv[-2], dst)
             dst.chmod(int(argv[argv.index("-m") + 1], 8))
+        if argv[:2] == ["git", "clone"] and not self.answers.get(tuple(argv), (0,))[0]:
+            Path(argv[-1]).mkdir(parents=True)
         if argv[:2] == ["ln", "-sfn"]:
             Path(argv[-1]).parent.mkdir(parents=True, exist_ok=True)
             Path(argv[-1]).unlink(missing_ok=True)

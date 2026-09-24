@@ -5,7 +5,9 @@ import grp
 import importlib
 import os
 import pwd
+import subprocess
 import tomllib
+from pathlib import Path
 
 import pytest
 
@@ -534,3 +536,153 @@ def test_nvidia(machine, monkeypatch):
     engine.notices.clear()
     apply("nvidia", cfg)
     assert engine.notices == []
+
+
+# Batch 5: the user's environment.
+
+
+def test_zsh(machine, monkeypatch, capsys):
+    monkeypatch.setattr(
+        pwd,
+        "getpwuid",
+        lambda uid: pwd.struct_passwd((ME, "x", 1000, 1000, "", "/home/x", "/bin/bash")),
+    )
+    monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/zsh")
+    apply("zsh")
+    assert ["chsh", "-s", "/usr/bin/zsh", ME] in machine.calls
+    omz = Path.home() / ".oh-my-zsh"
+    assert (omz / "custom/plugins/zsh-syntax-highlighting").is_dir()
+    clones = [c[-2] for c in machine.calls if c[:2] == ["git", "clone"]]
+    assert [url.rsplit("/", 1)[-1] for url in clones] == [
+        "ohmyzsh.git", "powerlevel10k.git", "zsh-autosuggestions.git", "zsh-syntax-highlighting.git",
+    ]  # fmt: skip
+    assert "takes effect at the next login" in engine.notices[0]
+    capsys.readouterr()
+    monkeypatch.setattr(
+        pwd,
+        "getpwuid",
+        lambda uid: pwd.struct_passwd((ME, "x", 1000, 1000, "", "/home/x", "/usr/bin/zsh")),
+    )
+    machine.calls.clear()
+    apply("zsh")
+    assert capsys.readouterr().out == ""
+    assert machine.calls == []
+
+
+def test_zsh_defers_a_failed_clone(machine, monkeypatch):
+    monkeypatch.setattr(engine, "sleep", lambda seconds: None)
+
+    def clone_fails(argv, check=False, **kwargs):
+        if argv[:2] == ["git", "clone"]:
+            raise subprocess.CalledProcessError(128, argv)
+        return machine(argv, check, **kwargs)
+
+    monkeypatch.setattr(engine, "_run", clone_fails)
+    with pytest.raises(engine.Deferred, match="cloning https://github.com/ohmyzsh"):
+        apply("zsh")
+    assert not (Path.home() / ".oh-my-zsh").exists()  # nothing half-cloned in place
+
+
+def test_uv(machine, capsys):
+    apply("uv")
+    assert machine.calls[-1] == ["uv", "python", "install"]
+    machine.answers[("uv", "python", "list", "--only-installed", "--managed-python")] = (
+        0,
+        "cpython-3.13\n",
+    )
+    capsys.readouterr()
+    apply("uv")
+    assert capsys.readouterr().out == ""
+
+
+def test_fnm(machine, capsys):
+    apply("fnm")
+    installs = [c for c in machine.calls if c[0] == "fnm" and c[1] != "ls"]
+    assert installs == [
+        ["fnm", "install", "--lts"],
+        ["fnm", "default", "lts-latest"],
+        ["fnm", "exec", "--using=lts-latest", "--", "npm", "ls", "-g", "pnpm"],
+        ["fnm", "exec", "--using=lts-latest", "--", "npm", "install", "-g", "pnpm"],
+    ]
+    machine.answers[("fnm", "ls")] = (0, "* v22.11.0 lts-latest, default\n* system\n")
+    machine.answers[("fnm", "exec", "--using=lts-latest", "--", "npm", "ls", "-g", "pnpm")] = (
+        0,
+        "└── pnpm@9.1.0\n",
+    )
+    capsys.readouterr()
+    apply("fnm")
+    assert capsys.readouterr().out == ""
+
+
+def test_rustup(machine, capsys):
+    machine.answers[("rustup", "default")] = (1, "")
+    apply("rustup")
+    changes = [c for c in machine.calls if c[1] in ("default", "toolchain") and len(c) > 2]
+    assert changes == [
+        ["rustup", "default", "stable"],
+        ["rustup", "toolchain", "uninstall", "stable"],
+        ["rustup", "toolchain", "install", "stable"],
+    ]
+    assert feature("rustup")[1].replaces() == ["rust"]
+    machine.answers = {
+        ("rustup", "default"): (0, "stable-x86_64-unknown-linux-gnu (default)\n"),
+        ("rustup", "run", "stable", "rustc", "-V"): (0, "rustc 1.90.0\n"),
+        ("rustup", "run", "stable", "cargo", "-V"): (0, "cargo 1.90.0\n"),
+    }
+    capsys.readouterr()
+    apply("rustup")
+    assert capsys.readouterr().out == ""
+
+
+def test_libvirt(machine, monkeypatch, capsys):
+    monkeypatch.setattr(grp, "getgrnam", lambda name: grp.struct_group((name, "x", 970, [ME])))
+    write("/proc/cpuinfo", "flags\t: fpu vme\n")
+    running(machine, "libvirtd.service", "virtlogd.socket")
+    info = "Name: default\nActive: no\nAutostart: no\n"
+    machine.answers[("virsh", "-c", "qemu:///system", "net-info", "default")] = (0, info)
+    apply("libvirt")
+    virsh = [c[3] for c in machine.calls if c[0] == "virsh"]
+    assert virsh == ["net-info", "net-autostart", "net-start"]
+    assert engine.notices[0].startswith("libvirt: no vmx/svm CPU flag")
+    machine.answers[("virsh", "-c", "qemu:///system", "net-info", "default")] = (
+        0,
+        "Active: yes\nAutostart: yes\n",
+    )
+    write("/proc/cpuinfo", "flags\t: fpu vmx\n")
+    capsys.readouterr()
+    apply("libvirt")
+    assert capsys.readouterr().out == ""
+    assert feature("libvirt")[1].replaces() == ["jack2"]
+
+
+def test_ssh_key(machine, monkeypatch, capsys):
+    key = Path.home() / ".ssh/id_ed25519"
+    apply("ssh_key", defaults())
+    keygen = [c for c in machine.calls if c[0] == "ssh-keygen"]
+    assert keygen[0][:6] == ["ssh-keygen", "-t", "ed25519", "-q", "-N", ""]
+    assert engine.notices[0].startswith("new SSH public key")
+    key.touch()
+    capsys.readouterr()
+    apply("ssh_key")
+    assert capsys.readouterr().out == ""
+
+    key.unlink()
+    engine.notices.clear()
+    cfg = defaults()
+    cfg["ssh"]["passphrase"] = True
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    machine.calls.clear()
+    apply("ssh_key", cfg)
+    assert machine.calls == []  # no terminal to ask for the passphrase
+    assert engine.notices[0].startswith(f"no SSH key at {key}")
+
+
+def test_ssh_agent(machine, capsys):
+    apply("ssh_agent")
+    assert machine.calls == [["systemctl", "--user", "show-environment"]]
+    assert engine.notices[0].startswith("no systemd user session")
+    engine.notices.clear()
+    machine.answers[("systemctl", "--user", "show-environment")] = (0, "HOME=/x\n")
+    apply("ssh_agent")
+    assert machine.calls[-1] == ["systemctl", "--user", "enable", "--now", "ssh-agent.socket"]
+    assert "SSH_AUTH_SOCK" in engine.notices[0]

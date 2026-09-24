@@ -173,6 +173,20 @@ def retrying(policy: RetryPolicy = NETWORK):
             return
 
 
+def network(*cmd: str, failure: str, **kwargs) -> None:
+    """CMD, which goes to the network: retried (NETWORK), and when it keeps
+    failing, defer(FAILURE) — the next apply finds the state still missing.
+    Its progress output is dropped unless KWARGS say otherwise; the `->`
+    line that follows says what happened."""
+    kwargs.setdefault("stdout", subprocess.DEVNULL)
+    try:
+        for attempt in retrying():
+            with attempt:
+                run(*cmd, **kwargs)
+    except subprocess.CalledProcessError:
+        defer(failure)
+
+
 def path(name) -> Path:
     """NAME, an absolute path on the system, under SYSROOT: where to read it."""
     return SYSROOT / str(name).lstrip("/")
