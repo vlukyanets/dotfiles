@@ -116,6 +116,13 @@ class Arch(Linux):
                     "reflector.timer tries again"
                 )
 
+    def initramfs_hooks(self) -> list[str]:
+        """HOOKS=(...) of mkinitcpio.conf, in order; [] without the line."""
+        conf = engine.path("/etc/mkinitcpio.conf")
+        text = conf.read_text() if conf.exists() else ""
+        found = re.search(r"^HOOKS=\((.*)\)", text, re.MULTILINE)
+        return found.group(1).split() if found else []
+
     def missing(self, names: list[str]) -> list[str]:
         if not names:
             return []

@@ -38,7 +38,7 @@ class Locale(Feature):
                     run("systemctl", "restart", "systemd-vconsole-setup.service")
             except subprocess.CalledProcessError:
                 pass  # no console to set up, e.g. inside a graphical session
-            if font and _hooks(r"sd-vconsole|consolefont"):
+            if font and {"sd-vconsole", "consolefont"} & set(strategy.initramfs_hooks()):
                 notice("console font changed — run 'sudo mkinitcpio -P' so early boot uses it too")
 
         zone = f"/usr/share/zoneinfo/{locale['timezone']}"
@@ -49,10 +49,3 @@ class Locale(Feature):
     class Arch:
         def packages(self):
             return list(self.cfg["features"]["locale"]["console"]["packages"])
-
-
-def _hooks(pattern: str) -> bool:
-    """mkinitcpio.conf's HOOKS= has a hook matching PATTERN."""
-    conf = engine.path("/etc/mkinitcpio.conf")
-    text = conf.read_text() if conf.exists() else ""
-    return bool(re.search(rf"^HOOKS=.*\b({pattern})\b", text, re.MULTILINE))

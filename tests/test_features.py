@@ -336,3 +336,79 @@ def test_a_failed_apply_still_gets_its_post(snapper):
         platforms.transaction()
         raise RuntimeError
     assert snapper.calls[-1][3:7] == ["create", "-t", "post", "--pre-number"]
+
+
+# Batch 4: boot and disks.
+
+UUID = "0a1b2c3d-1111-2222-3333-444455556666"
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        (f"rd.luks.name={UUID}=root rw", f"rd.luks.name={UUID}=root rw rd.luks.options={UUID}:discard"),
+        (f"rd.luks.name={UUID}=root rd.luks.options={UUID}:tpm2-device=auto quiet",
+         f"rd.luks.name={UUID}=root rd.luks.options={UUID}:tpm2-device=auto,discard quiet"),
+        (f"rd.luks.name={UUID}=root rd.luks.options={UUID}:discard", None),  # already
+        ("root=/dev/sda2 rw", "no rd.luks.name"),
+    ],
+)  # fmt: skip
+def test_with_discard(before, after):
+    from dotfiles.features.luks_discard import with_discard
+
+    result = with_discard(before)
+    if after is None:
+        assert result == before
+    elif after == "no rd.luks.name":
+        assert result is None
+    else:
+        assert result == after
+
+
+def test_luks_discard(machine, capsys):
+    write("/etc/mkinitcpio.conf", "HOOKS=(base systemd sd-encrypt)\n")
+    cmdline = write("/etc/kernel/cmdline", f"rd.luks.name={UUID}=root rw\n")
+    apply("luks_discard")
+    assert cmdline.read_text() == f"rd.luks.name={UUID}=root rw rd.luks.options={UUID}:discard\n"
+    assert engine.notices[0].startswith("LUKS discard enabled")
+    capsys.readouterr()
+    apply("luks_discard")
+    assert capsys.readouterr().out == ""
+    assert len(engine.notices) == 1
+
+
+@pytest.mark.parametrize(
+    ("setup", "notice"),
+    [
+        ({"/etc/mkinitcpio.conf": "HOOKS=(base udev encrypt)\n"}, "no sd-encrypt hook"),
+        ({"/etc/mkinitcpio.conf": "HOOKS=(base sd-encrypt)\n"}, "/etc/kernel/cmdline does not exist"),
+        ({"/etc/mkinitcpio.conf": "HOOKS=(sd-encrypt)\n", "/etc/kernel/cmdline": "rw\n"},
+         "no rd.luks.name="),
+    ],
+)  # fmt: skip
+def test_luks_discard_says_what_to_do_by_hand(machine, setup, notice):
+    for name, text in setup.items():
+        write(name, text)
+    apply("luks_discard")
+    assert notice in engine.notices[0]
+    assert not [c for c in machine.calls if c[0] == "install"]
+
+
+def test_plymouth(machine, capsys):
+    conf = write("/etc/mkinitcpio.conf", "MODULES=()\nHOOKS=(base systemd autodetect)\n")
+    apply("plymouth")
+    assert conf.read_text() == "MODULES=()\nHOOKS=(base systemd plymouth autodetect)\n"
+    assert machine.calls[-1] == ["plymouth-set-default-theme", "-R", "bgrt"]
+    assert "quiet splash" in engine.notices[0]
+    capsys.readouterr()
+    machine.answers[("plymouth-set-default-theme",)] = (0, "bgrt\n")
+    machine.calls.clear()
+    apply("plymouth")
+    assert capsys.readouterr().out == ""
+    assert ["plymouth-set-default-theme", "-R", "bgrt"] not in machine.calls
+
+
+def test_plymouth_goes_after_udev_without_systemd(machine):
+    conf = write("/etc/mkinitcpio.conf", "HOOKS=(base udev encrypt)\n")
+    apply("plymouth")
+    assert conf.read_text() == "HOOKS=(base udev plymouth encrypt)\n"
