@@ -120,28 +120,35 @@ run against an empty tree. It is not a command-line option.
 ## `dotfiles apply` — `dotfiles/apply.py`
 
 There is no list of steps. Every module in `dotfiles/features/` is a
-step, and so is the deploy of `home/`, named `dotfiles`. A module declares
-what the runner needs to know next to its code:
+step, and so is the deploy of `home/`, named `dotfiles`. Steps never name
+each other: a module declares the capabilities it provides and the ones it
+requires, next to its code. A capability is an abstract name for something
+on the machine, such as `packages` (packages can be installed), `aur` or
+`dotfiles` (home/ is deployed); it says nothing about which package
+manager, distribution or feature supplies it.
 
 ```python
 """Build and install paru."""
 
 GATE = "aur"  # optional; default: the module's own name, features.<name>
-NEEDS = ("makepkg",)  # optional; steps that run first and must not fail
+PROVIDES = ("aur",)  # optional; what the steps after it can rely on
+REQUIRES = ("packages",)  # optional; its providers run first and must not fail
 
 
 def apply(cfg: dict) -> None: ...
 ```
 
-- The order comes from `NEEDS` alone: a step runs after every step it
-  needs (a topological sort, `graphlib` from the stdlib); steps free to
-  run at the same point run by name. A feature that must run after
-  another says so in `NEEDS`, `dotfiles` included.
+- The order comes from capabilities alone: a step runs after every step
+  that provides a capability it requires (a topological sort, `graphlib`);
+  steps free to run at the same point run by name.
+- Several steps may provide one capability: one per system, say, each
+  behind its own `os_guard`. A step that requires it runs after all of
+  them; the ones that do not apply here skip.
 - A step runs only when `features.<GATE>.enabled`. `GATE = None` is for
   the few modules that read several flags themselves (services, tools,
-  apps). A disabled step is imported, since its `NEEDS` place the others,
-  but never run: importing a feature module has no side effects.
-- A `NEEDS` entry that names no step, or a cycle, fails the apply before
+  apps). A disabled step is imported, since its declarations place the
+  others, but never run: importing a feature module has no side effects.
+- A capability that nothing provides, or a cycle, fails the apply before
   any step runs, naming the module. A test checks every real module: its
   gate is a feature in the schema and it has `apply`.
 - A feature module is one function:
@@ -173,10 +180,11 @@ def apply(cfg: dict) -> None:
 - Any other exception (`die`, a failed `as_root`, a bug): the step
   failed. The runner prints `error: <step>: <message>` to stderr and
   continues with the next step.
-- A step whose `needs` include a failed step is not run and counts as
-  failed itself, so what depends on it is not run either:
-  `error: paru: not run, makepkg failed`. A need that is disabled,
-  skipped by `os_guard` or deferred does not block: only a failure does.
+- A step that requires a capability whose provider failed is not run and
+  counts as failed itself, so what depends on it is not run either:
+  `error: paru: not run, pacman failed`. A provider that is
+  disabled, skipped by `os_guard` or deferred does not block: only a
+  failure does.
 - `apply` exits 1 at the end when any step failed or was not run.
 - Ctrl-C stops the run, replays the notices, and exits 130.
 - Notices are printed at the end in every case, after a failure too:
@@ -244,8 +252,9 @@ This replaces `ci/test-lib.sh`; its checks all carry over.
   `conftest.py`, a helper that really tried to escalate fails the test.
 - `retry` (sleep patched), `defer`, `os_guard` against a fake os-release,
   `notice` (printed immediately and at the end).
-- Runner (fake feature modules in a temp package): order from `NEEDS`
-  and names, unknown need and cycle rejected, gated steps not run, `Skip` silent, a failed step does not stop the steps that
+- Runner (fake feature modules in a temp package): order from
+  capabilities and names, two providers of one capability, a capability
+  nothing provides and a cycle rejected, gated steps not run, `Skip` silent, a failed step does not stop the steps that
   do not need it, a step that needs it is not run (transitively), exit 1,
   notices after a failure, dry run makes no call to sudo or `run`.
 - `nobeep` in an empty `SYSROOT`: dry run reports `(missing)`, and a real
@@ -281,7 +290,7 @@ This replaces `ci/test-lib.sh`; its checks all carry over.
 1. **A failed step blocks only the steps that need it** (chezmoi stopped
    at the first failed script). A broken feature, such as a download
    that failed, no longer blocks the dotfiles and every unrelated
-   feature after it; the steps that build on it (`needs`) are not run,
+   feature after it; the steps that require what it provides are not run,
    so they do not fail again with a confusing second error.
 2. **Helpers return whether they changed something** instead of
    features comparing a global counter; there is no counter.

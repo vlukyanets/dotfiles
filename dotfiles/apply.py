@@ -1,5 +1,5 @@
 """dotfiles apply: every feature module and the dotfiles, each after the
-steps it needs, and the notices at the end."""
+steps that provide what it requires, and the notices at the end."""
 
 import graphlib
 import importlib
@@ -13,41 +13,58 @@ from dotfiles import config, engine, render
 from dotfiles.config import ROOT, ConfigError
 
 PACKAGE = "dotfiles.features"
-# The deploy of home/: a step without a module, which features can need.
+# The deploy of home/: a step without a module that provides "dotfiles".
 DEPLOY = "dotfiles"
 
 
 class Step(NamedTuple):
     name: str  # the module's name; DEPLOY for the deploy
     gate: str | None  # runs only when features.<gate>.enabled; None: always
-    needs: tuple[str, ...]  # steps that run first and must not have failed
+    provides: tuple[str, ...]  # capabilities other steps can require
+    requires: tuple[str, ...]  # capabilities whose providers run first
     module: object | None
+    after: tuple[str, ...] = ()  # the steps providing what it requires
 
 
 def steps(package: str = PACKAGE) -> list[Step]:
-    """Every module of PACKAGE, as a step, after the steps it NEEDS; the
-    rest by name. A module declares NEEDS = (...) and, when it is not
-    gated by features.<its name>, GATE = "<feature>" or None."""
-    found = {DEPLOY: Step(DEPLOY, None, (), None)}
+    """Every module of PACKAGE, as a step, after every step that PROVIDES
+    what it REQUIRES; the rest by name. A module may declare PROVIDES,
+    REQUIRES (capability names, not step names) and, when it is not gated
+    by features.<its name>, GATE = "<feature>" or None."""
+    found = [Step(DEPLOY, None, (DEPLOY,), (), None)]
     for info in pkgutil.iter_modules(importlib.import_module(package).__path__):
         module = importlib.import_module(f"{package}.{info.name}")
-        gate = getattr(module, "GATE", info.name)
-        found[info.name] = Step(info.name, gate, tuple(getattr(module, "NEEDS", ())), module)
-    for step in found.values():
-        for need in step.needs:
-            if need not in found:
-                raise ConfigError(f"{package}.{step.name}: NEEDS: no step {need!r}")
-    graph = graphlib.TopologicalSorter({name: step.needs for name, step in found.items()})
+        found.append(
+            Step(
+                info.name,
+                getattr(module, "GATE", info.name),
+                tuple(getattr(module, "PROVIDES", ())),
+                tuple(getattr(module, "REQUIRES", ())),
+                module,
+            )
+        )
+    providers: dict[str, list[str]] = {}
+    for step in found:
+        for capability in step.provides:
+            providers.setdefault(capability, []).append(step.name)
+    by_name = {}
+    for step in found:
+        missing = [c for c in step.requires if c not in providers]
+        if missing:
+            raise ConfigError(f"{package}.{step.name}: REQUIRES: nothing provides {missing[0]!r}")
+        after = {name for c in step.requires for name in providers[c]} - {step.name}
+        by_name[step.name] = step._replace(after=tuple(sorted(after)))
+    graph = graphlib.TopologicalSorter({name: step.after for name, step in by_name.items()})
     try:
         graph.prepare()
     except graphlib.CycleError as e:
-        raise ConfigError(f"{package}: NEEDS: a cycle: {' → '.join(e.args[1])}") from None
+        raise ConfigError(f"{package}: REQUIRES: a cycle: {' → '.join(e.args[1])}") from None
     order = []
     while graph.is_active():
         ready = sorted(graph.get_ready())
         order += ready
         graph.done(*ready)
-    return [found[name] for name in order]
+    return [by_name[name] for name in order]
 
 
 def _deploy(host: str, root: Path) -> None:
@@ -75,7 +92,7 @@ def apply(
         for step in steps(package):
             if step.gate and not cfg["features"][step.gate]["enabled"]:
                 continue
-            blocked = [name for name in step.needs if name in failed]
+            blocked = [name for name in step.after if name in failed]
             if blocked:
                 failed.add(step.name)
                 print(f"error: {step.name}: not run, {', '.join(blocked)} failed", file=sys.stderr)

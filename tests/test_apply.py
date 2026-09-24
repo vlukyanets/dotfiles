@@ -11,22 +11,31 @@ from dotfiles.config import ROOT, ConfigError
 # name -> (declarations, body of apply)
 MODULES = {
     "a": ('GATE = "on"', 'print("a ran")'),
-    "off": ('GATE = "off"', 'raise AssertionError("a disabled feature ran")'),
-    "boom": ("GATE = None", 'from dotfiles.engine import die\ndie("broken")'),
+    "off": (
+        'GATE = "off"\nPROVIDES = ("offcap",)',
+        'raise AssertionError("a disabled feature ran")',
+    ),
+    "boom": (
+        'GATE = None\nPROVIDES = ("boomcap",)',
+        'from dotfiles.engine import die\ndie("broken")',
+    ),
     "crash": ("GATE = None", "raise RuntimeError('bug')"),
     "guarded": (
-        "GATE = None",
+        'GATE = None\nPROVIDES = ("g",)',
         'from dotfiles.engine import os_guard\nos_guard("nowhere")\nprint("guarded ran")',
     ),
-    "needs_boom": ('GATE = None\nNEEDS = ("boom",)', 'print("needs_boom ran")'),
-    "needs_that": ('GATE = None\nNEEDS = ("needs_boom",)', 'print("needs_that ran")'),
-    # a disabled need does not block
+    "needs_boom": (
+        'GATE = None\nPROVIDES = ("nb",)\nREQUIRES = ("boomcap",)',
+        'print("needs_boom ran")',
+    ),
+    "needs_that": ('GATE = None\nREQUIRES = ("nb",)', 'print("needs_that ran")'),
+    # a disabled provider does not block
     "net": (
-        'GATE = None\nNEEDS = ("off",)',
+        'GATE = None\nPROVIDES = ("netcap",)\nREQUIRES = ("offcap",)',
         'from dotfiles.engine import defer\ndefer("cloning x failed")',
     ),
     "note": ("GATE = None", 'from dotfiles.engine import notice\nnotice("reboot")'),
-    "z": ('GATE = None\nNEEDS = ("guarded", "net", "dotfiles")', 'print("z ran")'),
+    "z": ('GATE = None\nREQUIRES = ("g", "netcap", "dotfiles")', 'print("z ran")'),
 }
 
 
@@ -58,8 +67,9 @@ def root(tmp_path) -> Path:
     return root
 
 
-def test_steps_run_after_their_needs_then_by_name(package):
-    assert [s.name for s in steps(package)] == [
+def test_steps_run_after_their_providers_then_by_name(package):
+    got = steps(package)
+    assert [s.name for s in got] == [
         "a",
         "boom",
         "crash",
@@ -72,8 +82,30 @@ def test_steps_run_after_their_needs_then_by_name(package):
         "needs_that",
         "z",
     ]
-    gates = {s.name: s.gate for s in steps(package)}
-    assert (gates["a"], gates["off"], gates["boom"], gates[DEPLOY]) == ("on", "off", None, None)
+    step = {s.name: s for s in got}
+    assert step["z"].after == ("dotfiles", "guarded", "net")
+    gates = (step["a"].gate, step["off"].gate, step["boom"].gate, step[DEPLOY].gate)
+    assert gates == ("on", "off", None, None)
+
+
+def test_every_provider_of_a_capability_runs_first(root, tmp_path, monkeypatch, capsys):
+    """One capability, one provider per system: the one that does not apply
+    here skips, the other provides it."""
+    package = make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "on_other_os": (
+                'GATE = None\nPROVIDES = ("installer",)',
+                'from dotfiles.engine import os_guard\nos_guard("nowhere")',
+            ),
+            "on_this_os": ('GATE = None\nPROVIDES = ("installer",)', 'print("installer ready")'),
+            "app": ('GATE = None\nREQUIRES = ("installer",)', 'print("app ran")'),
+        },
+    )
+    assert [s.name for s in steps(package)] == ["dotfiles", "on_other_os", "on_this_os", "app"]
+    assert apply("h", root, package=package) == 0
+    assert capsys.readouterr().out == "installer ready\napp ran\n"
 
 
 def test_order_gates_failures_and_notices(root, package, capsys):
@@ -99,14 +131,20 @@ def test_order_gates_failures_and_notices(root, package, capsys):
 @pytest.mark.parametrize(
     ("modules", "error"),
     [
-        ({"x": ('NEEDS = ("nope",)', "pass")}, "fakefeatures.x: NEEDS: no step 'nope'"),
         (
-            {"x": ('NEEDS = ("y",)', "pass"), "y": ('NEEDS = ("x",)', "pass")},
-            "fakefeatures: NEEDS: a cycle: ",
+            {"x": ('REQUIRES = ("nope",)', "pass")},
+            "fakefeatures.x: REQUIRES: nothing provides 'nope'",
+        ),
+        (
+            {
+                "x": ('PROVIDES = ("cx",)\nREQUIRES = ("cy",)', "pass"),
+                "y": ('PROVIDES = ("cy",)\nREQUIRES = ("cx",)', "pass"),
+            },
+            "fakefeatures: REQUIRES: a cycle: ",
         ),
     ],
 )
-def test_bad_needs(tmp_path, monkeypatch, modules, error):
+def test_bad_requires(tmp_path, monkeypatch, modules, error):
     with pytest.raises(ConfigError, match="^" + error):
         steps(make_package(tmp_path, monkeypatch, modules))
 
