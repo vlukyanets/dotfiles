@@ -1,11 +1,15 @@
 import grp
+import os
 import pwd
+import shutil
+import tomllib
+from pathlib import Path
 
 import pytest
 from conftest import Fake
 
 from dotfiles import engine, platforms
-from dotfiles.config import ConfigError
+from dotfiles.config import ROOT, ConfigError
 from dotfiles.engine import Failed
 from dotfiles.platforms import detect
 from dotfiles.platforms.arch import Arch
@@ -176,3 +180,100 @@ def test_detect(monkeypatch):
     release(ID="linuxmint", ID_LIKE="ubuntu debian")
     with pytest.raises(ConfigError, match="^no platform for linuxmint or ubuntu or debian$"):
         detect({})
+
+
+class AsRoot(Fake):
+    """Fakes every command, but carries out `install` as the test user, so
+    root's files land under SYSROOT; engine._owner then reads them as
+    root's (patched by the fixture)."""
+
+    def __call__(self, argv, check=False, **kwargs):
+        if argv[0] == "install":
+            dst = Path(argv[-1])
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(argv[-2], dst)
+            dst.chmod(int(argv[argv.index("-m") + 1], 8))
+        return super().__call__(argv, check, **kwargs)
+
+
+@pytest.fixture
+def root(monkeypatch) -> AsRoot:
+    fake = AsRoot()
+    monkeypatch.setattr(engine, "_run", fake)
+    monkeypatch.setattr(engine, "_owner", lambda path: "root:root")
+    monkeypatch.setenv("SUDO_CMD", "")
+    return fake
+
+
+def config(**features) -> dict:
+    """Every setup part off but FEATURES, with the defaults' settings."""
+    defaults = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())
+    for name, settings in features.items():
+        defaults["features"][name].update(enabled=True, **settings)
+    return defaults
+
+
+def test_setup_off_runs_nothing(root, capsys):
+    Arch(config()).setup()
+    assert root.calls == []
+    assert capsys.readouterr().out == ""
+
+
+def test_setup_pacman(root, capsys):
+    conf = engine.SYSROOT / "etc/pacman.conf"
+    conf.parent.mkdir(parents=True)
+    conf.write_text("[options]\nHoldPkg = pacman\n\n[core]\nInclude = /etc/pacman.d/mirrorlist\n")
+    arch = Arch(config(pacman={"parallel_downloads": 2}))
+    arch.setup()
+    assert conf.read_text() == (
+        "[options]\nHoldPkg = pacman\n\nInclude = /etc/pacman.conf.d/options.conf\n"
+        "[core]\nInclude = /etc/pacman.d/mirrorlist\n"
+    )
+    options = engine.SYSROOT / "etc/pacman.conf.d/options.conf"
+    assert options.read_text() == "ParallelDownloads = 2\n"
+    capsys.readouterr()
+    arch.setup()
+    assert capsys.readouterr().out == ""
+
+    arch = Arch(config(pacman={"multilib": True}))
+    arch.setup()
+    assert conf.read_text().endswith("\nInclude = /etc/pacman.conf.d/multilib.conf\n")
+    multilib = engine.SYSROOT / "etc/pacman.conf.d/multilib.conf"
+    assert multilib.read_text() == "[multilib]\nInclude = /etc/pacman.d/mirrorlist\n"
+    assert root.calls[-1] == ["pacman", "-Syu", "--noconfirm"]
+    assert capsys.readouterr().out.endswith("-> multilib database synced (pacman -Syu)\n")
+    # Until the database exists, every apply syncs again; then nothing.
+    db = engine.SYSROOT / "var/lib/pacman/sync/multilib.db"
+    db.parent.mkdir(parents=True)
+    db.touch()
+    root.calls.clear()
+    arch.setup()
+    assert capsys.readouterr().out == ""
+    assert not any(call[0] == "pacman" for call in root.calls)
+
+
+def test_setup_leaves_a_multilib_of_pacman_conf_alone(root):
+    conf = engine.SYSROOT / "etc/pacman.conf"
+    conf.parent.mkdir(parents=True)
+    conf.write_text("[options]\n[core]\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n")
+    Arch(config(pacman={"multilib": True})).setup()
+    assert not (engine.SYSROOT / "etc/pacman.conf.d/multilib.conf").exists()
+    assert "multilib.conf" not in conf.read_text()
+    assert not any(call[0] == "pacman" for call in root.calls)
+
+
+@pytest.mark.parametrize(
+    ("jobs", "options", "makeflags", "extra"),
+    [
+        ("20%", ["ccache", "!debug"], "-j3", "OPTIONS+=(ccache !debug)\n"),
+        ("1%", [], "-j1", ""),  # never below one job
+        ("$(nproc)", [], "-j$(nproc)", ""),  # evaluated by makepkg
+    ],
+)
+def test_setup_makepkg(root, monkeypatch, jobs, options, makeflags, extra):
+    monkeypatch.setattr(os, "cpu_count", lambda: 16)
+    cfg = config(makepkg={"jobs": jobs, "options": options})
+    cfg["git"].update(name="A B", email="a@b")
+    Arch(cfg).setup()
+    conf = engine.SYSROOT / "etc/makepkg.conf.d/dotfiles.conf"
+    assert conf.read_text() == f'MAKEFLAGS="{makeflags}"\n{extra}PACKAGER="A B <a@b>"\n'

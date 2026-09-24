@@ -193,6 +193,9 @@ def test_ensure_line():
     assert ensure_line("/etc/conf", "^d=", "d=4") is True
     assert ensure_line("/etc/conf", "^d=", "d=4") is False
     assert conf.read_text().endswith("#b=9\nd=4\n")
+    assert ensure_line("/etc/conf", "^e=", "e=5", before="^c=") is True
+    assert ensure_line("/etc/conf", "^e=", "e=5", before="^c=") is False
+    assert conf.read_text() == "a=1\nb=2\ne=5\nc=3\n#b=9\nd=4\n"
     assert oct(conf.stat().st_mode & 0o777) == "0o600"
     assert ensure_line("/etc/new", "^x=", "x=1") is True
     assert ensure_line("/etc/new", "^x=", "x=1") is False
