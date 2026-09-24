@@ -4,6 +4,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import stat
 import tempfile
 import tomllib
@@ -126,12 +127,19 @@ def _error(e: Exception, template: str, host: str) -> ConfigError:
     return ConfigError(f"{where}: {host}: {getattr(e, 'message', None) or e}")
 
 
-def render(host: str, out: Path, root: Path = ROOT, current: Path | None = None) -> list[str]:
+def render(
+    host: str,
+    out: Path,
+    root: Path = ROOT,
+    current: Path | None = None,
+    cfg: dict | None = None,
+) -> list[str]:
     """Write HOST's home tree into OUT, which must be missing or empty.
 
     CURRENT is the home directory whose files merged templates read as
-    `current`; without it they see an empty file. Returns the paths written,
-    relative to OUT.
+    `current`; without it they see an empty file. CFG is HOST's config,
+    resolved from ROOT when not given. Returns the paths written, relative
+    to OUT.
     """
     if out.exists() and any(out.iterdir()):
         raise ConfigError(f"{out}: not empty")
@@ -140,7 +148,7 @@ def render(host: str, out: Path, root: Path = ROOT, current: Path | None = None)
         return []
     entries = manifest(root)
     env = environment(home)
-    cfg = config.resolve(host, root)
+    cfg = config.resolve(host, root) if cfg is None else cfg
     context = (
         cfg
         | registries(host, cfg, root)
@@ -194,14 +202,25 @@ def render(host: str, out: Path, root: Path = ROOT, current: Path | None = None)
     return written
 
 
-def check(root: Path = ROOT) -> dict[str, str | None]:
-    """config.check, then every host that resolves is rendered into a temp dir."""
-    results = config.check(root)
+def check(root: Path = ROOT, source: Path | None = None) -> dict[str, str | None]:
+    """config.check of SOURCE (default ROOT), plus the machine config as
+    "local" when there is one; everything that resolves is rendered into a
+    temp dir with the templates of ROOT."""
+    source = source or root
+    results = config.check(source)
+    local = config.local_path()
+    if local.exists():
+        results["local"] = None
     for host, error in results.items():
         if error is None:
             with tempfile.TemporaryDirectory() as tmp:
                 try:
-                    render(host, Path(tmp) / "home", root)
+                    if host == "local":
+                        name = socket.gethostname()
+                        cfg = config.resolve(name, root, local)
+                    else:
+                        name, cfg = host, config.resolve(host, source)
+                    render(name, Path(tmp) / "home", root, cfg=cfg)
                 except ConfigError as e:
                     results[host] = str(e)
     return results
@@ -212,9 +231,14 @@ def _mode(path: Path) -> int:
 
 
 def deploy(
-    host: str, root: Path = ROOT, home: Path | None = None, dry_run: bool = False
+    host: str,
+    root: Path = ROOT,
+    home: Path | None = None,
+    dry_run: bool = False,
+    cfg: dict | None = None,
 ) -> list[str]:
-    """Bring HOME in line with HOST's rendered tree; returns one line per change.
+    """Bring HOME in line with HOST's rendered tree (CFG as in render);
+    returns one line per change.
 
     Only what differs is written, file by file through a temp file and a
     rename; nothing is ever deleted. Directories get their mode when they are
@@ -226,7 +250,7 @@ def deploy(
     changes = []
     with tempfile.TemporaryDirectory() as tmp:
         staged = Path(tmp) / "home"
-        for rel in render(host, staged, root, current=home):
+        for rel in render(host, staged, root, current=home, cfg=cfg):
             src, dst = staged / rel, home / rel
             # A symlinked directory on the way must not lead out of HOME.
             if not dst.parent.resolve().is_relative_to(real_home):

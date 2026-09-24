@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.scripts]
-dotfiles = "dotfiles.__main__:main"
+dotfiles = "dotfiles.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]

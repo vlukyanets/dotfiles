@@ -152,8 +152,9 @@ Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
 ## Project Structure
 
 ```
-pyproject.toml           project, [project.scripts] dotfiles = "dotfiles.__main__:main"
-dotfiles/__main__.py     argparse CLI: config, check
+pyproject.toml           project, [project.scripts] dotfiles = "dotfiles.cli:main"
+dotfiles/cli.py          argparse CLI: init, config, render, deploy, check, apply
+dotfiles/__main__.py     `python -m dotfiles`: calls cli.main
 dotfiles/config.py       load, chain, validate, merge — pure functions over dicts and a root Path
 dotfiles/defaults.toml   schema
 profiles/                base, server, laptop, vm

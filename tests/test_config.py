@@ -3,7 +3,17 @@ from pathlib import Path
 
 import pytest
 
-from dotfiles.config import ROOT, ConfigError, chain, check, explain, resolve
+from dotfiles.config import (
+    DEFAULTS,
+    ROOT,
+    ConfigError,
+    chain,
+    check,
+    explain,
+    init,
+    resolve,
+    resolve_with_sources,
+)
 
 
 def write(root: Path, rel: str, text: str) -> None:
@@ -196,3 +206,55 @@ def test_tests_run_isolated(isolated):
     assert Path.home() == isolated / "home"
     assert os.environ["XDG_RUNTIME_DIR"] == str(isolated / "run")
     assert os.environ["SUDO_CMD"] == "false"
+
+
+def test_init_writes_the_resolved_host_then_nothing(root, tmp_path):
+    write(root, "profiles/p.toml", "[features]\na = true\n")
+    write(root, "hosts/h.toml", 'extends = ["p"]\n')
+    local = tmp_path / "local/dotfiles/config.toml"
+    assert init("h", root, local) == f"-> {local} (missing)"
+    assert tomllib.loads(local.read_text()) == resolve("h", root)
+    assert local.read_text().startswith("# This machine's config: hosts/h.toml")
+    assert init("h", root, local) is None
+    write(root, "hosts/h.toml", 'extends = ["p"]\n[features]\nb = true\n')
+    assert init("h", root, local) == f"-> {local} (content differs)"
+    assert resolve("x", root, local) == {"features": {"a": True, "b": True}}
+
+
+def test_init_needs_a_host_file(root, tmp_path):
+    write(root, "profiles/p.toml", "")
+    with pytest.raises(ConfigError, match=r"^no hosts/p\.toml in "):
+        init("p", root, tmp_path / "config.toml")
+    assert not (tmp_path / "config.toml").exists()
+
+
+def test_local_config_replaces_the_hosts_chain(root, tmp_path):
+    write(root, "hosts/h.toml", "[features]\nb = true\n")
+    write(tmp_path, "config.toml", "[features]\na = true\n")
+    # hosts/h.toml is not read; the key the file lacks gets its default.
+    got, sources = resolve_with_sources("h", root, tmp_path / "config.toml")
+    assert got == {"features": {"a": True, "b": False}}
+    assert sources == {"features.a": str(tmp_path / "config.toml"), "features.b": DEFAULTS}
+
+
+@pytest.mark.parametrize(
+    "text, error",
+    [
+        ("[features]\nc = true\n", "features.c: unknown key"),
+        ('extends = ["p"]\n', "extends: unknown key"),
+        ("[features]\na = 1\n", "features.a: must be boolean, got integer"),
+    ],
+)
+def test_local_config_is_validated(root, tmp_path, text, error):
+    write(tmp_path, "config.toml", text)
+    with pytest.raises(ConfigError, match=f"^{tmp_path}/config.toml: {error}$"):
+        resolve("h", root, tmp_path / "config.toml")
+
+
+def test_missing_local_config_says_how_to_make_one(root):
+    local = Path.home() / ".config/dotfiles/config.toml"
+    with pytest.raises(ConfigError) as e:
+        resolve("h", root, local)
+    assert str(e.value) == (
+        "no ~/.config/dotfiles/config.toml — run dotfiles init <host>, or pass --source <checkout>"
+    )

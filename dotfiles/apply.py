@@ -79,8 +79,8 @@ def order(steps: list[Step], depends: dict[str, set[str]]) -> list[tuple[Step, l
     return done
 
 
-def _deploy(host: str, root: Path) -> None:
-    for line in render.deploy(host, root, dry_run=engine.DRY_RUN):
+def _deploy(host: str, root: Path, cfg: dict) -> None:
+    for line in render.deploy(host, root, dry_run=engine.DRY_RUN, cfg=cfg):
         engine.printed = True
         print(line)
 
@@ -89,7 +89,9 @@ def _error(name: str, msg) -> None:
     print(f"error: {name}: {msg}", file=sys.stderr)
 
 
-def _phases(host: str, root: Path, system: Platform, found: list[Step], failed: set[str]) -> None:
+def _phases(
+    host: str, root: Path, cfg: dict, system: Platform, found: list[Step], failed: set[str]
+) -> None:
     """Setup, packages, dotfiles, features; FAILED collects what failed."""
     wanted = sorted(set().union(*(step.packages for step in found)))
     replaced = sorted(set().union(*(step.replaces for step in found)))
@@ -114,7 +116,7 @@ def _phases(host: str, root: Path, system: Platform, found: list[Step], failed: 
             missing = system.missing(wanted)
 
     try:
-        _deploy(host, root)
+        _deploy(host, root, cfg)
     except Exception as e:  # noqa: BLE001 — the features still run
         failed.add("dotfiles")
         _error("dotfiles", e)
@@ -145,10 +147,11 @@ def apply(
     dry_run: bool = False,
     package: str = PACKAGE,
     platform_package: str = platforms.PACKAGE,
+    cfg: dict | None = None,
 ) -> int:
-    """Bring this machine in line with HOST's config; 1 when something failed
-    or was not run."""
-    cfg = config.resolve(host, root)
+    """Bring this machine in line with HOST's config (CFG, resolved from ROOT
+    when not given); 1 when something failed or was not run."""
+    cfg = config.resolve(host, root) if cfg is None else cfg
     engine.DRY_RUN = dry_run
     engine.printed = False
     failed: set[str] = set()
@@ -158,7 +161,7 @@ def apply(
         with ExitStack() as sessions:  # left after a failure and on Ctrl-C too
             for step in found:
                 sessions.enter_context(step.feature.session(system))
-            _phases(host, root, system, found, failed)
+            _phases(host, root, cfg, system, found, failed)
         if not engine.printed and not failed:
             print("nothing to change")
     finally:  # after a failure and on Ctrl-C too

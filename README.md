@@ -14,8 +14,10 @@ every feature of `dotfiles/defaults.toml`, one module each in
 
 ```
 dotfiles/defaults.toml  every key, its type and its default; every feature off
-profiles/<name>.toml    base, server, laptop
+profiles/<name>.toml    base, server, laptop, vm
 hosts/<hostname>.toml   one file per machine
+~/.config/dotfiles/config.toml
+                        this machine's resolved config, written by `dotfiles init`
 ```
 
 A host or profile sets only what differs and may inherit:
@@ -33,9 +35,15 @@ size    = "20g"
 
 Tables merge; values and arrays are replaced. A shared ancestor is merged
 once. Every file is checked against `dotfiles/defaults.toml`: an unknown
-key or a value of another type fails naming the file and the key. A machine
-with no file in `hosts/` gets the defaults. The rules in full:
-[SPEC-config](docs/spec/SPEC-config.md).
+key or a value of another type fails naming the file and the key. The
+rules in full: [SPEC-config](docs/spec/SPEC-config.md).
+
+A machine runs from its own copy of the config: `dotfiles init [HOST]`
+writes the resolved `hosts/HOST.toml` (default: this machine's hostname),
+every key with its effective value, to `~/.config/dotfiles/config.toml`,
+and overwrites it on the next init. `apply`, `deploy`, `config` and
+`render` read that file; `--source PATH` reads `hosts/<hostname>.toml` of
+the checkout at PATH instead, and `--host NAME` a host of this checkout.
 
 ## Running it
 
@@ -45,6 +53,7 @@ system Python.
     git clone git@github.com:vlukyanets/dotfiles.git && cd dotfiles
     uv sync --locked            # creates .venv/ here, installs uv.lock into it
     uv run --isolated dotfiles check
+    uv run --exact dotfiles init <host>   # ~/.config/dotfiles/config.toml
 
 Two environments, both built by uv from `uv.lock`:
 
@@ -61,13 +70,15 @@ of updating it.
 
 ## Commands
 
-    uv run --exact dotfiles config                            # this machine, as TOML
+    uv run --exact dotfiles init [HOST]                       # hosts/HOST.toml resolved into ~/.config/dotfiles/config.toml
+    uv run --exact dotfiles config                            # this machine's config, as TOML
+    uv run --exact dotfiles config --source .                 # the same from hosts/<hostname>.toml of the checkout at .
     uv run --exact dotfiles config --host hyper-lin --explain # each key with the file it came from
     uv run --exact dotfiles render --host hyper-lin --out DIR # a host's home tree, into an empty DIR
     uv run --exact dotfiles deploy --dry-run                  # what would change in $HOME
     uv run --exact dotfiles deploy                            # write it
     uv run --exact dotfiles apply --dry-run                   # features + dotfiles: what would change, no sudo
     uv run --exact dotfiles apply                             # this machine; "nothing to change" when it already matches
-    uv run --isolated dotfiles check                          # every host resolves and renders
+    uv run --isolated dotfiles check                          # every host and the machine config resolve and render
     uv run --isolated --group dev pytest
     uv run --isolated --group dev ruff check . && uv run --isolated --group dev ruff format --check .
