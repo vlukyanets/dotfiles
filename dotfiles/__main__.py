@@ -39,8 +39,8 @@ def main() -> int:
         if args.command == "apply":
             return apply.apply(socket.gethostname(), dry_run=args.dry_run)
         if args.command == "deploy":
-            for line in render.deploy(socket.gethostname(), dry_run=args.dry_run):
-                print(line)
+            lines = render.deploy(socket.gethostname(), dry_run=args.dry_run)
+            print("\n".join(lines) or "nothing to change")
         elif args.command == "render":
             render.render(args.host, args.out, current=args.current)
         elif args.explain:

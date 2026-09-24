@@ -67,7 +67,7 @@ of updating it.
     uv run --exact dotfiles deploy --dry-run                  # what would change in $HOME
     uv run --exact dotfiles deploy                            # write it
     uv run --exact dotfiles apply --dry-run                   # features + dotfiles: what would change, no sudo
-    uv run --exact dotfiles apply                             # this machine, silent when it already matches
+    uv run --exact dotfiles apply                             # this machine; "nothing to change" when it already matches
     uv run --isolated dotfiles check                          # every host resolves and renders
     uv run --isolated --group dev pytest
     uv run --isolated --group dev ruff check . && uv run --isolated --group dev ruff format --check .

@@ -81,6 +81,7 @@ def order(steps: list[Step], depends: dict[str, set[str]]) -> list[tuple[Step, l
 
 def _deploy(host: str, root: Path) -> None:
     for line in render.deploy(host, root, dry_run=engine.DRY_RUN):
+        engine.printed = True
         print(line)
 
 
@@ -149,6 +150,7 @@ def apply(
     or was not run."""
     cfg = config.resolve(host, root)
     engine.DRY_RUN = dry_run
+    engine.printed = False
     failed: set[str] = set()
     try:
         system = platforms.detect(cfg, platform_package)
@@ -157,6 +159,8 @@ def apply(
             for step in found:
                 sessions.enter_context(step.feature.session(system))
             _phases(host, root, system, found, failed)
+        if not engine.printed and not failed:
+            print("nothing to change")
     finally:  # after a failure and on Ctrl-C too
         engine.print_notices()
     return 1 if failed else 0

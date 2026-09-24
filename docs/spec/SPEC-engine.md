@@ -11,7 +11,7 @@ The helpers features are written with, the platforms that carry out what
 differs between systems, and `dotfiles apply`, which runs them. The
 contract: every check reads live state without root, a mutation goes
 through root only when needed, and a machine that already matches
-prints nothing and asks for no password.
+prints only `nothing to change` and asks for no password.
 
 Nobody writes down dependencies. A feature says which packages it needs on
 each platform; the platform's package manager says how those packages
@@ -388,8 +388,8 @@ class Locale(Feature):
    packages; nothing orders or gates it but its name and the package graph.
 2. A second platform is one file in `platforms/` plus a nested class in
    the features it supports; no feature's shared code changes.
-3. On a machine that matches, `dotfiles apply` prints nothing and runs no
-   sudo; `--dry-run` never runs sudo.
+3. On a machine that matches, `dotfiles apply` prints only `nothing to
+   change` and runs no sudo; `--dry-run` never runs sudo.
 4. A failed feature blocks only the features whose packages need its
    packages; exit 1; notices still printed.
 5. pytest, ruff and `dotfiles check` are green locally and in CI.
@@ -411,8 +411,10 @@ class Locale(Feature):
    check, one sudo, and the package manager orders the installation.
 5. **A failed feature blocks only what builds on it** in the package
    graph; the rest of the apply goes on.
-6. **Helpers return whether they changed something**; there is no global
-   counter. **Notices live in memory**, since one process runs the whole
-   apply.
+6. **Helpers return whether they changed something**; the engine only
+   remembers whether the apply printed a change or a warning, so a run
+   that printed neither and failed nothing ends with `nothing to change`
+   instead of no output at all. **Notices live in memory**, since one
+   process runs the whole apply.
 7. **No helper deletes** a line or a file yet; one comes with the first
    feature that needs it.
