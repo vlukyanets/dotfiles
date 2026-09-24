@@ -52,7 +52,7 @@ class Arch(Linux):
         # Options after the first repository section would be ignored.
         include = f"Include = {options}"
         ensure_line(PACMAN_CONF, f"^{re.escape(include)}$", include, before=r"^\[(?!options\])")
-        conf = engine._path(PACMAN_CONF)
+        conf = engine.path(PACMAN_CONF)
         lines = conf.read_text().splitlines() if conf.exists() else []  # a dry run on nothing
         if not pacman["multilib"] or "[multilib]" in lines:
             return  # a [multilib] enabled in pacman.conf itself is left alone
@@ -62,7 +62,7 @@ class Arch(Linux):
         ensure_line(PACMAN_CONF, f"^{re.escape(include)}$", include)
         # Keyed on the database, not the line just added, so a sync the network
         # cut off is redone. -Syu, not -Sy: -Sy then -S is a partial upgrade.
-        if not engine._path("/var/lib/pacman/sync/multilib.db").exists():
+        if not engine.path("/var/lib/pacman/sync/multilib.db").exists():
             for attempt in retrying():
                 with attempt, as_root():
                     run("pacman", "-Syu", "--noconfirm")
