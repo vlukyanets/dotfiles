@@ -100,11 +100,12 @@ def as_root():
         _root.reset(token)
 
 
-def run(*cmd: str, **kwargs) -> None:
+def run(*cmd: str, **kwargs) -> subprocess.CompletedProcess | None:
     """A mutation, as the user or inside as_root() as root; must succeed.
-    Nothing on a dry run."""
-    if not DRY_RUN:
-        _run([*(_sudo() if _root.get() else []), *cmd], check=True, **kwargs)
+    Nothing, and None, on a dry run."""
+    if DRY_RUN:
+        return None
+    return _run([*(_sudo() if _root.get() else []), *cmd], check=True, **kwargs)
 
 
 def _sudo() -> list[str]:

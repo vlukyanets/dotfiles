@@ -226,3 +226,113 @@ def test_thp(machine, capsys):
     apply("thp")
     assert capsys.readouterr().out == ""
     assert machine.calls == []
+
+
+# Batch 4: snapper and its pair.
+
+SNAPPER = ("snapper", "-c", "root")
+PRE = (*SNAPPER, "create", "-t", "pre", "-c", "number", "-d", "dotfiles apply", "-p")
+CONFIG = {
+    "TIMELINE_CREATE": "no",
+    "NUMBER_LIMIT": "10",
+    "NUMBER_LIMIT_IMPORTANT": "5",
+    "ALLOW_USERS": ME,
+    "SYNC_ACL": "yes",
+}
+
+
+def test_snapper(machine, capsys):
+    machine.answers[("findmnt", "-no", "FSTYPE", "/")] = (0, "btrfs\n")
+    cfg = defaults(snapper={"important_packages": ["linux-zen"]})
+    apply("snapper", cfg)
+    mutations = [c for c in machine.calls if c[0] == "snapper" and "get-config" not in c]
+    assert mutations == [
+        [*SNAPPER, "create-config", "/"],
+        [*SNAPPER, "set-config", *(f"{k}={v}" for k, v in CONFIG.items())],
+    ]
+    assert ["chmod", "750", "/.snapshots"] in machine.calls
+    assert engine.path("/etc/snap-pac.ini").read_text() == (
+        '[root]\nimportant_packages = ["linux-zen"]\nimportant_commands = []\n'
+    )
+    capsys.readouterr()
+
+    write("/etc/snapper/configs/root", "")
+    csv = "key,value\n" + "".join(f"{k},{v}\n" for k, v in CONFIG.items())
+    machine.answers[("snapper", "--machine-readable", "csv", "-c", "root", "get-config")] = (0, csv)
+    running(machine, "snapper-cleanup.timer")
+    machine.calls.clear()
+    apply("snapper", cfg)
+    assert capsys.readouterr().out == ""
+    assert not [c for c in machine.calls if c[0] not in ("findmnt", "snapper", "systemctl")]
+
+
+def test_snapper_needs_btrfs(machine):
+    machine.answers[("findmnt", "-no", "FSTYPE", "/")] = (0, "ext4\n")
+    with pytest.raises(engine.Failed, match="^/ is ext4, snapper needs a btrfs root$"):
+        apply("snapper")
+
+
+def test_snapper_steps_aside_for_a_mounted_snapshots_dir(machine):
+    machine.answers[("findmnt", "-no", "FSTYPE", "/")] = (0, "btrfs\n")
+    machine.answers[("findmnt", "-n", "/.snapshots")] = (0, "/.snapshots /dev/x[/@snapshots]\n")
+    apply("snapper")
+    order = [c[:2] for c in machine.calls if c[0] in ("umount", "rmdir", "mount", "mkdir")]
+    assert order == [["umount", "/.snapshots"], ["rmdir", "/.snapshots"], ["mkdir", "/.snapshots"],
+                     ["mount", "/.snapshots"]]  # fmt: skip
+
+
+@pytest.fixture
+def snapper(machine):
+    machine.answers[(*SNAPPER, "list")] = (0, "# | Type | Date\n0 | single |\n")
+    machine.answers[PRE] = (0, "42\n")
+    return machine
+
+
+def test_the_pair_is_taken_only_around_package_changes(snapper, capsys):
+    snap, strategy = feature("snapper", defaults(snapper={"important_packages": ["linux-zen"]}))
+    log = write("/var/log/pacman.log", "[x] [ALPM] installed linux-zen (1)\n")
+    with snap.session(strategy):
+        assert os.environ["SNAP_PAC_SKIP"] == "y"
+        assert not [c for c in snapper.calls if c[3:4] == ["create"]]  # nothing changed yet
+        platforms.transaction()
+        platforms.transaction()
+        with log.open("a") as f:
+            f.write("[y] [ALPM] upgraded linux-zen (2)\n")
+    assert "SNAP_PAC_SKIP" not in os.environ
+    creates = [c for c in snapper.calls if c[3:4] in (["create"], ["modify"])]
+    assert creates == [
+        list(PRE),
+        [*SNAPPER, "modify", "-u", "important=yes", "42"],
+        [*SNAPPER, "create", "-t", "post", "--pre-number", "42", "-c", "number", "-d",
+         "dotfiles apply", "-u", "important=yes"],
+    ]  # fmt: skip
+    assert capsys.readouterr().out == (
+        "-> snapper pre snapshot #42\n-> snapper post snapshot for #42 (important)\n"
+    )
+
+
+def test_no_pair_without_a_change_a_usable_snapper_or_on_a_dry_run(snapper, monkeypatch):
+    snap, strategy = feature("snapper")
+    with snap.session(strategy):
+        pass  # nothing changed
+    assert not [c for c in snapper.calls if c[3:4] == ["create"]]
+
+    snapper.answers[(*SNAPPER, "list")] = (1, "")  # ALLOW_USERS not set yet
+    with snap.session(strategy):
+        assert "SNAP_PAC_SKIP" not in os.environ
+        platforms.transaction()
+    assert not [c for c in snapper.calls if c[3:4] == ["create"]]
+
+    snapper.answers[(*SNAPPER, "list")] = (0, "0 | single |\n")
+    monkeypatch.setattr(engine, "DRY_RUN", True)
+    with snap.session(strategy):
+        platforms.transaction()
+    assert not [c for c in snapper.calls if c[3:4] == ["create"]]
+
+
+def test_a_failed_apply_still_gets_its_post(snapper):
+    snap, strategy = feature("snapper")
+    with pytest.raises(RuntimeError), snap.session(strategy):
+        platforms.transaction()
+        raise RuntimeError
+    assert snapper.calls[-1][3:7] == ["create", "-t", "post", "--pre-number"]

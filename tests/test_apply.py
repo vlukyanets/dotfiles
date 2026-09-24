@@ -274,7 +274,7 @@ UNSWITCHED = {"ssh_key", "rbw"}
 SETUP = {"pacman", "makepkg", "reflector"}
 # Features of the batches still to come (SPEC-features); shrinks to nothing.
 NOT_YET = {
-    *("luks_discard", "nvidia", "plymouth", "snapper", "swap"),  # batch 4
+    *("luks_discard", "nvidia", "plymouth", "swap"),  # batch 4
     *("fnm", "libvirt", "rustup", "ssh_agent", "uv", "zsh"),  # batch 5
     *("firefox", "greetd", "niri", "vscode"),  # batches 6 and 7
 }
@@ -337,7 +337,8 @@ def test_dry_run_on_a_real_host_never_calls_sudo(arch, monkeypatch, capsys):
     def checks_only(argv, check=False, **kwargs):
         if check:  # run(): a mutation
             pytest.fail(f"ran {argv}")
-        return subprocess.CompletedProcess(argv, 1, "", "")
+        btrfs = argv == ["findmnt", "-no", "FSTYPE", "/"]  # hyper-lin's root, for snapper and swap
+        return subprocess.CompletedProcess(argv, 1, "btrfs\n" if btrfs else "", "")
 
     monkeypatch.setattr(engine, "_run", checks_only)
     assert apply("hyper-lin", dry_run=True) == 0
