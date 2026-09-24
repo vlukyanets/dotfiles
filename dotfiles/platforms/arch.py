@@ -3,9 +3,19 @@ makepkg's build flags, fresh mirrors)."""
 
 import os
 import re
+import subprocess
 
 from dotfiles import engine
-from dotfiles.engine import as_root, changed, ensure_file, ensure_line, output, retrying, run
+from dotfiles.engine import (
+    as_root,
+    changed,
+    ensure_file,
+    ensure_line,
+    notice,
+    output,
+    retrying,
+    run,
+)
 from dotfiles.platforms.linux import Linux
 
 # pacman's field names are translated; the parser reads the English ones.
@@ -24,6 +34,8 @@ class Arch(Linux):
             self._pacman()
         if features["makepkg"]["enabled"]:
             self._makepkg()
+        if features["reflector"]["enabled"]:
+            self._reflector()
 
     def _pacman(self) -> None:
         pacman = self.cfg["features"]["pacman"]
@@ -58,6 +70,43 @@ class Arch(Linux):
         git = self.cfg["git"]
         lines.append(f'PACKAGER="{git["name"]} <{git["email"]}>"')
         ensure_file("/etc/makepkg.conf.d/dotfiles.conf", "\n".join(lines) + "\n", owner="root:root")
+
+    def _reflector(self) -> None:
+        reflector = self.cfg["features"]["reflector"]
+        edits = []
+        if missing := self.missing(["reflector"]):
+            changed(f"packages: {' '.join(missing)} (missing)")
+            self.install(missing)
+            edits.append(True)
+        args = ["--save /etc/pacman.d/mirrorlist"]
+        if reflector["country"]:
+            args.append(f"--country {','.join(reflector['country'])}")
+        for key in ("protocol", "latest", "sort", "age", "completion_percent", "download_timeout"):
+            args.append(f"--{key.replace('_', '-')} {reflector[key]}")
+        conf = "\n".join(args) + "\n"
+        edits.append(ensure_file("/etc/xdg/reflector/reflector.conf", conf, owner="root:root"))
+        timer = (
+            f"[Timer]\nOnCalendar=\nOnCalendar={reflector['on_calendar']}\n"
+            f"OnBootSec=\nOnBootSec={reflector['on_boot_sec']}\n"
+        )
+        override = "/etc/systemd/system/reflector.timer.d/override.conf"
+        if ensure_file(override, timer, owner="root:root"):
+            with as_root():
+                run("systemctl", "daemon-reload")
+            edits.append(True)
+        edits.append(self.ensure_service("reflector.timer"))
+        # Something changed: refresh now, before the install downloads,
+        # rather than at the timer's next run.
+        if any(edits):
+            try:
+                with as_root():
+                    run("systemctl", "start", "reflector.service")
+                changed("mirrorlist refreshed")
+            except subprocess.CalledProcessError:
+                notice(
+                    "refreshing the mirrorlist failed (network?) — the old one stays, "
+                    "reflector.timer tries again"
+                )
 
     def missing(self, names: list[str]) -> list[str]:
         if not names:

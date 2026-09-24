@@ -1,3 +1,4 @@
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -304,9 +305,16 @@ def test_nobeep(monkeypatch, capsys):
 
 
 def test_dry_run_on_a_real_host_never_calls_sudo(arch, monkeypatch, capsys):
-    """hyper-lin end to end on the real Arch platform: nothing is run,
-    nothing written, sudo untouched."""
-    monkeypatch.setattr(engine, "_run", lambda argv, **kw: pytest.fail(f"ran {argv}"))
+    """hyper-lin end to end on the real Arch platform: checks only (which
+    answer "nothing installed, nothing enabled"), nothing written, sudo
+    untouched."""
+
+    def checks_only(argv, check=False, **kwargs):
+        if check:  # run(): a mutation
+            pytest.fail(f"ran {argv}")
+        return subprocess.CompletedProcess(argv, 1, "", "")
+
+    monkeypatch.setattr(engine, "_run", checks_only)
     assert apply("hyper-lin", dry_run=True) == 0
     out = capsys.readouterr().out
     assert "-> /etc/modprobe.d/nobeep.conf (missing)\n" in out

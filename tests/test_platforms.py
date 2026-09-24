@@ -277,3 +277,48 @@ def test_setup_makepkg(root, monkeypatch, jobs, options, makeflags, extra):
     Arch(cfg).setup()
     conf = engine.SYSROOT / "etc/makepkg.conf.d/dotfiles.conf"
     assert conf.read_text() == f'MAKEFLAGS="{makeflags}"\n{extra}PACKAGER="A B <a@b>"\n'
+
+
+def test_setup_reflector(root, capsys):
+    arch = Arch(config(reflector={"country": ["Ukraine", "Poland"]}))
+    root.answers[("pacman", "-T", "reflector")] = (127, "reflector\n")
+    arch.setup()
+    conf = engine.SYSROOT / "etc/xdg/reflector/reflector.conf"
+    assert conf.read_text() == (
+        "--save /etc/pacman.d/mirrorlist\n--country Ukraine,Poland\n--protocol https\n"
+        "--latest 20\n--sort rate\n--age 12\n--completion-percent 100\n--download-timeout 5\n"
+    )
+    override = engine.SYSROOT / "etc/systemd/system/reflector.timer.d/override.conf"
+    assert override.read_text() == (
+        "[Timer]\nOnCalendar=\nOnCalendar=weekly\nOnBootSec=\nOnBootSec=15min\n"
+    )
+    commands = [call for call in root.calls if call[0] != "install"]
+    assert commands[commands.index(["pacman", "-S", "--needed", "--noconfirm", "reflector"]) :] == [
+        ["pacman", "-S", "--needed", "--noconfirm", "reflector"],
+        ["systemctl", "daemon-reload"],
+        ["systemctl", "is-enabled", "reflector.timer"],
+        ["systemctl", "is-active", "reflector.timer"],
+        ["systemctl", "enable", "--now", "reflector.timer"],
+        ["systemctl", "start", "reflector.service"],
+    ]
+    out = capsys.readouterr().out
+    assert out.startswith("-> packages: reflector (missing)\n")
+    assert out.endswith("-> mirrorlist refreshed\n")
+
+    # In place: nothing started, nothing printed.
+    root.answers = {
+        ("systemctl", "is-enabled", "reflector.timer"): (0, "enabled\n"),
+        ("systemctl", "is-active", "reflector.timer"): (0, "active\n"),
+    }
+    root.calls.clear()
+    arch.setup()
+    assert capsys.readouterr().out == ""
+    assert ["systemctl", "start", "reflector.service"] not in root.calls
+    assert ["systemctl", "daemon-reload"] not in root.calls
+
+    # A new schedule: daemon-reload and a refresh; a failed refresh is a notice.
+    arch.cfg["features"]["reflector"]["on_calendar"] = "daily"
+    root.answers[("systemctl", "start", "reflector.service")] = (1, "")
+    arch.setup()
+    assert ["systemctl", "daemon-reload"] in root.calls
+    assert engine.notices[0].startswith("refreshing the mirrorlist failed (network?)")
