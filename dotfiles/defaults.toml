@@ -78,6 +78,7 @@ yubikey.enabled        = false  # ykman, pcscd.socket
 ssh_agent.enabled      = false  # owned by secrets-ssh; .zshrc reads it
 # desktop
 niri.enabled           = false  # compositor + portal, GTK dark theme, ~/.config/niri, mimeapps.list
+niri.numlock           = false  # Num Lock on at login; the laptop profile turns it on, vm off
 fonts.enabled          = false  # emoji + CJK fallbacks
 nerd_font.enabled      = false  # FiraCode Nerd Font + symbols; nvim reads it
 audio.enabled          = false  # pipewire-pulse/alsa/jack, wireplumber, playerctl, brightnessctl
