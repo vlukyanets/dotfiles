@@ -34,7 +34,7 @@ but one sample, `nobeep` (the rest go to `features`).
 ## Tech Stack
 
 Stdlib only: `subprocess`, `shutil`, `os`, `pwd`/`grp`, `platform`
-(`freedesktop_os_release`), `importlib`, `pkgutil`, `graphlib`, `abc`,
+(`freedesktop_os_release`), `importlib`, `pkgutil`, `abc`,
 `contextvars`, `dataclasses`, `tempfile`, `re`. No new dependency.
 
 ## Project Structure
@@ -263,7 +263,7 @@ class Docker(Feature):
 ## `dotfiles apply` — `dotfiles/apply.py`
 
 1. **Platform.** `system = detect(cfg)`, an instance of the platform
-   class, then `system.setup()`.
+   class, then `system.setup()`, on every apply (it checks first).
 2. **Packages.** The packages of every enabled feature that applies here,
    together: `system.missing(...)`, and when something is missing, one
    line `-> packages: a b c (missing)` and `system.install(...)` in one
@@ -272,8 +272,11 @@ class Docker(Feature):
 3. **Dotfiles.** `render.deploy`.
 4. **Features, in order.** `system.depends(...)` on all their packages
    gives the graph: feature A runs before feature B when a package of B
-   needs a package of A. `graphlib` sorts; features free to run at the
-   same point run by name, and a feature without packages has no edges.
+   needs a package that A has and B does not (a package both list, like
+   `git`, orders neither). Features free to run at the same point run by
+   name, and a feature without packages has no edges. A cycle in the
+   package graph is broken by name, not an error: its features need each
+   other and any order is as good.
    Each runs as `Docker(cfg).apply(strategy)` does.
 5. **Notices.**
 
@@ -285,10 +288,11 @@ order.
 
 ### Failures
 
-- `setup` fails or `install` fails: every feature with a package still
-  missing afterwards is not run (`error: docker: not run, packages
-  missing: docker-buildx`); the others run. A failed download is
-  deferred: the notice says the next apply retries.
+- `setup` fails (`error: platform: …`, nothing is installed) or
+  `install` fails after its retries (`error: packages: …`): every feature
+  with a package still missing afterwards is not run (`error: docker: not
+  run, packages missing: docker-buildx`); the others run. The next apply
+  finds the packages still missing and tries again.
 - A feature raises (`die`, a failed `run`, a bug): `error: <feature>:
   <message>` on stderr; the features whose packages need its packages are
   not run (`error: foo: not run, docker failed`), and so on transitively.
@@ -297,8 +301,8 @@ order.
 - `apply` exits 1 when any feature failed or was not run. Ctrl-C stops the
   run, replays the notices and exits 130. Notices are printed at the end
   in every case, from the runner's `finally`.
-- In a dry run nothing is installed, so step 4 runs every feature anyway:
-  its checks report what the real run would change.
+- In a dry run the runner does not call `install`, and step 4 runs every
+  feature anyway: its checks report what the real run would change.
 
 ```
 Notices from this apply:

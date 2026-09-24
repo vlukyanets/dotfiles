@@ -8,7 +8,6 @@ sudo prompts.
 
 import grp
 import os
-import platform
 import pwd
 import re
 import shlex
@@ -32,10 +31,6 @@ notices: list[str] = []
 
 class Failed(Exception):
     """die(): this feature cannot go on."""
-
-
-class Skip(Exception):
-    """os_guard(): this feature does not apply to this machine."""
 
 
 class Deferred(Exception):
@@ -73,18 +68,6 @@ def defer(msg: str):
     """A network step failed and nothing later needs it: the rest of this
     feature is left to the next apply, whose checks find the state still missing."""
     raise Deferred(msg)
-
-
-def os_guard(*names: str) -> None:
-    """End the feature silently unless this machine is one of NAMES: an OS
-    (linux, darwin), a distro id (arch) or a family from ID_LIKE (debian)."""
-    try:
-        release = platform.freedesktop_os_release()
-    except OSError:
-        release = {}
-    ids = {sys.platform, release.get("ID", ""), *release.get("ID_LIKE", "").split()}
-    if not ids & set(names):
-        raise Skip
 
 
 def _run(argv: list[str], check: bool = False, **kwargs) -> subprocess.CompletedProcess:
