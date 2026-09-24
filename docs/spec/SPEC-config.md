@@ -117,7 +117,7 @@ pyproject.toml           project, [project.scripts] dotfiles = "dotfiles.__main_
 dotfiles/__main__.py     argparse CLI: config, check
 dotfiles/config.py       load, chain, validate, merge — pure functions over dicts and a root Path
 dotfiles/defaults.toml   schema
-profiles/                base, server, laptop
+profiles/                base, server, laptop, vm
 hosts/                   hyper-lin (extends laptop), echo-server (extends server)
 tests/test_config.py     unit tests on tmp_path fixtures + checks on the real data
 docs/spec/               capability map, module specs
@@ -192,7 +192,8 @@ def resolve(root: Path, host: str) -> dict:
 3. `config --explain` is in this iteration.
 4. Profiles: `base` = package manager, locale, zsh, CLI tools, ssh agent;
    `server` = base + sshd, tailscale; `laptop` = base + luks_discard, swap,
-   snapper, zram, bluetooth, fwupd + the desktop stack. Dev toolchains and
+   snapper, zram, bluetooth, fwupd + the desktop stack; `vm` = laptop
+   without luks_discard, bluetooth, fwupd and swap. Dev toolchains and
    personal apps stay in `hyper-lin`.
 5. Every feature is a table under `features` with `enabled` and its own
    settings, so a feature's switch and its settings sit in one place.

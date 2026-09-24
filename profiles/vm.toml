@@ -1,0 +1,10 @@
+# A virtual machine to try the desktop on: laptop without the hardware it
+# does not have (LUKS, bluetooth, firmware) and without a swap file, since
+# the disk is small; zram covers swap.
+extends = ["laptop"]
+
+[features]
+luks_discard.enabled = false
+bluetooth.enabled    = false
+fwupd.enabled        = false
+swap.enabled         = false
