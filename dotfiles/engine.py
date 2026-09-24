@@ -100,21 +100,22 @@ def as_root():
         _root.reset(token)
 
 
-def run(*cmd: str, **kwargs) -> None:
+def run(*cmd: str, **kwargs) -> subprocess.CompletedProcess | None:
     """A mutation, as the user or inside as_root() as root; must succeed.
-    Nothing on a dry run."""
-    if not DRY_RUN:
-        _run([*(_sudo() if _root.get() else []), *cmd], check=True, **kwargs)
+    Nothing, and None, on a dry run."""
+    if DRY_RUN:
+        return None
+    return _run([*(_sudo() if _root.get() else []), *cmd], check=True, **kwargs)
 
 
 def _sudo() -> list[str]:
     if os.geteuid() == 0:
         return []
     sudo = shlex.split(os.environ.get("SUDO_CMD", "sudo"))
-    # During a snapper-wrapped apply the pacman hook needs these two; a
-    # sudoers rule matching ALL implies SETENV.
-    if sudo and os.environ.get("DOTFILES_SNAPPER_STATE"):
-        sudo.append("--preserve-env=SNAP_PAC_SKIP,DOTFILES_SNAPPER_STATE")
+    # Set by features.snapper for the apply, so snap-pac's hooks under the
+    # root pacman skip their snapshots; a sudoers rule matching ALL implies SETENV.
+    if sudo and os.environ.get("SNAP_PAC_SKIP"):
+        sudo.append("--preserve-env=SNAP_PAC_SKIP")
     return sudo
 
 
@@ -172,8 +173,23 @@ def retrying(policy: RetryPolicy = NETWORK):
             return
 
 
-def _path(path) -> Path:
-    return SYSROOT / str(path).lstrip("/")
+def network(*cmd: str, failure: str, **kwargs) -> None:
+    """CMD, which goes to the network: retried (NETWORK), and when it keeps
+    failing, defer(FAILURE) — the next apply finds the state still missing.
+    Its progress output is dropped unless KWARGS say otherwise; the `->`
+    line that follows says what happened."""
+    kwargs.setdefault("stdout", subprocess.DEVNULL)
+    try:
+        for attempt in retrying():
+            with attempt:
+                run(*cmd, **kwargs)
+    except subprocess.CalledProcessError:
+        defer(failure)
+
+
+def path(name) -> Path:
+    """NAME, an absolute path on the system, under SYSROOT: where to read it."""
+    return SYSROOT / str(name).lstrip("/")
 
 
 def _writable(path: Path) -> bool:
@@ -205,7 +221,7 @@ def _owner(path: Path) -> str:
 def ensure_file(dst, content: str | bytes, mode: int = 0o644, owner: str | None = None) -> bool:
     """DST has CONTENT, MODE and OWNER ("user:group" or "user"). Compared
     without root; written with root only when the user cannot."""
-    real = _path(dst)
+    real = path(dst)
     data = content.encode() if isinstance(content, str) else content
     user, _, group = (owner or "").partition(":")
     group = group or user
@@ -239,7 +255,7 @@ def ensure_file(dst, content: str | bytes, mode: int = 0o644, owner: str | None 
 
 def ensure_symlink(target, link) -> bool:
     """LINK is a symlink to TARGET."""
-    real = _path(link)
+    real = path(link)
     try:
         if os.readlink(real) == str(target):
             return False
@@ -255,7 +271,7 @@ def ensure_line(file, regex: str, line: str, before: str | None = None) -> bool:
     """The first line of FILE matching REGEX becomes LINE; when nothing
     matches, LINE goes before the first line matching BEFORE, else at the
     end. FILE's mode and owner are kept."""
-    real = _path(file)
+    real = path(file)
     if not real.exists():
         return ensure_file(file, line + "\n")
     lines, done = [], False

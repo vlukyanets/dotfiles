@@ -1,4 +1,7 @@
+import os
+import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -19,11 +22,10 @@ def isolate(monkeypatch, base):
         path.mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv(var, str(path))
     monkeypatch.setenv("SUDO_CMD", "false")
-    # dotfiles apply sets these for a host with snapper; setenv first so the
-    # monkeypatch removes them again even when they were not set before.
-    for var in ("SNAP_PAC_SKIP", "DOTFILES_SNAPPER_STATE"):
-        monkeypatch.setenv(var, "")
-        monkeypatch.delenv(var)
+    # features.snapper sets it for an apply; setenv first so the monkeypatch
+    # removes it again even when it was not set before.
+    monkeypatch.setenv("SNAP_PAC_SKIP", "")
+    monkeypatch.delenv("SNAP_PAC_SKIP")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -73,4 +75,34 @@ class Fake:
 def fake(monkeypatch) -> Fake:
     fake = Fake()
     monkeypatch.setattr(engine, "_run", fake)
+    return fake
+
+
+class AsRoot(Fake):
+    """Fakes every command, but carries out `install`, `ln -sfn` and an
+    empty `git clone` as the test user, so root's files land under SYSROOT; engine._owner then reads
+    them as root's (patched by the fixture)."""
+
+    def __call__(self, argv, check=False, **kwargs):
+        if argv[0] == "install":
+            dst = Path(argv[-1])
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(argv[-2], dst)
+            dst.chmod(int(argv[argv.index("-m") + 1], 8))
+        if argv[:2] == ["git", "clone"] and not self.answers.get(tuple(argv), (0,))[0]:
+            Path(argv[-1]).mkdir(parents=True)
+        if argv[:2] == ["ln", "-sfn"]:
+            Path(argv[-1]).parent.mkdir(parents=True, exist_ok=True)
+            Path(argv[-1]).unlink(missing_ok=True)
+            os.symlink(argv[-2], argv[-1])
+        return super().__call__(argv, check, **kwargs)
+
+
+@pytest.fixture
+def machine(monkeypatch) -> AsRoot:
+    """Every command faked, root's files written under SYSROOT, no sudo prefix."""
+    fake = AsRoot()
+    monkeypatch.setattr(engine, "_run", fake)
+    monkeypatch.setattr(engine, "_owner", lambda path: "root:root")
+    monkeypatch.setenv("SUDO_CMD", "")
     return fake

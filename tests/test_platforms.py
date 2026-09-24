@@ -1,13 +1,12 @@
 import grp
 import os
 import pwd
-import shutil
 import subprocess
 import tomllib
 from pathlib import Path
 
 import pytest
-from conftest import Fake
+from conftest import AsRoot, Fake
 
 from dotfiles import engine, platforms
 from dotfiles.config import ROOT, ConfigError
@@ -114,6 +113,11 @@ def test_ensure_group_member(system, arch, capsys, monkeypatch):
     assert arch.ensure_group_member("docker") is False
     with pytest.raises(Failed, match="^group nope does not exist$"):
         arch.ensure_group_member("nope")
+    # A dry run installs nothing, so the package that brings the group has not yet.
+    monkeypatch.setattr(engine, "DRY_RUN", True)
+    capsys.readouterr()
+    assert arch.ensure_group_member("nope") is True
+    assert capsys.readouterr().out == f"-> added {me} to group nope\n"
 
 
 def test_arch_missing(system, arch):
@@ -159,16 +163,16 @@ def test_arch_install_takes_the_rest_from_the_aur(system, monkeypatch):
         ["paru", "--version"],
         ["paru", "-S", "--needed", "--noconfirm", "clock-rs-git"],
     ]
-    # paru's own sudo is SUDO_CMD, snapper's variables kept.
+    # paru's own sudo is SUDO_CMD, snap-pac's skip kept.
     monkeypatch.setenv("SUDO_CMD", "false")
-    monkeypatch.setenv("DOTFILES_SNAPPER_STATE", "/run/x")
+    monkeypatch.setenv("SNAP_PAC_SKIP", "y")
     Arch(config(aur={})).install(["clock-rs-git"])
     assert system.calls[-1] == [
         "paru",
         "--sudo",
         "false",
         "--sudoflags",
-        "--preserve-env=SNAP_PAC_SKIP,DOTFILES_SNAPPER_STATE",
+        "--preserve-env=SNAP_PAC_SKIP",
         *["-S", "--needed", "--noconfirm", "clock-rs-git"],
     ]
 
@@ -241,27 +245,9 @@ def test_detect(monkeypatch):
         detect({})
 
 
-class AsRoot(Fake):
-    """Fakes every command, but carries out `install` as the test user, so
-    root's files land under SYSROOT; engine._owner then reads them as
-    root's (patched by the fixture)."""
-
-    def __call__(self, argv, check=False, **kwargs):
-        if argv[0] == "install":
-            dst = Path(argv[-1])
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(argv[-2], dst)
-            dst.chmod(int(argv[argv.index("-m") + 1], 8))
-        return super().__call__(argv, check, **kwargs)
-
-
 @pytest.fixture
-def root(monkeypatch) -> AsRoot:
-    fake = AsRoot()
-    monkeypatch.setattr(engine, "_run", fake)
-    monkeypatch.setattr(engine, "_owner", lambda path: "root:root")
-    monkeypatch.setenv("SUDO_CMD", "")
-    return fake
+def root(machine) -> AsRoot:
+    return machine
 
 
 def config(**features) -> dict:
@@ -447,3 +433,24 @@ def test_ensure_paru_dry_run(system, monkeypatch, capsys):
     assert Arch(config(aur={})).ensure_paru() is True
     assert system.calls == [["paru", "--version"]]
     assert capsys.readouterr().out == "-> paru built from the AUR\n"
+
+
+def test_watching_runs_before_each_package_change(system, monkeypatch):
+    seen = []
+    system.answers[("pacman", "-Si", "tmux")] = (0, si("tmux"))
+    system.answers[("pacman", "-Qq", "jack2")] = (0, "jack2\n")
+
+    def hook():
+        seen.append(len(system.calls))
+
+    arch = Arch(config())
+    with platforms.watching(hook):
+        arch.install(["tmux"], ["jack2"])
+    # Before -Rdd (after the -Qq check) and before -S (after the -Si query).
+    assert [system.calls[i][1] for i in seen] == ["-Rdd", "-S"]
+    arch.install(["tmux"])  # outside the block: not watched
+    assert len(seen) == 2
+    monkeypatch.setattr(engine, "DRY_RUN", True)
+    with platforms.watching(hook):
+        arch.install(["tmux"])  # a dry run changes nothing
+    assert len(seen) == 2

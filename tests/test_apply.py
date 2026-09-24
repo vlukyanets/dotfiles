@@ -7,10 +7,11 @@ from typing import ClassVar
 import pytest
 
 from dotfiles import apply as runner
-from dotfiles import engine
+from dotfiles import engine, platforms
 from dotfiles.apply import Step, apply, order, steps
 from dotfiles.config import ROOT, ConfigError
 from dotfiles.feature import Feature
+from dotfiles.platforms.arch import Arch
 from dotfiles.platforms.linux import Linux
 
 HEAD = "from dotfiles.engine import defer, die, notice\nfrom dotfiles.feature import Feature\n\n\n"
@@ -268,18 +269,26 @@ def test_a_module_defines_one_feature(root, system, tmp_path, monkeypatch):
         steps({"features": {}}, FakeArch({}), package)
 
 
+# Modules that always run, switched by a setting outside [features].
+UNSWITCHED = {"ssh_key", "rbw"}
+# Features without a module: Arch.setup() does them.
+SETUP = {"pacman", "makepkg", "reflector"}
+
+
 def test_real_features_are_consistent():
-    defaults = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())["features"]
-    cfg = {"features": {name: {**table, "enabled": True} for name, table in defaults.items()}}
-    found = steps(cfg, FakeArch(cfg))
-    assert found, "no feature applies to Arch"
-    for s in found:
-        assert s.name in defaults, f"{s.name}: not a feature in dotfiles/defaults.toml"
+    cfg = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())
+    for table in cfg["features"].values():
+        table["enabled"] = True
+    found = {s.name: s for s in steps(cfg, Arch(cfg))}  # packages() only reads files
+    for name, s in found.items():
+        assert type(s.feature).__name__ == name.title().replace("_", ""), name
+        assert name in cfg["features"] or name in UNSWITCHED, f"{name}: not in the schema"
+    missing = set(cfg["features"]) - set(found) - SETUP
+    assert not missing, f"features without a module: {sorted(missing)}"
 
 
 @pytest.fixture
 def arch(monkeypatch):
-    from dotfiles import platforms
 
     monkeypatch.setattr(platforms.platform, "freedesktop_os_release", lambda: {"ID": "arch"})
 
@@ -323,7 +332,8 @@ def test_dry_run_on_a_real_host_never_calls_sudo(arch, monkeypatch, capsys):
     def checks_only(argv, check=False, **kwargs):
         if check:  # run(): a mutation
             pytest.fail(f"ran {argv}")
-        return subprocess.CompletedProcess(argv, 1, "", "")
+        btrfs = argv == ["findmnt", "-no", "FSTYPE", "/"]  # hyper-lin's root, for snapper and swap
+        return subprocess.CompletedProcess(argv, 1, "btrfs\n" if btrfs else "", "")
 
     monkeypatch.setattr(engine, "_run", checks_only)
     assert apply("hyper-lin", dry_run=True) == 0
@@ -331,3 +341,37 @@ def test_dry_run_on_a_real_host_never_calls_sudo(arch, monkeypatch, capsys):
     assert "-> /etc/modprobe.d/nobeep.conf (missing)\n" in out
     assert "-> ~/.zshrc (missing)\n" in out
     assert not (Path.home() / ".zshrc").exists()
+
+
+SESSION = """
+from contextlib import contextmanager
+
+LOG = []
+
+
+class Snap(Feature):
+    @contextmanager
+    def session(self, system):
+        LOG.append("enter")
+        try:
+            yield
+        finally:
+            LOG.append("exit")
+
+    def apply(self, strategy):
+        LOG.append("apply")
+        die("broken")
+
+    class Linux:
+        pass
+"""
+
+
+def test_a_session_wraps_the_whole_apply(root, system, tmp_path, monkeypatch):
+    package = make_package(tmp_path, monkeypatch, {"on": SESSION, "off": SESSION})
+    monkeypatch.setattr(
+        FakeArch, "setup", lambda self: sys.modules[f"{package}.on"].LOG.append("setup")
+    )
+    assert apply("h", root, package=package) == 1
+    assert sys.modules[f"{package}.on"].LOG == ["enter", "setup", "apply", "exit"]
+    assert f"{package}.off" not in sys.modules  # a disabled feature is not even imported

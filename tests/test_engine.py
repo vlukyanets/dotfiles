@@ -28,7 +28,7 @@ def test_as_root_prefix(fake, monkeypatch):
         run("true", cwd="/")
         output("check")  # checks never get root
     run("true")
-    monkeypatch.setenv("DOTFILES_SNAPPER_STATE", "/run/x")
+    monkeypatch.setenv("SNAP_PAC_SKIP", "y")
     with as_root():
         run("true")
     monkeypatch.setenv("SUDO_CMD", "")
@@ -45,7 +45,7 @@ def test_as_root_prefix(fake, monkeypatch):
         ["sudo", "-n", "true"],
         ["check"],
         ["true"],
-        ["sudo", "-n", "--preserve-env=SNAP_PAC_SKIP,DOTFILES_SNAPPER_STATE", "true"],
+        ["sudo", "-n", "--preserve-env=SNAP_PAC_SKIP", "true"],
         ["true"],
         ["true"],
     ]
@@ -212,3 +212,13 @@ def test_ensure_symlink():
     assert (engine.SYSROOT / "etc/localtime").readlink().as_posix() == (
         "/usr/share/zoneinfo/Europe/Berlin"
     )
+
+
+def test_network_retries_then_defers(fake, monkeypatch):
+    monkeypatch.setattr(engine, "sleep", lambda seconds: None)
+    engine.network("git", "clone", "x", failure="cloning x failed")
+    assert fake.calls == [["git", "clone", "x"]]
+    fake.answers[("git", "clone", "x")] = (128, "")
+    with pytest.raises(engine.Deferred, match="^cloning x failed$"):
+        engine.network("git", "clone", "x", failure="cloning x failed")
+    assert len(fake.calls) == 4  # 1 + 3 attempts

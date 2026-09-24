@@ -7,6 +7,7 @@ import pwd
 import re
 from contextlib import nullcontext
 
+from dotfiles import engine
 from dotfiles.engine import as_root, changed, die, ensure_line, notice, output, run
 from dotfiles.platforms import Platform
 
@@ -58,8 +59,10 @@ class Linux(Platform):
         try:
             entry = grp.getgrnam(group)
         except KeyError:
-            die(f"group {group} does not exist")
-        if me.pw_name in entry.gr_mem or me.pw_gid == entry.gr_gid:
+            if not engine.DRY_RUN:
+                die(f"group {group} does not exist")
+            entry = None  # its package, not installed by a dry run, brings it
+        if entry and (me.pw_name in entry.gr_mem or me.pw_gid == entry.gr_gid):
             return False
         with as_root():
             run("usermod", "-aG", group, me.pw_name)
