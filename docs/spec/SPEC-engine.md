@@ -96,8 +96,8 @@ nest and the previous value comes back on exit. Only mutations get root:
 `output()` runs as the user inside the block too, so a check never asks
 for a password. `ensure_file` and `ensure_symlink` choose root themselves
 (the path is not writable, or another owner); `as_root()` around them
-forces it. When `DOTFILES_SNAPPER_STATE` is set, sudo gets
-`--preserve-env=SNAP_PAC_SKIP,DOTFILES_SNAPPER_STATE`. The command must
+forces it. When `SNAP_PAC_SKIP` is set (by `features.snapper`), sudo gets
+`--preserve-env=SNAP_PAC_SKIP`. The command must
 succeed (`check=True`): a failed mutation fails the feature. `sudo`
 prompts on its own when its timestamp has expired; a clean apply never
 gets that far.
@@ -284,9 +284,13 @@ class Docker(Feature):
    Each runs as `Docker(cfg).apply(strategy)` does.
 5. **Notices.**
 
-With `features.snapper` enabled, `apply` sets `SNAP_PAC_SKIP=y` and
-`DOTFILES_SNAPPER_STATE=$XDG_RUNTIME_DIR/dotfiles-snapper` for the whole
-run, so the pacman hook takes one snapshot pair per apply. stdout is
+Phases 1–4 run inside the `session(system)` of every enabled feature, a
+context manager that is `nullcontext()` unless the feature needs to wrap
+the apply (`snapper` does, for its snapshot pair). The sessions are left
+after a failure and on Ctrl-C too. Inside them, `with
+platforms.watching(hook):` has HOOK called right before each package
+change; a platform calls `platforms.transaction()` before every command
+that installs, upgrades or removes a package (not on a dry run). stdout is
 line-buffered, so `->` lines and the output of child commands appear in
 order.
 

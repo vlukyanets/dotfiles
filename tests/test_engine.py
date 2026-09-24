@@ -28,7 +28,7 @@ def test_as_root_prefix(fake, monkeypatch):
         run("true", cwd="/")
         output("check")  # checks never get root
     run("true")
-    monkeypatch.setenv("DOTFILES_SNAPPER_STATE", "/run/x")
+    monkeypatch.setenv("SNAP_PAC_SKIP", "y")
     with as_root():
         run("true")
     monkeypatch.setenv("SUDO_CMD", "")
@@ -45,7 +45,7 @@ def test_as_root_prefix(fake, monkeypatch):
         ["sudo", "-n", "true"],
         ["check"],
         ["true"],
-        ["sudo", "-n", "--preserve-env=SNAP_PAC_SKIP,DOTFILES_SNAPPER_STATE", "true"],
+        ["sudo", "-n", "--preserve-env=SNAP_PAC_SKIP", "true"],
         ["true"],
         ["true"],
     ]
