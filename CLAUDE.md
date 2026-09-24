@@ -10,6 +10,7 @@ holds the capability map and the module specs that drive the work.
 | Tests | `uv run --isolated --group dev pytest` |
 | Lint and format | `uv run --isolated --group dev ruff check . && uv run --isolated --group dev ruff format --check .` |
 | Every host resolves | `uv run --isolated dotfiles check` |
+| This machine's config | `uv run --exact dotfiles init [host]` writes `~/.config/dotfiles/config.toml`; commands read it unless `--source <checkout>` or `--host` |
 | One host, with sources | `uv run --exact dotfiles config --host <name> --explain` |
 | A host's home tree | `uv run --exact dotfiles render --host <name> --out <empty dir>` |
 | Dotfiles into `$HOME` | `uv run --exact dotfiles deploy --dry-run`, then without the flag |
@@ -22,7 +23,9 @@ master and every PR; uv is pinned there by version and sha256.
 
 - Keys and defaults: `dotfiles/defaults.toml` — the schema; a new key goes here first.
   A feature is `features.<name>.enabled` plus its settings in the same table.
-- Profiles `profiles/`, machines `hosts/`; one namespace for `extends`.
+- Profiles `profiles/`, machines `hosts/`; one namespace for `extends`. A
+  machine runs from `~/.config/dotfiles/config.toml` (`config.init`,
+  `config.local_path`); the CLI (`dotfiles/cli.py`) picks it or a checkout.
 - Resolution, validation, merge, explain, check: `dotfiles/config.py`.
 - Dotfiles: `home/` (real names, `*.j2` templates), modes and gates in
   `home.toml`, rendering in `dotfiles/render.py`.

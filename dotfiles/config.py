@@ -1,6 +1,7 @@
 """Host configuration: the defaults, then the host's chain of profiles and hosts."""
 
 import copy
+import os
 import tomllib
 from pathlib import Path
 
@@ -31,7 +32,19 @@ def load(path: Path, root: Path) -> dict:
         with path.open("rb") as f:
             return tomllib.load(f)
     except tomllib.TOMLDecodeError as e:
-        raise ConfigError(f"{path.relative_to(root)}: {e}") from None
+        where = path.relative_to(root) if path.is_relative_to(root) else shown(path)
+        raise ConfigError(f"{where}: {e}") from None
+
+
+def local_path() -> Path:
+    """This machine's config, written by `dotfiles init`."""
+    base = os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
+    return Path(base) / "dotfiles/config.toml"
+
+
+def shown(path: Path) -> str:
+    """PATH with ~ for the home directory, the way errors and changes name it."""
+    return f"~/{path.relative_to(Path.home())}" if path.is_relative_to(Path.home()) else str(path)
 
 
 def kind(value) -> str:
@@ -117,12 +130,24 @@ def leaves(data: dict, prefix: str = ""):
             yield prefix + key, value
 
 
-def resolve_with_sources(host: str, root: Path = ROOT) -> tuple[dict, dict[str, str]]:
-    """Merged config for HOST and, per dotted key, the file its value came from."""
+def resolve_with_sources(
+    host: str, root: Path = ROOT, local: Path | None = None
+) -> tuple[dict, dict[str, str]]:
+    """Merged config for HOST and, per dotted key, the file its value came
+    from. With LOCAL, the host's files are that one file (the machine
+    config) instead of its chain in hosts/."""
     schema = load(root / DEFAULTS, root)
     config = copy.deepcopy(schema)
     sources = {key: DEFAULTS for key, _ in leaves(schema)}
-    for where, data in chain(host, root):
+    if local is None:
+        files = chain(host, root)
+    elif local.is_file():
+        files = [(shown(local), load(local, root))]
+    else:
+        raise ConfigError(
+            f"no {shown(local)} — run dotfiles init <host>, or pass --source <checkout>"
+        )
+    for where, data in files:
         validate(data, schema, where)
         merge(config, data)
         sources.update((key, where) for key, _ in leaves(data))
@@ -134,9 +159,29 @@ def resolve_with_sources(host: str, root: Path = ROOT) -> tuple[dict, dict[str, 
     return config, sources
 
 
-def resolve(host: str, root: Path = ROOT) -> dict:
+def resolve(host: str, root: Path = ROOT, local: Path | None = None) -> dict:
     """Merged config for HOST: the defaults, then every file in its chain."""
-    return resolve_with_sources(host, root)[0]
+    return resolve_with_sources(host, root, local)[0]
+
+
+def init(host: str, source: Path = ROOT, path: Path | None = None) -> str | None:
+    """HOST's resolved config from the checkout SOURCE written to PATH (the
+    machine config), created or overwritten; the change line, None when
+    PATH already holds it."""
+    if not (source / "hosts" / f"{host}.toml").is_file():
+        raise ConfigError(f"no hosts/{host}.toml in {source}")
+    path = path or local_path()
+    text = (
+        f"# This machine's config: hosts/{host}.toml and everything it extends,\n"
+        f"# resolved by `dotfiles init` from {source.resolve()}.\n"
+        "# apply, deploy, config and render read it; the next init overwrites it.\n\n"
+    ) + tomli_w.dumps(resolve(host, source))
+    if path.is_file() and path.read_text() == text:
+        return None
+    why = "content differs" if path.exists() else "missing"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    return f"-> {shown(path)} ({why})"
 
 
 def toml_value(value) -> str:
@@ -146,9 +191,9 @@ def toml_value(value) -> str:
     return tomli_w.dumps({"v": value}).removeprefix("v = ").removesuffix("\n")
 
 
-def explain(host: str, root: Path = ROOT) -> str:
+def explain(host: str, root: Path = ROOT, local: Path | None = None) -> str:
     """One line per leaf, `key = value  # file`: valid TOML, and grep finds any key."""
-    config, sources = resolve_with_sources(host, root)
+    config, sources = resolve_with_sources(host, root, local)
     return "".join(
         f"{key} = {toml_value(value)}  # {sources[key]}\n" for key, value in leaves(config)
     )
