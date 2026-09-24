@@ -3,6 +3,7 @@ command faked, root's files written under SYSROOT (conftest.machine)."""
 
 import grp
 import importlib
+import json
 import os
 import pwd
 import subprocess
@@ -686,3 +687,76 @@ def test_ssh_agent(machine, capsys):
     apply("ssh_agent")
     assert machine.calls[-1] == ["systemctl", "--user", "enable", "--now", "ssh-agent.socket"]
     assert "SSH_AUTH_SOCK" in engine.notices[0]
+
+
+# Batch 6: desktop.
+
+
+def test_niri(machine, capsys):
+    machine.answers[("gsettings", "get", "org.gnome.desktop.interface", "color-scheme")] = (
+        0,
+        "'default'",
+    )
+    machine.answers[("gsettings", "get", "org.gnome.desktop.interface", "gtk-theme")] = (
+        0,
+        "'Adwaita'",
+    )
+    apply("niri")
+    assert [c[3:] for c in machine.calls if c[1] == "set"] == [
+        ["color-scheme", "'prefer-dark'"],
+        ["gtk-theme", "'Adwaita-dark'"],
+    ]
+    machine.answers[("gsettings", "get", "org.gnome.desktop.interface", "color-scheme")] = (
+        0,
+        "'prefer-dark'",
+    )
+    machine.answers[("gsettings", "get", "org.gnome.desktop.interface", "gtk-theme")] = (
+        0,
+        "'Adwaita-dark'",
+    )
+    capsys.readouterr()
+    apply("niri")
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize(
+    ("settings", "packages", "command"),
+    [
+        ({}, ["greetd", "greetd-tuigreet"],
+         "tuigreet --remember --remember-session --sessions /usr/share/xsessions:/usr/share/wayland-sessions"),
+        ({"greeter": "noctalia-greeter"}, ["greetd", "noctalia-greeter"], "noctalia-greeter-session"),
+        ({"greeter": "noctalia-greeter", "session": "niri", "user": "val"}, ["greetd", "noctalia-greeter"],
+         "noctalia-greeter-session -- --session niri --user val"),
+    ],
+)  # fmt: skip
+def test_greetd(machine, capsys, settings, packages, command):
+    cfg = defaults(greetd=settings)
+    assert feature("greetd", cfg)[1].packages() == packages
+    apply("greetd", cfg)
+    conf = engine.path("/etc/greetd/config.toml").read_text()
+    assert f'command = "{command}"\n' in conf and 'user = "greeter"' in conf
+    assert machine.calls[-1] == ["systemctl", "enable", "greetd.service"]
+    assert "reboot" in engine.notices[0]
+    machine.answers[("systemctl", "is-enabled", "greetd.service")] = (0, "enabled")
+    capsys.readouterr()
+    apply("greetd", cfg)
+    assert capsys.readouterr().out == ""
+
+
+def test_greetd_knows_two_greeters():
+    cfg = defaults(greetd={"greeter": "gdm"})
+    greetd, strategy = feature("greetd", cfg)
+    assert strategy.packages() == []
+    with pytest.raises(engine.Failed, match="'gdm': tuigreet or noctalia-greeter"):
+        greetd.apply(strategy)
+
+
+def test_firefox(machine, capsys):
+    apply("firefox")
+    policy = json.loads(engine.path("/usr/lib/firefox/distribution/policies.json").read_text())
+    prefs = policy["policies"]["Preferences"]
+    assert prefs["browser.startup.page"] == {"Value": 0, "Status": "default"}
+    assert all(p["Status"] == "default" for p in prefs.values())  # nothing locked
+    capsys.readouterr()
+    apply("firefox")
+    assert capsys.readouterr().out == ""
