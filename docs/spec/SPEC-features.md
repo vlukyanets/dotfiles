@@ -223,7 +223,7 @@ AUR, or fails naming them and `features.aur`.
     `-hardened` or plain), plus nvtop.
   - The 32-bit package only with `pacman.multilib`, otherwise a notice.
   - A driver that was missing before the apply → a notice to reboot.
-- **`snapper`** (with the snapshot pair below)
+- **`snapper`** (its snapshot pair is below)
   - `/` not btrfs → `die`. An active swap file on the root subvolume → a
     notice.
   - snapper, snap-pac.
@@ -237,35 +237,56 @@ AUR, or fails naming them and `features.aur`.
     - `SYNC_ACL=yes`.
   - `/etc/snap-pac.ini`: `[root]` with `important_packages` and
     `important_commands` as JSON lists.
-  - `/usr/local/lib/dotfiles/snapper-pre` (755) and
-    `/etc/pacman.d/hooks/00-dotfiles-snapper-pre.hook`.
   - Services snapper-cleanup.timer, and snapper-timeline.timer with
     `timeline`.
 
 ### The snapshot pair around an apply (batch 4)
 
-With `features.snapper`, `apply` runs its phases inside
-`snapshot.pair(cfg)`, a context manager in `dotfiles/snapshot.py`; the
-environment variables `apply` sets for snapper today move there.
+One pair of snapshots per apply, taken by the `snapper` feature itself,
+and only when packages change. With the feature off there are no
+snapshots, and snap-pac is left alone.
 
-- **Enter.** Only when snapper works (`snapper -c root list` as the user)
-  and the runtime dir exists:
-  - a state file left by a dead apply: its pre snapshot is deleted and
-    the file removed;
-  - the state file is written: `pid=`, and `log=` (the size of
-    `/var/log/pacman.log`).
-- **The pacman hook** runs as root before every transaction. It takes one
-  pre snapshot per apply, `pre=` in the state file, and only when a
-  package changes. So an apply that installs nothing takes no snapshots.
-- **Exit** (also after a failure):
-  - no `pre=`, or another apply's state file → nothing;
-  - otherwise a post snapshot for it. When pacman.log since `log=` shows
-    a package of `important_packages` installed, upgraded or removed,
-    the pair is marked important.
+Two small engine pieces, generic, make this possible:
 
-The hook is a seven-line POSIX `sh` script written into the system by the
-feature, like the niri scripts in `home/`. pacman executes it; the tool
-itself runs no shell.
+- **A feature may wrap the whole apply.** `Feature.session(system)` is a
+  context manager, `nullcontext()` by default. The runner enters the
+  session of every enabled feature before `setup()` and leaves them after
+  the last feature: on success, on a failure and on Ctrl-C.
+- **The platform announces a package change.** `with
+  platforms.watching(hook):` (a `ContextVar`, like `as_root`) registers
+  HOOK. `Arch` calls `platforms.transaction()` right before each command
+  that changes packages:
+  - `pacman -S`, `-Syu`, `-Rdd`, `-U`;
+  - `paru -S`.
+
+  It does not call it on a dry run. Strategies are separate instances of
+  the platform class, and a `ContextVar` reaches them all.
+
+`Snapper.session(system)`:
+
+- **Enter**
+  - Snapper works (`snapper -c root list` as the user answers, which it
+    does only once `ALLOW_USERS` is set), so the pair is possible.
+  - `SNAP_PAC_SKIP=y` goes into the environment of the apply, so snap-pac
+    takes no snapshots of its own. `engine._sudo()` then adds
+    `--preserve-env=SNAP_PAC_SKIP`, and paru gets the same through
+    `--sudoflags`. The variable is removed when the session ends.
+  - `watching(pre)` registers the pre snapshot.
+- **`pre`**, called by the first real transaction only:
+  - `snapper -c root create -t pre -c number -d "dotfiles apply" -p`, as
+    the user through snapperd; the number it prints is kept;
+  - the size of `/var/log/pacman.log` is kept too;
+  - `-> snapper pre snapshot #N`.
+- **Exit**, when a pre was taken:
+  - `snapper -c root create -t post --pre-number N -c number -d
+    "dotfiles apply"`;
+  - when pacman.log since the pre shows a package of `important_packages`
+    installed, upgraded, reinstalled or removed, both snapshots get
+    `important=yes`.
+
+No pacman hook, no script, no state file: the pair lives in one
+process, the apply. On the first apply snapper is not set up yet (the
+feature configures it after the install), so that apply takes no pair.
 
 ### The user's environment (batch 5)
 
@@ -392,11 +413,15 @@ their batches (the second as TOML, like every other registry).
 - **Pure functions that decide something** have table tests: the nvidia
   generation from a GPU name, the snapper important-package check, the
   luks cmdline edit, the plymouth HOOKS edit.
-- **`snapshot.pair`:** a fake snapper and a temp runtime dir cover
-  - nothing without a pre;
-  - a post for a pre;
+- **The snapshot pair:** a fake snapper and platform cover
+  - no transaction → no snapshots;
+  - several transactions → one pre, one post;
   - important from the pacman.log;
-  - a stale state file from a dead pid.
+  - snapper not usable → no pair, and `SNAP_PAC_SKIP` not set;
+  - a dry run → none;
+  - a failed apply still gets its post.
+- **The runner:** sessions are entered only for enabled features, before
+  `setup`, and left after a failure too.
 - **By hand, at the end of each batch:** `apply --dry-run` with the
   hyper-lin config on a real Arch (read-only); no sudo.
 
@@ -434,15 +459,12 @@ their batches (the second as TOML, like every other registry).
 2. **An impossible combination fails in the feature** (`gaming` without
    multilib, a `swap` without a size), not in the config check. The
    config check knows keys and types, not features.
-3. **The snapshot pair is part of `apply`** (`snapshot.pair`), not a
-   feature: it must wrap the install, which runs before any feature.
+3. **The snapshot pair belongs to the `snapper` feature.** It wraps the
+   apply through `Feature.session`, and the pre is taken on the platform's
+   first package change (`platforms.watching`). snap-pac is silenced
+   with `SNAP_PAC_SKIP` in the environment of the transactions. There is
+   no pacman hook of our own.
 4. **nvidia reads the GPU from sysfs and pci.ids**, so the driver is
    chosen on the first apply, without pciutils.
 5. **The VS Code registry becomes `data/vscode.toml`**, like every other
    registry.
-
-## Open Questions
-
-1. The snapper hook stays a small `sh` script (pacman runs it as root,
-   outside the tool). Or do you want it in Python, run by the system
-   `python3`?
