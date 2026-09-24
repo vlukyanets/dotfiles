@@ -133,8 +133,8 @@ lang      = "en_US.UTF-8"
 locales   = ["en_US.UTF-8 UTF-8"]
 keymap    = "us"
 timezone  = "UTC"
-# Names from data/languages.toml, in keyboard-layout order; niri,
-# fcitx5 and switch-layout.sh read the same list.
+# Names from data/fcitx5-languages-config.toml, in keyboard-layout order;
+# niri, fcitx5 and switch-layout.sh read the same list.
 languages = ["english"]
 
 [features.locale.console]

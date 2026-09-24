@@ -1,6 +1,6 @@
 """Not a feature of the schema: switched by ssh.generate_key. An ed25519 key
 for this machine; the key never leaves ~/.ssh, only its .pub is worth
-copying into data/ssh-keys.toml."""
+copying into data/ssh-pubkeys-collection.toml."""
 
 import os
 import pwd
@@ -32,8 +32,8 @@ class SshKey(Feature):
         changed(f"generated {key}")
         pub = key.with_name("id_ed25519.pub")
         notice(
-            "new SSH public key — add it to data/ssh-keys.toml and wherever it should log in:\n"
-            + (pub.read_text().strip() if pub.exists() else str(pub))
+            "new SSH public key — add it to data/ssh-pubkeys-collection.toml and wherever "
+            "it should log in:\n" + (pub.read_text().strip() if pub.exists() else str(pub))
         )
 
     class Arch:

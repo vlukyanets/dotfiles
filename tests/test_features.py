@@ -762,9 +762,9 @@ def test_firefox(machine, capsys):
     assert capsys.readouterr().out == ""
 
 
-# Batch 7: VS Code, with the real data/vscode.toml.
+# Batch 7: VS Code, with the real data/vscode-extensions.toml.
 
-VSCODE = tomllib.loads((ROOT / "data/vscode.toml").read_text())["vscode"]
+VSCODE = tomllib.loads((ROOT / "data/vscode-extensions.toml").read_text())["vscode"]
 PACK = "ms-vscode-remote.vscode-remote-extensionpack"
 
 

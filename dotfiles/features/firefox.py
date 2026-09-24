@@ -1,5 +1,6 @@
-"""Firefox with the about:config defaults of data/firefox.toml as a
-distribution policy: every value a new default, nothing locked."""
+"""Firefox with the about:config defaults of
+data/firefox-privacy-config.toml as a distribution policy: every value a
+new default, nothing locked."""
 
 import json
 
@@ -11,7 +12,7 @@ from dotfiles.feature import Feature
 
 class Firefox(Feature):
     def apply(self, strategy):
-        prefs = config.load(ROOT / "data/firefox.toml", ROOT)["firefox"]["prefs"]
+        prefs = config.load(ROOT / "data/firefox-privacy-config.toml", ROOT)["firefox"]["prefs"]
         policy = {
             "policies": {
                 "Preferences": {
