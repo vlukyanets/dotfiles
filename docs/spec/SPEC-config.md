@@ -27,7 +27,10 @@ User stories:
 
 - Python ≥ 3.11: `tomllib`, `argparse`, `socket` from the stdlib.
 - `tomli-w` for TOML output — the one runtime dependency (Arch: `python-tomli-w`, extra).
-- `uv` for the project and dev tools; dev dependencies `pytest`, `ruff`.
+- `uv` for the project and dev tools; dev dependencies `pytest`, `ruff`, in a
+  group that is not a default one: `.venv/` holds the runtime only, and
+  verification brings the group into a throwaway environment
+  (`uv run --isolated --group dev`).
 
 ## Data model
 
@@ -86,13 +89,13 @@ The resolved config does not contain `extends`.
 ## Commands
 
 ```
-uv sync                                           # venv + dev tools
-uv run dotfiles config                            # this machine (socket.gethostname())
-uv run dotfiles config --host hyper-lin           # any host, TOML on stdout
-uv run dotfiles config --host hyper-lin --explain # every leaf as a dotted key, with the file it came from
-uv run dotfiles check                             # every host in hosts/ + one unknown host; exit 1 on any error, all errors listed
-uv run pytest
-uv run ruff check . && uv run ruff format --check .
+uv sync                                           # .venv/: runtime dependencies only
+uv run --exact dotfiles config                    # this machine (socket.gethostname())
+uv run --exact dotfiles config --host hyper-lin   # any host, TOML on stdout
+uv run --exact dotfiles config --host hyper-lin --explain # every leaf as a dotted key, with the file it came from
+uv run --isolated dotfiles check                  # every host in hosts/ + one unknown host; exit 1 on any error, all errors listed
+uv run --isolated --group dev pytest              # verification: a throwaway environment, .venv/ untouched
+uv run --isolated --group dev ruff check . && uv run --isolated --group dev ruff format --check .
 python -m dotfiles config                         # same, without uv (bootstrap path)
 ```
 
@@ -158,7 +161,7 @@ def resolve(root: Path, host: str) -> dict:
   = defaults; `secrets.backend` enum.
 - `--explain` names the right file for a value set in defaults, a profile
   and the host.
-- `uv run dotfiles check` passes on the real data.
+- `uv run --isolated dotfiles check` passes on the real data.
 
 ## Boundaries
 
@@ -172,13 +175,13 @@ def resolve(root: Path, host: str) -> dict:
 
 ## Success Criteria
 
-1. `uv run dotfiles config --host hyper-lin` prints that machine's whole
+1. `uv run --exact dotfiles config --host hyper-lin` prints that machine's whole
    configuration as TOML: every key of the schema, with its resolved value.
 2. `hosts/hyper-lin.toml` extends `laptop` and holds only what differs from
    it; `echo-server` extends `server`; `laptop` and `server` extend `base`.
-3. `uv run dotfiles check` exits 0 on the repo data and 1 on each broken
+3. `uv run --isolated dotfiles check` exits 0 on the repo data and 1 on each broken
    fixture from the test list, naming file and key.
-4. `uv run pytest` and `ruff` pass.
+4. `uv run --isolated --group dev pytest` and `ruff` pass.
 5. Runs with `python -m dotfiles` from a checkout with no venv when
    `python-tomli-w` is the only third-party package installed.
 

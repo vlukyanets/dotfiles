@@ -320,9 +320,9 @@ Notices from this apply:
 ## Commands
 
 ```
-uv run dotfiles apply --dry-run     # what would change; no sudo, no writes
-uv run dotfiles apply               # this machine: packages, dotfiles, features, notices
-uv run pytest tests/test_engine.py tests/test_platforms.py tests/test_apply.py
+uv run --exact dotfiles apply --dry-run     # what would change; no sudo, no writes
+uv run --exact dotfiles apply               # this machine: packages, dotfiles, features, notices
+uv run --isolated --group dev pytest tests/test_engine.py tests/test_platforms.py tests/test_apply.py
 ```
 
 `deploy` stays as a separate command for the dotfiles alone.

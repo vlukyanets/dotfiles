@@ -27,3 +27,8 @@ line-length = 100
 
 [tool.ruff.lint]
 extend-select = ["I", "UP", "B"]
+
+[tool.uv]
+# .venv/ runs the tool; tests and lint bring the dev group in a throwaway
+# environment of their own (uv run --isolated --group dev).
+default-groups = []

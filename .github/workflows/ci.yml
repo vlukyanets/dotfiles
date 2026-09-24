@@ -40,14 +40,15 @@ jobs:
           echo "$bin" >> "$GITHUB_PATH"
           "$bin/uv" --version
 
-      - name: Install the project
-        run: uv sync --locked
-
+      # Each step in a throwaway environment of its own, from uv.lock: the
+      # same commands as on a machine, where .venv/ holds the runtime only.
       - name: Lint
-        run: uv run ruff check . && uv run ruff format --check .
+        run: |
+          uv run --locked --isolated --group dev ruff check .
+          uv run --locked --isolated --group dev ruff format --check .
 
       - name: Tests
-        run: uv run pytest -q
+        run: uv run --locked --isolated --group dev pytest -q
 
       - name: Every host resolves
-        run: uv run dotfiles check
+        run: uv run --locked --isolated dotfiles check
