@@ -119,33 +119,31 @@ run against an empty tree. It is not a command-line option.
 
 ## `dotfiles apply` — `dotfiles/apply.py`
 
+There is no list of steps. Every module in `dotfiles/features/` is a
+step, and so is the deploy of `home/`, named `dotfiles`. A module declares
+what the runner needs to know next to its code:
+
 ```python
-class Step(NamedTuple):
-    module: str  # dotfiles/features/<module>.py; "dotfiles" is the deploy
-    gate: str | None  # runs only when features.<gate>.enabled
-    needs: tuple[str, ...] = ()  # earlier steps that must not have failed
+"""Build and install paru."""
+
+GATE = "aur"  # optional; default: the module's own name, features.<name>
+NEEDS = ("makepkg",)  # optional; steps that run first and must not fail
 
 
-STEPS = [
-    Step("nobeep", "nobeep"),
-    ...,
-    # e.g., in `packages`: Step("paru", "aur", needs=("makepkg",))
-    Step("dotfiles", None),
-    # e.g., in `features`: Step("ssh_agent", "ssh_agent", needs=("dotfiles",))
-]
+def apply(cfg: dict) -> None: ...
 ```
 
-- The order is this list, one list with the deploy as the step
-  `dotfiles`. It keeps the old groups (core, packages, system, shell,
-  ssh, desktop, then the after steps) and order.
-- A step with a gate runs only when `features.<gate>.enabled`. A disabled
-  step is never imported, so it prints nothing and has no side effects.
-  `None` is for the few modules that read several flags themselves (the
-  old map scripts: services, tools, apps).
-- `needs` names earlier steps that this one builds on, `dotfiles`
-  included. A test checks that every name
-  exists and comes earlier. The actual edges are decided per feature in
-  `packages` and `features`; this module provides the mechanism.
+- The order comes from `NEEDS` alone: a step runs after every step it
+  needs (a topological sort, `graphlib` from the stdlib); steps free to
+  run at the same point run by name. A feature that must run after
+  another says so in `NEEDS`, `dotfiles` included.
+- A step runs only when `features.<GATE>.enabled`. `GATE = None` is for
+  the few modules that read several flags themselves (services, tools,
+  apps). A disabled step is imported, since its `NEEDS` place the others,
+  but never run: importing a feature module has no side effects.
+- A `NEEDS` entry that names no step, or a cycle, fails the apply before
+  any step runs, naming the module. A test checks every real module: its
+  gate is a feature in the schema and it has `apply`.
 - A feature module is one function:
 
 ```python
@@ -206,7 +204,7 @@ uv run pytest tests/test_engine.py tests/test_apply.py
 
 ```
 dotfiles/engine.py        output, notices, as_root, retry/defer, os_guard, ensure_* helpers
-dotfiles/apply.py         STEPS, the runner, snapper env, notices at the end
+dotfiles/apply.py         step discovery and order, the runner, snapper env, notices
 dotfiles/features/        one module per feature (nobeep only, in this module)
 tests/test_engine.py      helpers, twice each: one change, then none
 tests/test_apply.py       runner: order, gates, failures, notices, dry run
@@ -246,8 +244,8 @@ This replaces `ci/test-lib.sh`; its checks all carry over.
   `conftest.py`, a helper that really tried to escalate fails the test.
 - `retry` (sleep patched), `defer`, `os_guard` against a fake os-release,
   `notice` (printed immediately and at the end).
-- Runner (fake feature modules in a temp package): order, gated steps
-  not imported, `Skip` silent, a failed step does not stop the steps that
+- Runner (fake feature modules in a temp package): order from `NEEDS`
+  and names, unknown need and cycle rejected, gated steps not run, `Skip` silent, a failed step does not stop the steps that
   do not need it, a step that needs it is not run (transitively), exit 1,
   notices after a failure, dry run makes no call to sudo or `run`.
 - `nobeep` in an empty `SYSROOT`: dry run reports `(missing)`, and a real

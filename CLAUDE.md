@@ -32,8 +32,9 @@ master and every PR; uv is pinned there by version and sha256.
   context; the names a host takes from them are checked in
   `render.registries` (`REFERENCES`).
 - Helpers features are written with (the `lib.sh` port): `dotfiles/engine.py`.
-  Features: `dotfiles/features/<name>.py`, one `apply(cfg)` each; their
-  order, gates and `needs` in `dotfiles/apply.py` (`STEPS`).
+  Features: `dotfiles/features/<name>.py`, one `apply(cfg)` each, with
+  `NEEDS` (what runs first) and `GATE` in the module; the runner that
+  finds and orders them: `dotfiles/apply.py`.
 - Why: `docs/spec/SPEC-<module>.md`, then `docs/spec/CAPABILITY-MAP.md`.
 
 ## Commits and branches
