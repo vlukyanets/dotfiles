@@ -176,10 +176,13 @@ class Platform(ABC):
     def packages(self) -> list[str]:
         return []  # a strategy's default
 
+    def replaces(self) -> list[str]:
+        return []  # installed packages its packages replace (packages spec)
+
     @abstractmethod
     def missing(self, names: list[str]) -> list[str]: ...  # not installed; no root
     @abstractmethod
-    def install(self, names: list[str]) -> None: ...  # one transaction
+    def install(self, names: list[str], replaces: list[str] = ()) -> None: ...  # one transaction
     # name -> every package it needs, transitively
     @abstractmethod
     def depends(self, names: list[str]) -> dict[str, set[str]]: ...
@@ -193,7 +196,7 @@ class Linux(Platform):  # linux.py: what every Linux here shares
 
 
 class Arch(Linux):  # arch.py
-    ...  # missing: pacman -T; install: pacman -S --needed, as root, retried; depends: pacman -Si, walked
+    ...  # missing: pacman -T; install: pacman -S or paru; depends: pacman -Si, walked
 ```
 
 - `detect(cfg)` reads `/etc/os-release`: the platform is the class in

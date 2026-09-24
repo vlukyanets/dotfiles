@@ -104,7 +104,8 @@ replacement is being installed.
    unsatisfied until the install below provides the name again.
 2. **Split.** `pacman -Si` (no root) answers for the names in the sync
    databases; those are repository packages, the rest are taken as AUR
-   packages.
+   packages. `-Si` knows package names only, not what they provide, so a
+   strategy lists real names (`rust`, not `cargo`).
 3. **Repositories.** `pacman -S --needed --noconfirm …`, as root,
    retried, one transaction. Failure after the retries:
    `pacman -S failed; if downloads returned 404 the sync databases are

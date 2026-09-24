@@ -31,7 +31,7 @@ authorized_keys = []
 
 [features]
 # packages
-aur.enabled            = false  # paru, built from the AUR once
+aur.enabled            = false  # AUR packages allowed; paru built when it does not run
 # system
 nobeep.enabled         = false  # blacklist pcspkr
 oomd.enabled           = false  # systemd-oomd pressure tuning + the service
