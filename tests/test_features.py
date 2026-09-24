@@ -412,3 +412,64 @@ def test_plymouth_goes_after_udev_without_systemd(machine):
     conf = write("/etc/mkinitcpio.conf", "HOOKS=(base udev encrypt)\n")
     apply("plymouth")
     assert conf.read_text() == "HOOKS=(base udev plymouth encrypt)\n"
+
+
+@pytest.fixture
+def btrfs(machine):
+    machine.answers[("findmnt", "-no", "FSTYPE", "/")] = (0, "btrfs\n")
+    machine.answers[("findmnt", "-no", "UUID", "/")] = (0, "f00d\n")
+    machine.answers[("findmnt", "-no", "SOURCE", "/")] = (0, "/dev/mapper/root[/@]\n")
+    machine.answers[("btrfs", "subvolume", "list", "/")] = (0, "ID 256 gen 9 top level 5 path @\n")
+    return machine
+
+
+def test_swap(btrfs, capsys):
+    cfg = defaults(swap={"size": "20g"})
+    write(
+        "/etc/fstab", "UUID=f00d / btrfs subvol=/@ 0 0\nUUID=f00d /swap btrfs subvol=/@swap 0 0\n"
+    )
+    apply("swap", cfg)
+    mount = [
+        c
+        for c in btrfs.calls
+        if c[0] in ("mount", "umount") or c[:3] == ["btrfs", "subvolume", "create"]
+    ]
+    assert [c[0] for c in mount] == ["mount", "btrfs", "umount"]
+    assert mount[0][:4] == ["mount", "-o", "subvolid=5", "/dev/mapper/root"]
+    assert mount[1][-1].endswith("/@swap")
+    unit = engine.path("/etc/systemd/system/swap.mount").read_text()
+    assert "What=UUID=f00d\n" in unit and "Options=noatime,subvol=/@swap\n" in unit
+    order = [
+        c[:3] for c in btrfs.calls if c[0] in ("systemctl", "mkdir", "btrfs") and "is-" not in c[1]
+    ]
+    assert order[-6:] == [
+        ["btrfs", "subvolume", "create"],
+        ["systemctl", "daemon-reload"],
+        ["mkdir", "-p", "/swap"],
+        ["systemctl", "enable", "--now"],
+        ["btrfs", "filesystem", "mkswapfile"],
+        ["systemctl", "enable", "--now"],
+    ]
+    assert engine.notices[0].startswith("/etc/fstab still has a line for /swap")
+    capsys.readouterr()
+
+    running(btrfs, "swap.mount", "swap-swapfile.swap")
+    write("/swap/swapfile", "")
+    btrfs.calls.clear()
+    apply("swap", cfg)
+    assert capsys.readouterr().out == ""
+    assert not [c for c in btrfs.calls if c[0] not in ("findmnt", "systemctl")]
+
+
+def test_swap_needs_a_size_and_btrfs(btrfs):
+    with pytest.raises(engine.Failed, match="features.swap.size is empty"):
+        apply("swap")
+    btrfs.answers[("findmnt", "-no", "FSTYPE", "/")] = (0, "ext4\n")
+    with pytest.raises(engine.Failed, match="^/ is ext4"):
+        apply("swap", defaults(swap={"size": "8g"}))
+
+
+def test_swap_keeps_an_existing_subvolume(btrfs):
+    btrfs.answers[("btrfs", "subvolume", "list", "/")] = (0, "ID 256 path @\nID 257 path @swap\n")
+    apply("swap", defaults(swap={"size": "8g"}))
+    assert not [c for c in btrfs.calls if c[0] == "mount"]
