@@ -116,6 +116,11 @@ class Arch(Linux):
                     "reflector.timer tries again"
                 )
 
+    def multilib(self) -> bool:
+        """The [multilib] repository is enabled through features.pacman."""
+        pacman = self.cfg["features"]["pacman"]
+        return pacman["enabled"] and pacman["multilib"]
+
     def initramfs_hooks(self) -> list[str]:
         """HOOKS=(...) of mkinitcpio.conf, in order; [] without the line."""
         conf = engine.path("/etc/mkinitcpio.conf")

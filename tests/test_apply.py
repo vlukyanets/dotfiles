@@ -11,6 +11,7 @@ from dotfiles import engine, platforms
 from dotfiles.apply import Step, apply, order, steps
 from dotfiles.config import ROOT, ConfigError
 from dotfiles.feature import Feature
+from dotfiles.platforms.arch import Arch
 from dotfiles.platforms.linux import Linux
 
 HEAD = "from dotfiles.engine import defer, die, notice\nfrom dotfiles.feature import Feature\n\n\n"
@@ -274,7 +275,6 @@ UNSWITCHED = {"ssh_key", "rbw"}
 SETUP = {"pacman", "makepkg", "reflector"}
 # Features of the batches still to come (SPEC-features); shrinks to nothing.
 NOT_YET = {
-    *("nvidia",),  # batch 4
     *("fnm", "libvirt", "rustup", "ssh_agent", "uv", "zsh"),  # batch 5
     *("firefox", "greetd", "niri", "vscode"),  # batches 6 and 7
 }
@@ -284,7 +284,7 @@ def test_real_features_are_consistent():
     cfg = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())
     for table in cfg["features"].values():
         table["enabled"] = True
-    found = {s.name: s for s in steps(cfg, FakeArch(cfg))}
+    found = {s.name: s for s in steps(cfg, Arch(cfg))}  # packages() only reads files
     for name, s in found.items():
         assert type(s.feature).__name__ == name.title().replace("_", ""), name
         assert name in cfg["features"] or name in UNSWITCHED, f"{name}: not in the schema"

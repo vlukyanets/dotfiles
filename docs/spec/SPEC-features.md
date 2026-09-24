@@ -185,7 +185,8 @@ AUR, or fails naming them and `features.aur`.
     snapshots of `/`.
   - `size` empty, or `/` not btrfs → `die` naming the setting.
   - While `swap.mount` is not active: create `@swap` when `btrfs
-    subvolume list /` lacks it, through a temporary mount of subvolid 5.
+    subvolume list /` (as root) lacks it, through a temporary mount of
+    subvolid 5. A dry run cannot list it and says so.
   - Units `/etc/systemd/system/swap.mount` (`UUID=` of `/`,
     `subvol=/@swap`, `noatime`) and `swap-swapfile.swap`;
     `daemon-reload` when they changed.
@@ -196,7 +197,8 @@ AUR, or fails naming them and `features.aur`.
     file on the root subvolume.
 - **`plymouth`**
   - plymouth.
-  - `plymouth` goes into mkinitcpio.conf's `HOOKS=` after `systemd`, else
+  - `plymouth` goes into mkinitcpio.conf's `HOOKS=` (read by
+    `Arch.initramfs_hooks()`, as `locale` and `luks_discard` do) after `systemd`, else
     after `udev`, else after `base`. The line is edited in place with
     `ensure_line`.
   - `plymouth-set-default-theme -R bgrt` when the theme is not bgrt or
@@ -221,8 +223,10 @@ AUR, or fails naming them and `features.aur`.
 
   - Headers for the running kernel (`os.uname().release`: `-zen`, `-lts`,
     `-hardened` or plain), plus nvtop.
-  - The 32-bit package only with `pacman.multilib`, otherwise a notice.
-  - A driver that was missing before the apply → a notice to reboot.
+  - The 32-bit package only with `pacman.multilib` (`strategy.multilib()`,
+    which `gaming` asks too), otherwise a notice.
+  - The driver not loaded (`/sys/module/nvidia` missing) → a notice to
+    reboot, on every apply until it is.
 - **`snapper`** (its snapshot pair is below)
   - `/` not btrfs → `die`. An active swap file on the root subvolume → a
     notice.
@@ -230,8 +234,9 @@ AUR, or fails naming them and `features.aur`.
   - `/etc/snapper/configs/root` missing → `snapper -c root create-config
     /`. An existing `/.snapshots` mount is unmounted around it and put
     back, and the directory is set to 750.
-  - `get-config` (as the user; as root until `ALLOW_USERS` is set), then
-    `set-config` for each key that differs:
+  - `get-config` as the user, then one `set-config` for the keys that
+    differ. Until `ALLOW_USERS` is set the user reads nothing, so every key
+    is set once. The keys:
     - `TIMELINE_CREATE`, `NUMBER_LIMIT`, `NUMBER_LIMIT_IMPORTANT`;
     - `ALLOW_USERS=<user>`;
     - `SYNC_ACL=yes`.

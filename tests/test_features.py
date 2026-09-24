@@ -473,3 +473,64 @@ def test_swap_keeps_an_existing_subvolume(btrfs):
     btrfs.answers[("btrfs", "subvolume", "list", "/")] = (0, "ID 256 path @\nID 257 path @swap\n")
     apply("swap", defaults(swap={"size": "8g"}))
     assert not [c for c in btrfs.calls if c[0] == "mount"]
+
+
+PCI_IDS = """# comment
+10de  NVIDIA Corporation
+\t1b80  GP104 [GeForce GTX 1080]
+\t\t1043 8591  subsystem
+\t2684  AD102 [GeForce RTX 4090]
+10df  Emulex Corporation
+\t1b80  not this one
+"""
+
+
+def pci(slot: str, vendor: str, kind: str, device: str) -> None:
+    for name, value in (("vendor", vendor), ("class", kind), ("device", device)):
+        write(f"/sys/bus/pci/devices/{slot}/{name}", value + "\n")
+
+
+@pytest.mark.parametrize(
+    ("name", "package", "lib32"),
+    [
+        ("AD102 [GeForce RTX 4090]", "nvidia-dkms", "lib32-nvidia-utils"),
+        ("TU116 [GeForce GTX 1660 SUPER]", "nvidia-dkms", "lib32-nvidia-utils"),
+        ("GP104 [GeForce GTX 1080]", "nvidia-580xx-dkms", "lib32-nvidia-580xx-utils"),
+        ("GK104 [GeForce GTX 770]", "nvidia-470xx-dkms", "lib32-nvidia-470xx-utils"),
+        ("GF110 [GeForce GTX 580]", "nvidia-390xx-dkms", "lib32-nvidia-390xx-utils"),
+        ("G92 [GeForce 9800 GT]", "nvidia-340xx-dkms", None),
+    ],
+)
+def test_nvidia_driver_by_generation(name, package, lib32):
+    from dotfiles.features.nvidia import driver
+
+    assert driver(name) == (package, lib32, True)
+    assert driver("GH100 [H100]") == ("nvidia-dkms", "lib32-nvidia-utils", False)
+
+
+def test_nvidia(machine, monkeypatch):
+    from dotfiles.features import nvidia
+
+    write("/usr/share/hwdata/pci.ids", PCI_IDS)
+    pci("0000:00:02.0", "0x8086", "0x030000", "0x3e92")  # Intel, not NVIDIA
+    assert feature("nvidia")[1].packages() == []
+    pci("0000:01:00.0", "0x10de", "0x030000", "0x1b80")
+    pci("0000:01:00.1", "0x10de", "0x040300", "0x10f0")  # its audio function
+    assert nvidia.gpu() == "GP104 [GeForce GTX 1080]"
+
+    monkeypatch.setattr(os, "uname", lambda: os.uname_result(("", "", "6.10.1-zen1-1-zen", "", "")))
+    cfg = defaults(pacman={"enabled": True, "multilib": True})
+    assert feature("nvidia", cfg)[1].packages() == [
+        "nvidia-580xx-dkms", "linux-zen-headers", "lib32-nvidia-580xx-utils", "nvtop",
+    ]  # fmt: skip
+    apply("nvidia", cfg)
+    assert engine.notices == ["the NVIDIA driver is not loaded — reboot for it to take effect"]
+
+    engine.notices.clear()
+    write("/sys/module/nvidia/version", "580\n")
+    assert "lib32-nvidia-580xx-utils" not in feature("nvidia")[1].packages()
+    apply("nvidia")
+    assert engine.notices[0].startswith("nvidia: no lib32-nvidia-580xx-utils")
+    engine.notices.clear()
+    apply("nvidia", cfg)
+    assert engine.notices == []
