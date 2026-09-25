@@ -45,6 +45,8 @@ master and every PR; uv is pinned there by version and sha256.
 ## Commits and branches
 
 - `master` holds finished modules; each module is built on its own branch.
+- Branch names are short, lowercase, hyphenated and say what changes
+  (`hyper-lin-no-android`); no generated names or `claude/` prefixes.
 - Subject: one line, imperative, plain language. Body: optional, one paragraph.
 - No Conventional Commits prefixes, no AI attribution lines in commits or
   pull requests.
