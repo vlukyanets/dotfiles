@@ -204,8 +204,11 @@ def render(
 
 def check(root: Path = ROOT, source: Path | None = None) -> dict[str, str | None]:
     """config.check of SOURCE (default ROOT), plus the machine config as
-    "local" when there is one; everything that resolves is rendered into a
-    temp dir with the templates of ROOT."""
+    "local" when there is one; everything that resolves has its features'
+    requirements checked on every platform and is rendered into a temp dir
+    with the templates of ROOT."""
+    from dotfiles import apply  # apply deploys through this module
+
     source = source or root
     results = config.check(source)
     local = config.local_path()
@@ -220,6 +223,7 @@ def check(root: Path = ROOT, source: Path | None = None) -> dict[str, str | None
                         cfg = config.resolve(name, root, local)
                     else:
                         name, cfg = host, config.resolve(host, source)
+                    apply.requirements(cfg)
                     render(name, Path(tmp) / "home", root, cfg=cfg)
                 except ConfigError as e:
                     results[host] = str(e)

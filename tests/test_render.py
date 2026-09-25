@@ -1,8 +1,9 @@
+import shutil
 from pathlib import Path
 
 import pytest
 
-from dotfiles.config import ConfigError
+from dotfiles.config import ROOT, ConfigError
 from dotfiles.render import check, deploy, render
 
 
@@ -139,6 +140,17 @@ def test_out_must_be_empty(root, tmp_path):
 def test_check_renders_every_host(root):
     write(root, "home/f.j2", "{{ git.name or fail('no name') }}")
     assert check(root) == {"on": None, "unknown-host": "home/f.j2:1: unknown-host: no name"}
+
+
+def test_check_names_a_requirement_left_off(tmp_path):
+    for sub in ("hosts", "profiles", "data"):
+        shutil.copytree(ROOT / sub, tmp_path / sub)
+    (tmp_path / "dotfiles").mkdir()
+    shutil.copy(ROOT / "dotfiles/defaults.toml", tmp_path / "dotfiles")
+    (tmp_path / "hosts/solo.toml").write_text(
+        'extends = ["laptop"]\n[features]\nnoctalia.enabled = false\n'
+    )
+    assert check(source=tmp_path)["solo"] == "niri: requires features.noctalia.enabled = true"
 
 
 def test_registries_reach_templates_and_names_are_checked(root, tmp_path):

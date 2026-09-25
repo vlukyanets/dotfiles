@@ -12,3 +12,6 @@ class Gaming(Feature):
             if not self.multilib():
                 return []  # nothing half-installed; apply says why
             return ["steam", "gamemode", "mangohud", "lib32-mangohud", "ttf-liberation"]
+
+        def requires(self):
+            return ["pacman"]  # its multilib: steam and the lib32 packages

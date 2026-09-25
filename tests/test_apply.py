@@ -65,13 +65,15 @@ def feature(
     packages: list[str] | None = None,
     on="Linux",
     replaces: list[str] | None = None,
+    requires: list[str] | None = None,
 ) -> str:
     """A feature module: class CLS whose apply runs APPLY, supported on ON
-    with PACKAGES, which replace REPLACES."""
+    with PACKAGES, which replace REPLACES, and needing REQUIRES."""
     body = f"class {cls}(Feature):\n    def apply(self, strategy):\n        {apply}\n\n"
     body += f"    class {on}:\n"
     body += f"        def packages(self):\n            return {packages or []!r}\n"
     body += f"        def replaces(self):\n            return {replaces or []!r}\n"
+    body += f"        def requires(self):\n            return {requires or []!r}\n"
     return body
 
 
@@ -170,8 +172,8 @@ def test_dry_run_installs_nothing_and_runs_every_feature(
     assert capsys.readouterr().out == "-> packages: pg (missing)\ndb\n"
 
 
-def step(name, packages=()):
-    return Step(name, None, None, frozenset(packages), frozenset())
+def step(name, packages=(), requires=()):
+    return Step(name, None, None, frozenset(packages), frozenset(), frozenset(requires))
 
 
 def test_order_follows_the_package_graph():
@@ -191,6 +193,13 @@ def test_order_follows_the_package_graph():
         ("app", ["db", "web"]),
         ("zlib", []),
     ]
+
+
+def test_order_puts_a_requirement_first():
+    # No package ties them; "a" still runs after "b", which it requires.
+    steps_ = [step("a", ["x"], requires=["b", "setup"]), step("b", ["y"]), step("c", ["z"])]
+    got = [(s.name, after) for s, after in order(steps_, {})]
+    assert got == [("b", []), ("a", ["b"]), ("c", [])]  # setup is no step: nothing to wait for
 
 
 def test_order_breaks_a_cycle_by_name():
@@ -237,6 +246,46 @@ def test_failures_block_what_builds_on_them(root, system, tmp_path, monkeypatch,
         "error: web: not run, db failed\n"
         "error: app: not run, web failed\n"
     )
+
+
+def test_a_failed_requirement_blocks(root, system, tmp_path, monkeypatch, capsys):
+    (root / "dotfiles/defaults.toml").write_text(
+        "[features]\nshell.enabled = true\nbar.enabled = true\n"
+    )
+    package = make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "shell": feature("Shell", 'die("broken")'),
+            "bar": feature("Bar", 'print("bar ran")', requires=["shell"]),
+        },
+    )
+    assert apply("h", root, package=package) == 1
+    assert capsys.readouterr() == ("", "error: shell: broken\nerror: bar: not run, shell failed\n")
+
+
+def test_a_requirement_left_off_is_a_config_error(root, system, tmp_path, monkeypatch):
+    (root / "dotfiles/defaults.toml").write_text(
+        "[features]\non.enabled = true\noff.enabled = false\nelse.enabled = true\n"
+    )
+    package = make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "on": feature("On", "die('ran')", requires=["off", "nope"]),
+            "off": feature("Off"),
+            "else": feature("Else", "die('ran')", on="Debian", requires=["off"]),  # not here
+        },
+    )
+    msg = "^on: requires nope, which is not a feature; on: requires features.off.enabled = true$"
+    with pytest.raises(ConfigError, match=msg):
+        apply("h", root, package=package)
+    cfg = {"features": {"on": {"enabled": True}, "off": {"enabled": False}}}
+    with pytest.raises(ConfigError, match=msg):
+        runner.requirements(cfg, package, "dotfiles.platforms")
+    cfg["features"]["off"]["enabled"] = True
+    with pytest.raises(ConfigError, match="^on: requires nope, which is not a feature$"):
+        runner.requirements(cfg, package, "dotfiles.platforms")
 
 
 def test_packages_that_did_not_install_block_their_features(
@@ -293,6 +342,13 @@ def test_real_features_are_consistent():
         assert name in cfg["features"] or name in UNSWITCHED, f"{name}: not in the schema"
     missing = set(cfg["features"]) - set(found) - SETUP
     assert not missing, f"features without a module: {sorted(missing)}"
+    # What depends on what on Arch; the package graph orders the rest.
+    assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {
+        "fcitx5": ["niri"],
+        "gaming": ["pacman"],
+        "kotlin": ["jdk"],
+        "niri": ["noctalia"],
+    }
 
 
 @pytest.fixture

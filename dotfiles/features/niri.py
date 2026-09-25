@@ -15,3 +15,6 @@ class Niri(Feature):
                 "niri", "xwayland-satellite", "xdg-desktop-portal-gtk", "xdg-utils",
                 "wl-clipboard", "gnome-themes-extra",
             ]  # fmt: skip
+
+        def requires(self):
+            return ["noctalia"]  # config.kdl starts it and binds its launcher

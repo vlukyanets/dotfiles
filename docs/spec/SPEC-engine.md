@@ -1,7 +1,8 @@
 # Spec: `engine` — helpers, platforms and `dotfiles apply`
 
 Status: draft 2026-09-24, revises the version approved the same day
-(platforms, features as classes, order from the package graph). Module of
+(platforms, features as classes, order from the package graph and each
+strategy's requirements). Module of
 the [capability map](CAPABILITY-MAP.md); depends on `config` (and `render`
 for the deploy step of `apply`).
 
@@ -262,7 +263,28 @@ class Docker(Feature):
 - The feature's name is its file name: it runs only when
   `features.<name>.enabled`. A file whose name is not a feature in the
   schema runs always and reads its flags itself (services, tools, apps).
-- Nothing else is declared: no gate, no dependencies, no order.
+- A strategy may declare the features it needs on its platform,
+  `requires()` (default `[]`), with the reason next to it:
+
+  ```python
+  class Gaming(Feature):
+      class Arch:
+          def requires(self):
+              return ["pacman"]  # its multilib: steam and the lib32 packages
+  ```
+
+  Each must be enabled: otherwise `steps()` raises `ConfigError`, one
+  `gaming: requires features.pacman.enabled = true` per requirement
+  (`gaming: requires x, which is not a feature` for a name the schema
+  lacks), so `apply` stops before setup. `dotfiles check` asks
+  `requires()` of every enabled schema feature on every platform
+  (`platforms.every`), so a host that breaks one fails check wherever it
+  would run. `requires()` reads `self.cfg` only, never the machine.
+  Requirements are for what the package graph cannot see: a config that
+  starts another feature's program, a setup part (`pacman`), a virtual
+  dependency a feature chooses (`jdk` for kotlin). A required setup
+  feature orders nothing: setup runs before every feature.
+- Nothing else is declared: no gate, no order but through `requires()`.
 
 ## `dotfiles apply` — `dotfiles/apply.py`
 
@@ -274,12 +296,12 @@ class Docker(Feature):
    transaction, whose order is the package manager's. Nothing missing →
    nothing printed, no root.
 3. **Dotfiles.** `render.deploy`.
-4. **Features, in order.** `system.depends(...)` on all their packages
-   gives the graph: feature A runs before feature B when a package of B
-   needs a package that A has and B does not (a package both list, like
-   `git`, orders neither). Features free to run at the same point run by
+4. **Features, in order.** Feature A runs before feature B when B
+   requires A, or when a package of B needs a package that A has and B
+   does not, by `system.depends(...)` on all their packages (a package
+   both list, like `git`, orders neither). Features free to run at the same point run by
    name, and a feature without packages has no edges. A cycle in the
-   package graph is broken by name, not an error: its features need each
+   graph is broken by name, not an error: its features need each
    other and any order is as good.
    Each runs as `Docker(cfg).apply(strategy)` does.
 5. **Notices.**
@@ -364,8 +386,10 @@ class Locale(Feature):
   class's, and is what `apply` receives; none → skipped.
 - Runner (a fake platform, fake features in a temp package): one install
   for all packages and silence when none is missing; order from the fake
-  graph, ties by name; a failed feature blocks exactly the features whose
-  packages need its packages; missing packages block their feature;
+  graph, ties by name; a requirement runs first; a requirement left off is a
+  `ConfigError` from `apply` and `requirements`; a failed feature blocks
+  exactly the features whose packages need its packages or that require
+  it; missing packages block their feature;
   notices after a failure and on Ctrl-C; a dry run never calls sudo.
 - `nobeep` in an empty `SYSROOT`; `dotfiles apply --dry-run` on hyper-lin
   by hand.
@@ -379,13 +403,14 @@ class Locale(Feature):
   deletes; a platform besides Arch.
 - **Never:** shell scripts (features, helpers, platforms and tests are
   Python; commands are argv lists, never a shell); sudo in a dry run or a
-  test; keeping sudo alive in the background; writing dependencies or
-  order by hand.
+  test; keeping sudo alive in the background; writing an order by hand,
+  or a requirement the package graph already covers.
 
 ## Success Criteria
 
 1. A feature file holds only what it does and, per platform, its
-   packages; nothing orders or gates it but its name and the package graph.
+   packages and the features it requires; nothing orders or gates it but
+   its name, the package graph and those requirements.
 2. A second platform is one file in `platforms/` plus a nested class in
    the features it supports; no feature's shared code changes.
 3. On a machine that matches, `dotfiles apply` prints only `nothing to
@@ -397,7 +422,10 @@ class Locale(Feature):
 ## Decisions
 
 1. **Order and dependencies come from the package manager**, through
-   `Platform.depends`; nothing is declared by hand. Order the graph does
+   `Platform.depends`, plus what a strategy `requires()`: what the graph
+   cannot see (a config that starts another feature's program, a setup
+   part, a provider chosen by another feature) is declared per platform,
+   where it holds, and checked against the host's config. Order the graph does
    not cover is fixed by the phases: the package manager is ready before
    any install (`setup`), and the dotfiles are deployed before any
    feature.
@@ -409,8 +437,8 @@ class Locale(Feature):
 3. **Package names are per platform**, never mapped.
 4. **All packages in one transaction**, before any feature runs: one
    check, one sudo, and the package manager orders the installation.
-5. **A failed feature blocks only what builds on it** in the package
-   graph; the rest of the apply goes on.
+5. **A failed feature blocks only what builds on it**, in the package
+   graph or by requirement; the rest of the apply goes on.
 6. **Helpers return whether they changed something**; the engine only
    remembers whether the apply printed a change or a warning, so a run
    that printed neither and failed nothing ends with `nothing to change`
