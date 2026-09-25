@@ -55,7 +55,7 @@ that leaves it off fails `dotfiles check`. On Arch:
 
 | Feature | Requires | Why |
 |---|---|---|
-| `gaming` | `pacman` | steam and the lib32 packages come from its multilib |
+| `gaming` | `pacman`, `nvidia` | steam and the lib32 packages come from its multilib; the NVIDIA driver and its lib32 part (nothing without an NVIDIA GPU) |
 | `kotlin` | `jdk` | kotlin needs a java-environment; `jdk` picks which |
 | `niri` | `noctalia` | `config.kdl` starts it and binds its launcher |
 | `fcitx5` | `niri` | `config.kdl` starts it and sets its environment |

@@ -14,4 +14,6 @@ class Gaming(Feature):
             return ["steam", "gamemode", "mangohud", "lib32-mangohud", "ttf-liberation"]
 
         def requires(self):
-            return ["pacman"]  # its multilib: steam and the lib32 packages
+            # pacman's multilib: steam and the lib32 packages. nvidia: the
+            # driver and its lib32 part; on a machine without the GPU it is a no-op.
+            return ["pacman", "nvidia"]

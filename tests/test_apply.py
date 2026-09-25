@@ -345,7 +345,7 @@ def test_real_features_are_consistent():
     # What depends on what on Arch; the package graph orders the rest.
     assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {
         "fcitx5": ["niri"],
-        "gaming": ["pacman"],
+        "gaming": ["nvidia", "pacman"],
         "kotlin": ["jdk"],
         "niri": ["noctalia"],
     }
