@@ -12,9 +12,9 @@ from dotfiles.feature import Feature
 # Generation -> driver package and its 32-bit libraries, after nvidia-utils'
 # support matrix; every branch but the current one comes from the AUR.
 DRIVERS = [
-    (r"RTX [2-9]\d{3}|GTX 16\d{2}|MX[3-9]\d{2}", "nvidia-dkms", "lib32-nvidia-utils"),
+    (r"RTX [2-9]\d{3}|GTX 16\d{2}|MX[4-9]\d{2}", "nvidia-dkms", "lib32-nvidia-utils"),
     (
-        r"GTX 10\d{2}|GTX 9\d{2}|MX[12]\d{2}|\d{3}MX",
+        r"GTX 10\d{2}|GTX 9\d{2}|MX[1-3]\d{2}|9\d{2}MX",
         "nvidia-580xx-dkms",
         "lib32-nvidia-580xx-utils",
     ),
@@ -49,6 +49,14 @@ class Nvidia(Feature):
             package, lib32, _ = driver(name)
             extra = [lib32] if lib32 and self.multilib() else []
             return [package, headers(), *extra, "nvtop"]
+
+        def replaces(self):
+            # An older branch conflicts with the current driver, which steam's
+            # vulkan-driver dependencies pull from the repositories.
+            name = gpu()
+            if name is None or driver(name)[0] == UNKNOWN[0]:
+                return []
+            return ["nvidia-utils", "lib32-nvidia-utils"]
 
 
 def gpu() -> str | None:

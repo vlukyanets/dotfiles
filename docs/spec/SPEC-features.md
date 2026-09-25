@@ -214,8 +214,8 @@ AUR, or fails naming them and `features.aur`.
 
     | GPU | Driver | 32-bit |
     |---|---|---|
-    | RTX 20+, GTX 16, MX300+ | nvidia-dkms | lib32-nvidia-utils |
-    | GTX 9/10, MX100–200 | nvidia-580xx-dkms | lib32-nvidia-580xx-utils |
+    | RTX 20+, GTX 16, MX400+ | nvidia-dkms | lib32-nvidia-utils |
+    | GTX 9/10, 9xxMX, MX100–300 | nvidia-580xx-dkms | lib32-nvidia-580xx-utils |
     | GTX 6/7 | nvidia-470xx-dkms | lib32-nvidia-470xx-utils |
     | GTX 4/5 | nvidia-390xx-dkms | lib32-nvidia-390xx-utils |
     | GeForce 8/9/100–300 | nvidia-340xx-dkms | — |
@@ -223,6 +223,9 @@ AUR, or fails naming them and `features.aur`.
 
   - Headers for the running kernel (`os.uname().release`: `-zen`, `-lts`,
     `-hardened` or plain), plus nvtop.
+  - An AUR branch replaces `nvidia-utils` and `lib32-nvidia-utils`: they
+    conflict with it, and steam's `vulkan-driver` dependencies pull them
+    from the repositories before paru runs (`SPEC-packages`, install).
   - The 32-bit package only with `pacman.multilib` (`strategy.multilib()`,
     which `gaming` asks too), otherwise a notice.
   - The driver not loaded (`/sys/module/nvidia` missing) → a notice to

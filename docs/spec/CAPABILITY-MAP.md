@@ -10,7 +10,7 @@ stable; specs, plans and commits refer to work by them.
 | `config` | Load `dotfiles/defaults.toml` (schema), `profiles/*.toml`, `hosts/*.toml`; resolve `extends` (host → profiles/hosts); validate every file against the schema; merge; dump the result; `check` every host | — |
 | `render` | Jinja2 templates for dotfiles under `home/`, rendered with the resolved config; feature gates; deploy to `$HOME` with check-before-write (content, mode) | `config` |
 | `engine` | `ensure_file/line/symlink/service/sysctl/...`, `as_root`, `retry`, `defer`, notices, ordered feature runner, a clean apply that only says `nothing to change` | `config` |
-| `packages` | Arch setup (pacman.conf drop-ins, multilib, makepkg, reflector); install from the repositories or the AUR, conflicts left to pacman; paru built on demand | `engine` |
+| `packages` | Arch setup (pacman.conf drop-ins, multilib, makepkg, reflector, paru); install from the repositories or the AUR, conflicts left to pacman | `engine` |
 | `features` | One Python module per feature in `dotfiles/defaults.toml` (38), grouped `system`, `shell`, `ssh`, `desktop` | `packages`, `render` |
 | `tooling` | CI: `check` on every host, ruff, pytest; GitHub workflow | `config` |
 | `docs` | README, CLAUDE.md, a page per feature | all |

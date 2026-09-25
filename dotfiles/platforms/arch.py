@@ -1,5 +1,5 @@
 """Arch Linux: pacman, set up before any install (its options, multilib,
-makepkg's build flags, fresh mirrors)."""
+makepkg's build flags, fresh mirrors, the AUR helper)."""
 
 import os
 import re
@@ -43,6 +43,8 @@ class Arch(Linux):
             self._makepkg()
         if features["reflector"]["enabled"]:
             self._reflector()
+        if features["aur"]["enabled"]:
+            self._aur()
 
     def _pacman(self) -> None:
         pacman = self.cfg["features"]["pacman"]
@@ -116,6 +118,14 @@ class Arch(Linux):
                     "reflector.timer tries again"
                 )
 
+    def _aur(self) -> None:
+        # Only AUR packages need paru: a build that fails holds back those,
+        # not the repositories. install builds it again and names the failure.
+        try:
+            self.ensure_paru()
+        except (engine.Failed, subprocess.CalledProcessError) as e:
+            notice(f"paru did not build ({e}) — AUR packages wait until it does")
+
     def multilib(self) -> bool:
         """The [multilib] repository is enabled through features.pacman."""
         pacman = self.cfg["features"]["pacman"]
@@ -135,13 +145,7 @@ class Arch(Linux):
         return list(names) if found is None else found.split()
 
     def install(self, names: list[str], replaces: list[str] = ()) -> None:
-        for name in replaces:
-            # -Qq also answers for a package that only provides NAME (rustup for rust).
-            if output("pacman", "-Qq", name) == name:
-                transaction()
-                with as_root():
-                    run("pacman", "-Rdd", "--noconfirm", name)
-                changed(f"removed {name}, its replacement follows")
+        self._remove(replaces)
         known = _parse(output("pacman", "-Si", *names, env=C) or "") if names else {}
         repo = [n for n in names if n in known]
         aur = [n for n in names if n not in known]
@@ -152,6 +156,10 @@ class Arch(Linux):
         if not self.cfg["features"]["aur"]["enabled"]:
             die(f"not in the repositories: {' '.join(aur)} — enable features.aur to build them")
         self.ensure_paru()
+        # The repositories fill a virtual dependency with their first provider
+        # (steam's lib32-vulkan-driver: lib32-nvidia-utils) when the one wanted
+        # comes from the AUR; that pick conflicts with it and goes again here.
+        self._remove(replaces)
         # paru runs as the user and calls sudo itself: the same one run() would.
         sudo = engine._sudo()
         flags = ["--sudo", sudo[0]] if sudo else []
@@ -164,6 +172,15 @@ class Arch(Linux):
                     run("paru", *flags, "-S", "--needed", "--noconfirm", *aur)
         except subprocess.CalledProcessError:
             die(f"paru -S failed; {STALE.format('paru')}")
+
+    def _remove(self, replaces: list[str]) -> None:
+        for name in replaces:
+            # -Qq also answers for a package that only provides NAME (rustup for rust).
+            if output("pacman", "-Qq", name) == name:
+                transaction()
+                with as_root():
+                    run("pacman", "-Rdd", "--noconfirm", name)
+                changed(f"removed {name}, its replacement follows")
 
     def ensure_paru(self) -> bool:
         """paru runs. A paru left behind by a libalpm bump does not, so the

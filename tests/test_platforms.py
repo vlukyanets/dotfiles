@@ -177,6 +177,30 @@ def test_arch_install_takes_the_rest_from_the_aur(system, monkeypatch):
     ]
 
 
+def test_arch_install_removes_a_replaced_package_the_repositories_pulled(system, monkeypatch):
+    """steam's lib32-vulkan-driver filled by lib32-nvidia-utils, which the
+    AUR driver replaces: gone again before paru installs that."""
+    system.programs.add("paru")
+    system.answers[("pacman", "-Si", "steam", "lib32-nvidia-580xx-utils")] = (0, si("steam"))
+    system.answers[("paru", "--version")] = (0, "paru v2.1.0 - libalpm v16.0.1\n")
+    steam = ["pacman", "-S", "--needed", "--noconfirm", "steam"]
+
+    def pulled(argv, check=False, **kwargs):
+        if argv == steam:
+            system.answers[("pacman", "-Qq", "lib32-nvidia-utils")] = (0, "lib32-nvidia-utils\n")
+        if argv[:2] == ["pacman", "-Rdd"]:
+            system.answers[("pacman", "-Qq", argv[-1])] = (1, "")
+        return Fake.__call__(system, argv, check, **kwargs)
+
+    monkeypatch.setattr(engine, "_run", pulled)
+    Arch(config(aur={})).install(["steam", "lib32-nvidia-580xx-utils"], ["lib32-nvidia-utils"])
+    assert [c for c in system.calls if c[1] in ("-S", "-Rdd")] == [
+        steam,
+        ["pacman", "-Rdd", "--noconfirm", "lib32-nvidia-utils"],
+        ["paru", "-S", "--needed", "--noconfirm", "lib32-nvidia-580xx-utils"],
+    ]
+
+
 def test_arch_install_without_the_aur_fails_after_the_repositories(system):
     system.answers[("pacman", "-Si", "tmux", "clock-rs-git")] = (0, si("tmux"))
     with pytest.raises(Failed, match="not in the repositories: clock-rs-git — enable features.aur"):
@@ -262,6 +286,24 @@ def test_setup_off_runs_nothing(root, capsys):
     Arch(config()).setup()
     assert root.calls == []
     assert capsys.readouterr().out == ""
+
+
+def test_setup_aur_builds_paru_last(root, monkeypatch):
+    built = []
+    monkeypatch.setattr(Arch, "_reflector", lambda self: built.append("reflector"))
+    monkeypatch.setattr(Arch, "ensure_paru", lambda self: built.append("paru"))
+    Arch(config(reflector={}, aur={})).setup()
+    assert built == ["reflector", "paru"]
+
+
+def test_setup_aur_failure_is_a_notice(root, monkeypatch):
+    def fails(self):
+        raise subprocess.CalledProcessError(1, ["makepkg"])
+
+    monkeypatch.setattr(Arch, "ensure_paru", fails)
+    Arch(config(aur={})).setup()  # the repositories still install
+    assert engine.notices[0].startswith("paru did not build (")
+    assert engine.notices[0].endswith("AUR packages wait until it does")
 
 
 def test_setup_pacman(root, capsys):
