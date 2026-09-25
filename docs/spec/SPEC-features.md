@@ -45,11 +45,20 @@ reading their own switch (the runner already allows this):
 |---|---|---|
 | `ssh_key.py` | `ssh.generate_key` | an ed25519 key when `~/.ssh` has none |
 | `rbw.py` | `secrets.backend == "rbw"` | `rbw`, `pinentry` |
-| — | `features.pacman`, `makepkg`, `reflector` | done by `Arch.setup()` (`packages`), no module |
+| — | `features.pacman`, `makepkg`, `reflector`, `aur` | done by `Arch.setup()` (`packages`), no module |
 
 A setting that makes a feature impossible (`gaming` without
 `pacman.multilib`) returns no packages and fails in `apply` with a message
-naming the setting, so nothing half-installs.
+naming the setting, so nothing half-installs. A feature that needs another
+one enabled says so in its strategy (`requires()`, `SPEC-engine`); a host
+that leaves it off fails `dotfiles check`. On Arch:
+
+| Feature | Requires | Why |
+|---|---|---|
+| `gaming` | `pacman`, `nvidia` | steam and the lib32 packages come from its multilib; the NVIDIA driver and its lib32 part (nothing without an NVIDIA GPU) |
+| `kotlin` | `jdk` | kotlin needs a java-environment; `jdk` picks which |
+| `niri` | `noctalia` | `config.kdl` starts it and binds its launcher |
+| `fcitx5` | `niri` | `config.kdl` starts it and sets its environment |
 
 Features read their settings from `self.cfg["features"][name]`; the
 strategy gets the same config, so `packages()` may depend on it
@@ -470,7 +479,8 @@ their batches (the second as TOML, like every other registry).
    gate, and a packages-only feature is four lines.
 2. **An impossible combination fails in the feature** (`gaming` without
    multilib, a `swap` without a size), not in the config check. The
-   config check knows keys and types, not features.
+   config check knows keys and types, and the features each strategy
+   requires, not settings inside another feature.
 3. **The snapshot pair belongs to the `snapper` feature.** It wraps the
    apply through `Feature.session`, and the pre is taken on the platform's
    first package change (`platforms.watching`). snap-pac is silenced

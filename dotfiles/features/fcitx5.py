@@ -8,3 +8,6 @@ class Fcitx5(Feature):
             if "chinese" in self.cfg["features"]["locale"]["languages"]:
                 packages.append("fcitx5-chinese-addons")
             return packages
+
+        def requires(self):
+            return ["niri"]  # config.kdl starts it and sets its environment

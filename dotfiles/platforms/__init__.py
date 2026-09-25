@@ -7,10 +7,12 @@ systemctl themselves; they call the platform, through their strategy.
 
 import importlib
 import importlib.util
+import pkgutil
 import platform
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from contextvars import ContextVar
+from inspect import isabstract
 
 from dotfiles import engine
 from dotfiles.config import ConfigError
@@ -56,6 +58,11 @@ class Platform(ABC):
         before those are installed, where they would conflict."""
         return []
 
+    def requires(self) -> list[str]:
+        """Features a strategy needs on this platform: each must be enabled,
+        and runs before it (setup's, like pacman, run before every one)."""
+        return []
+
     @abstractmethod
     def missing(self, names: list[str]) -> list[str]:
         """NAMES that are not installed. A check: no root, no change."""
@@ -96,3 +103,13 @@ def detect(cfg: dict, package: str = PACKAGE) -> Platform:
             raise ConfigError(f"{name}: defines {len(found)} platforms, not one")
         return found[0](cfg)
     raise ConfigError(f"no platform for {' or '.join(filter(None, ids)) or 'this system'}")
+
+
+def every(cfg: dict, package: str = PACKAGE) -> list[Platform]:
+    """One of each platform detect() can answer with, by module name: the
+    ones a host may run on, for checks that must hold on all of them."""
+    found = []
+    for info in sorted(pkgutil.iter_modules(importlib.import_module(package).__path__)):
+        module = importlib.import_module(f"{package}.{info.name}")
+        found += [c(cfg) for c in classes(module) if issubclass(c, Platform) and not isabstract(c)]
+    return found

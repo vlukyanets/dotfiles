@@ -38,8 +38,10 @@ master and every PR; uv is pinned there by version and sha256.
 - Features: `dotfiles/features/<name>.py`, one `Feature` subclass each; its
   nested classes (`Arch`, `Linux`, …) are the strategies `apply` receives,
   with the packages for that platform (`packages()`, repository and AUR
-  alike) and the ones they replace (`replaces()`). The name gates it; the order comes
-  from the package graph (`dotfiles/apply.py`). Nothing else is declared.
+  alike), the ones they replace (`replaces()`) and the features they need
+  there (`requires()`: enabled, or check fails; run first). The name gates
+  it; the order comes from the package graph and those requirements
+  (`dotfiles/apply.py`). Nothing else is declared.
 - Why: `docs/spec/SPEC-<module>.md`, then `docs/spec/CAPABILITY-MAP.md`.
 
 ## Commits and branches

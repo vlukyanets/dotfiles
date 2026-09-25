@@ -1,6 +1,6 @@
 """dotfiles apply: the platform, the packages of every feature at once, the
-dotfiles, then the features in the order their packages need each other,
-and the notices at the end."""
+dotfiles, then the features in the order their packages and their declared
+requirements need each other, and the notices at the end."""
 
 import importlib
 import pkgutil
@@ -23,12 +23,13 @@ class Step(NamedTuple):
     strategy: Platform
     packages: frozenset[str]
     replaces: frozenset[str]
+    requires: frozenset[str] = frozenset()  # features that must be on, and run first
 
 
-def steps(cfg: dict, system: Platform, package: str = PACKAGE) -> list[Step]:
-    """The features of PACKAGE that are enabled and have a strategy for
-    SYSTEM, by name. A module whose name is not a feature in the schema is
-    not switched by one: it always runs and reads its flags itself."""
+def features(cfg: dict, package: str = PACKAGE) -> list[tuple[str, Feature]]:
+    """The features of PACKAGE that CFG does not switch off, by name. A
+    module whose name is not a feature in the schema is not switched by
+    one: it always runs and reads its flags itself."""
     found = []
     for info in sorted(pkgutil.iter_modules(importlib.import_module(package).__path__)):
         name = info.name
@@ -38,23 +39,63 @@ def steps(cfg: dict, system: Platform, package: str = PACKAGE) -> list[Step]:
         classes = [c for c in platforms.classes(module) if issubclass(c, Feature)]
         if len(classes) != 1:
             raise ConfigError(f"{package}.{name}: defines {len(classes)} features, not one")
-        feature = classes[0](cfg)
+        found.append((name, classes[0](cfg)))
+    return found
+
+
+def steps(cfg: dict, system: Platform, package: str = PACKAGE) -> list[Step]:
+    """The features of PACKAGE that are enabled and have a strategy for
+    SYSTEM, by name; a ConfigError when one requires a feature that is off."""
+    found = []
+    for name, feature in features(cfg, package):
         strategy = feature.strategy(system)
         if strategy is not None:  # none: the feature does not apply here
             packages, replaces = frozenset(strategy.packages()), frozenset(strategy.replaces())
-            found.append(Step(name, feature, strategy, packages, replaces))
+            requires = frozenset(strategy.requires())
+            found.append(Step(name, feature, strategy, packages, replaces, requires))
+    if problems := unmet(cfg, {step.name: step.requires for step in found}):
+        raise ConfigError("; ".join(problems))
     return found
+
+
+def unmet(cfg: dict, requires: dict[str, frozenset[str]]) -> list[str]:
+    """What each feature REQUIRES that CFG does not enable, one line each."""
+    problems = []
+    for feature, names in sorted(requires.items()):
+        for name in sorted(names):
+            if name not in cfg["features"]:
+                problems.append(f"{feature}: requires {name}, which is not a feature")
+            elif not cfg["features"][name]["enabled"]:
+                problems.append(f"{feature}: requires features.{name}.enabled = true")
+    return problems
+
+
+def requirements(
+    cfg: dict, package: str = PACKAGE, platform_package: str = platforms.PACKAGE
+) -> None:
+    """The requirements of what CFG enables, on every platform: a ConfigError
+    naming each one left off. Only requires() is asked, so nothing is read
+    from this machine; modules the schema does not know are not checked."""
+    found = [(n, f) for n, f in features(cfg, package) if n in cfg["features"]]
+    problems: list[str] = []
+    for system in platforms.every(cfg, platform_package):
+        strategies = {name: feature.strategy(system) for name, feature in found}
+        requires = {n: frozenset(s.requires()) for n, s in strategies.items() if s is not None}
+        problems += [p for p in unmet(cfg, requires) if p not in problems]
+    if problems:
+        raise ConfigError("; ".join(problems))
 
 
 def order(steps: list[Step], depends: dict[str, set[str]]) -> list[tuple[Step, list[str]]]:
     """STEPS in running order, each with the names of the steps it runs
-    after: B after A when a package of B needs a package that A has and B
-    does not. Ties go by name; a cycle in the package graph is broken by
+    after: B after A when B requires A, or when a package of B needs a
+    package that A has and B does not. Ties go by name; a cycle is broken by
     name too."""
     owners: dict[str, set[str]] = {}
     for step in steps:
         for pkg in step.packages:
             owners.setdefault(pkg, set()).add(step.name)
+    names = {step.name for step in steps}
     after = {
         step.name: sorted(
             {
@@ -64,6 +105,7 @@ def order(steps: list[Step], depends: dict[str, set[str]]) -> list[tuple[Step, l
                 if dep not in step.packages
                 for owner in owners.get(dep, ())
             }
+            | (step.requires & names)
         )
         for step in steps
     }
