@@ -9,9 +9,7 @@ email = "valikluks95@gmail.com"
 sshd.enabled           = true
 resolved.enabled       = true
 tailscale.enabled      = true
-thp.enabled            = true
 nvidia.enabled         = true
-yubikey.enabled        = true
 # development
 docker.enabled         = true
 libvirt.enabled        = true
@@ -86,6 +84,7 @@ packages = ["terminus-font"]
 size = "20g"
 
 [features.snapper]
+enabled            = false
 important_packages = ["linux-zen", "linux-zen-headers", "nvidia-580xx-dkms", "systemd", "pacman"]
 important_commands = ["pacman -Syu", "paru -Syu"]
 
