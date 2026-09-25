@@ -6,7 +6,8 @@ depends on `engine`.
 ## Objective
 
 Make `Arch` a complete package backend: `setup()` prepares pacman (its
-options, multilib, the build flags of local packages, fresh mirrors) before
+options, multilib, the build flags of local packages, fresh mirrors, the
+AUR helper) before
 anything is installed, and `install()` takes every package from wherever
 it lives, the repositories or the AUR. A strategy lists its packages by
 name, repository and AUR alike, and the installed packages they replace.
@@ -72,6 +73,12 @@ read from `self.cfg`. In this order, the first failure stopping the rest
    - Any of these changed: `systemctl start reflector.service`, as root.
      Its failure is a notice, not an error: the old mirrorlist stays and
      the timer tries again.
+4. **aur** (`features.aur`) — `ensure_paru()`, last: it builds with
+   makepkg's flags, from fresh mirrors. paru is ready before any feature's
+   package, so it is the one AUR helper whatever the host installs. A
+   build that fails is a notice (`paru did not build (…) — AUR packages
+   wait until it does`), not a setup failure: only AUR packages need it,
+   and `install` builds it again when one is missing, failing there.
 
 Every file is `root:root`, mode 644, written with `ensure_file`, so a dry
 run prints what would change and writes nothing.
@@ -112,10 +119,20 @@ replacement is being installed.
    stale: run pacman -Syu and apply again`.
 4. **AUR.** With `features.aur` off: `not in the repositories: a b —
    enable features.aur to build them from the AUR`, after the repository
-   packages are installed. Otherwise `ensure_paru()`, then
-   `paru -S --needed --noconfirm …` as the user, retried; paru calls sudo
+   packages are installed. Otherwise `ensure_paru()` (built by setup
+   already, so only a `paru --version`), the replaced packages removed
+   again as in 1, then `paru -S --needed --noconfirm …` as the user, retried; paru calls sudo
    itself, with `--sudo` and `--sudoflags` taken from `SUDO_CMD` and the
    snapper variables, so a test's `SUDO_CMD=false` holds for it too.
+
+The second removal is for virtual dependencies: pacman fills one with its
+first provider unless a target or an installed package provides it, and a
+provider that comes from the AUR is neither while the repositories
+install. steam needs `lib32-vulkan-driver`; with `nvidia-580xx` from the
+AUR, pacman picks `lib32-nvidia-utils` (and `nvidia-utils` with it), which
+conflicts with the AUR driver. The strategy that installs the AUR driver
+says it replaces those two, so they go right before paru brings their
+replacement: one wasted download on the first apply, not a failed one.
 
 `apply` re-checks `missing` afterwards, so a failed AUR package blocks
 only the features that list it.
@@ -136,15 +153,14 @@ libalpm bump no longer does) → nothing. Otherwise, in a temp dir:
    files, `pacman -U --noconfirm <files>` as root.
 4. `-> paru built from the AUR`.
 
-`features.aur` is also a feature, `features/aur.py`: its `Arch` strategy
-has no packages, and its `apply` calls `strategy.ensure_paru()`, so an
-enabled AUR has a working paru even when no feature needs an AUR package.
+`features.aur` has no module of its own, like `pacman`, `makepkg` and
+`reflector`: setup reads it, so an enabled AUR has a working paru even when
+no feature needs an AUR package.
 
 ## Project Structure
 
 ```
-dotfiles/platforms/arch.py   Arch: setup (pacman, makepkg, reflector), install, ensure_paru
-dotfiles/features/aur.py     class Aur(Feature), an Arch strategy that ensures paru
+dotfiles/platforms/arch.py   Arch: setup (pacman, makepkg, reflector, paru), install, ensure_paru
 dotfiles/platforms/__init__.py  Platform.replaces(), install(names, replaces)
 dotfiles/apply.py            Step.replaces, passed to install
 dotfiles/defaults.toml       comments of features.pacman / makepkg / reflector / aur
@@ -186,8 +202,10 @@ def _makepkg(self) -> None:
 - reflector: `daemon-reload` only when the override changed; a failed
   `start` is a notice and setup goes on; nothing started when nothing
   changed.
+- aur: paru after reflector; a failed build a notice, setup goes on.
 - install: a replaced package removed only when installed under its own
-  name, before the install; one `pacman -S` with the repository names only; AUR
+  name, before the install, and again before paru when the repository
+  install pulled it in; one `pacman -S` with the repository names only; AUR
   names through paru with `--sudo false`; AUR names with `features.aur`
   off fail after the repository install; the 404 hint on failure.
 - ensure_paru: nothing when `paru --version` answers; otherwise clone,
@@ -223,7 +241,8 @@ def _makepkg(self) -> None:
 3. **A replaced package is named by the strategy** that installs its
    replacement (`replaces()`) and removed with `pacman -Rdd` just before the
    install, rather than left to pacman's undocumented `--ask` answers.
-4. **paru is built on demand**: by `install` when an AUR package is
-   missing, by the `aur` feature otherwise.
+4. **paru is built by setup**, before any package, when `features.aur` is
+   on; `install` builds it again only when that failed and an AUR package
+   is missing.
 5. **Enabling multilib runs `pacman -Syu` once**, as the Arch wiki asks
    after enabling a repository.

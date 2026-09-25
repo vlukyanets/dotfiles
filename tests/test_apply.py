@@ -280,7 +280,7 @@ def test_a_module_defines_one_feature(root, system, tmp_path, monkeypatch):
 # Modules that always run, switched by a setting outside [features].
 UNSWITCHED = {"ssh_key", "rbw"}
 # Features without a module: Arch.setup() does them.
-SETUP = {"pacman", "makepkg", "reflector"}
+SETUP = {"pacman", "makepkg", "reflector", "aur"}
 
 
 def test_real_features_are_consistent():

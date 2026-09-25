@@ -482,6 +482,7 @@ PCI_IDS = """# comment
 10de  NVIDIA Corporation
 \t1b80  GP104 [GeForce GTX 1080]
 \t\t1043 8591  subsystem
+\t174d  GM108M [GeForce MX130]
 \t2684  AD102 [GeForce RTX 4090]
 10df  Emulex Corporation
 \t1b80  not this one
@@ -498,7 +499,12 @@ def pci(slot: str, vendor: str, kind: str, device: str) -> None:
     [
         ("AD102 [GeForce RTX 4090]", "nvidia-dkms", "lib32-nvidia-utils"),
         ("TU116 [GeForce GTX 1660 SUPER]", "nvidia-dkms", "lib32-nvidia-utils"),
+        ("TU117M [GeForce MX450]", "nvidia-dkms", "lib32-nvidia-utils"),
         ("GP104 [GeForce GTX 1080]", "nvidia-580xx-dkms", "lib32-nvidia-580xx-utils"),
+        ("GP107M [GeForce MX350]", "nvidia-580xx-dkms", "lib32-nvidia-580xx-utils"),
+        ("GM108M [GeForce MX130]", "nvidia-580xx-dkms", "lib32-nvidia-580xx-utils"),
+        ("GM108M [GeForce 940MX]", "nvidia-580xx-dkms", "lib32-nvidia-580xx-utils"),
+        ("GK104M [GeForce GTX 670MX]", "nvidia-470xx-dkms", "lib32-nvidia-470xx-utils"),
         ("GK104 [GeForce GTX 770]", "nvidia-470xx-dkms", "lib32-nvidia-470xx-utils"),
         ("GF110 [GeForce GTX 580]", "nvidia-390xx-dkms", "lib32-nvidia-390xx-utils"),
         ("G92 [GeForce 9800 GT]", "nvidia-340xx-dkms", None),
@@ -537,6 +543,22 @@ def test_nvidia(machine, monkeypatch):
     engine.notices.clear()
     apply("nvidia", cfg)
     assert engine.notices == []
+    # The repositories' driver conflicts with an AUR branch, not with itself.
+    assert feature("nvidia")[1].replaces() == ["nvidia-utils", "lib32-nvidia-utils"]
+    write("/sys/bus/pci/devices/0000:01:00.0/device", "0x2684\n")
+    assert feature("nvidia")[1].replaces() == []
+
+
+def test_nvidia_mx130(machine):
+    """A laptop's 3D controller next to the Intel GPU; Maxwell, so 580xx."""
+    write("/usr/share/hwdata/pci.ids", PCI_IDS)
+    pci("0000:00:02.0", "0x8086", "0x030000", "0x5917")
+    pci("0000:01:00.0", "0x10de", "0x030200", "0x174d")
+    cfg = defaults(pacman={"enabled": True, "multilib": True})
+    strategy = feature("nvidia", cfg)[1]
+    assert strategy.packages()[0] == "nvidia-580xx-dkms"
+    assert "lib32-nvidia-580xx-utils" in strategy.packages()
+    assert strategy.replaces() == ["nvidia-utils", "lib32-nvidia-utils"]
 
 
 # Batch 5: the user's environment.
