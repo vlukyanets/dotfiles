@@ -291,15 +291,17 @@ def test_setup_off_runs_nothing(root, capsys):
 def test_setup_aur_builds_paru_last(root, monkeypatch):
     built = []
     monkeypatch.setattr(Arch, "_reflector", lambda self: built.append("reflector"))
+    monkeypatch.setattr(Arch, "ensure_rustup", lambda self: built.append("rustup"))
     monkeypatch.setattr(Arch, "ensure_paru", lambda self: built.append("paru"))
     Arch(config(reflector={}, aur={})).setup()
-    assert built == ["reflector", "paru"]
+    assert built == ["reflector", "rustup", "paru"]
 
 
 def test_setup_aur_failure_is_a_notice(root, monkeypatch):
     def fails(self):
         raise subprocess.CalledProcessError(1, ["makepkg"])
 
+    monkeypatch.setattr(Arch, "ensure_rustup", lambda self: False)
     monkeypatch.setattr(Arch, "ensure_paru", fails)
     Arch(config(aur={})).setup()  # the repositories still install
     assert engine.notices[0].startswith("paru did not build (")
@@ -450,23 +452,52 @@ def test_ensure_paru(monkeypatch, capsys):
     fake.answers = {
         ("paru", "--version"): (127, ""),
         ("pacman", "-T", "base-devel", "git"): (127, "base-devel\n"),
-        ("pacman", "-T", "cargo", "git", "libalpm.so", "pacman"): (127, "cargo\n"),
+        ("pacman", "-T", "rustup"): (127, "rustup\n"),
+        ("pacman", "-T", "git", "libalpm.so", "pacman"): (127, "pacman\n"),
         ("rustup", "default"): (1, ""),  # rustup without a toolchain
     }
     assert arch.ensure_paru() is True
-    mutations = [c for c in fake.calls if c[:2] not in (["pacman", "-T"], ["paru", "--version"])]
+    checks = (["pacman", "-T"], ["pacman", "-Qq"], ["paru", "--version"], ["rustup", "default"])
+    mutations = [
+        c for c in fake.calls if c[:2] not in checks or c == ["rustup", "default", "stable"]
+    ]
     assert mutations[0] == ["pacman", "-S", "--needed", "--noconfirm", "base-devel"]
     assert mutations[1][:5] == ["git", "clone", "--quiet", "--depth", "1"]
+    # cargo from rustup, never the rust package pacman would pick for it.
     assert mutations[2:6] == [
-        ["pacman", "-S", "--needed", "--noconfirm", "--asdeps", "cargo"],
-        ["rustup", "default"],
+        ["pacman", "-S", "--needed", "--noconfirm", "rustup"],
         ["rustup", "default", "stable"],
+        ["pacman", "-S", "--needed", "--noconfirm", "--asdeps", "pacman"],
         ["makepkg", "--noconfirm"],
     ]
     assert mutations[-1][:3] == ["pacman", "-U", "--noconfirm"]
     assert mutations[-1][3].endswith("/paru-2.1.0-1-x86_64.pkg.tar.zst")
     assert len(mutations[-1]) == 4  # the .debug file was not built
-    assert capsys.readouterr().out == "-> paru built from the AUR\n"
+    assert capsys.readouterr().out == (
+        "-> packages: rustup (cargo and rustc)\n-> rustup default stable\n"
+        "-> paru built from the AUR\n"
+    )
+
+
+def test_ensure_rustup(system, arch, capsys):
+    system.programs.add("rustup")
+    system.answers[("pacman", "-T", "rustup")] = (127, "rustup\n")
+    system.answers[("pacman", "-Qq", "rust")] = (0, "rust\n")
+    system.answers[("rustup", "default")] = (1, "")
+    assert arch.ensure_rustup() is True
+    assert [
+        c for c in system.calls if c[1] not in ("-T", "-Qq") and c != ["rustup", "default"]
+    ] == [
+        ["pacman", "-Rdd", "--noconfirm", "rust"],
+        ["pacman", "-S", "--needed", "--noconfirm", "rustup"],
+        ["rustup", "default", "stable"],
+    ]
+    assert capsys.readouterr().out == (
+        "-> removed rust, its replacement follows\n"
+        "-> packages: rustup (cargo and rustc)\n-> rustup default stable\n"
+    )
+    system.answers = {("rustup", "default"): (0, "stable-x86_64-unknown-linux-gnu (default)\n")}
+    assert arch.ensure_rustup() is False
 
 
 def test_ensure_paru_dry_run(system, monkeypatch, capsys):

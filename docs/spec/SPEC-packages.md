@@ -73,10 +73,10 @@ read from `self.cfg`. In this order, the first failure stopping the rest
    - Any of these changed: `systemctl start reflector.service`, as root.
      Its failure is a notice, not an error: the old mirrorlist stays and
      the timer tries again.
-4. **aur** (`features.aur`) — `ensure_paru()`, last: it builds with
-   makepkg's flags, from fresh mirrors. paru is ready before any feature's
+4. **aur** (`features.aur`) — `ensure_rustup()`, then `ensure_paru()`,
+   last: paru builds with makepkg's flags, from fresh mirrors. paru is ready before any feature's
    package, so it is the one AUR helper whatever the host installs. A
-   build that fails is a notice (`paru did not build (…) — AUR packages
+   failure of either is a notice (`paru did not build (…) — AUR packages
    wait until it does`), not a setup failure: only AUR packages need it,
    and `install` builds it again when one is missing, failing there.
 
@@ -144,14 +144,28 @@ libalpm bump no longer does) → nothing. Otherwise, in a temp dir:
 
 1. `git clone --depth 1 https://aur.archlinux.org/paru.git`, retried.
 2. Its `.SRCINFO` gives `depends` and `makedepends` (version constraints
-   dropped); `install(missing(...))` for those, so root goes through
-   `as_root` as everywhere else. `cargo` is satisfied by `rustup` when it
-   is installed, otherwise pacman picks `rust`. A rustup with no default
-   toolchain gets `rustup default stable` (retried): cargo does not run
-   without one, and the feature that sets it runs only after the packages.
+   dropped). `cargo` or `rust` among them → `ensure_rustup()`; the rest
+   `--asdeps` from the repositories, as root through `as_root` as
+   everywhere else.
 3. `makepkg --noconfirm` as the user, `makepkg --packagelist` for the
    files, `pacman -U --noconfirm <files>` as root.
 4. `-> paru built from the AUR`.
+
+### `Arch.ensure_rustup()`
+
+cargo and rustc come from rustup on every Arch host that builds from the
+AUR; the `rust` package never goes in. pacman fills a `cargo` dependency
+with `rust` unless something provides it already, so rustup is there
+before paru or any AUR build asks.
+
+1. rustup missing → `rust`, when installed under that name, removed with
+   `pacman -Rdd` (as for replaced packages), then `pacman -S rustup`,
+   explicit: `-> packages: rustup (cargo and rustc)`.
+2. No default toolchain (`rustup default` prints nothing) → `rustup
+   default stable`, retried: cargo does not run without one.
+
+The `rustup` feature does the same for a host that wants the toolchain
+without the AUR, and keeps it healthy.
 
 `features.aur` has no module of its own, like `pacman`, `makepkg` and
 `reflector`: setup reads it, so an enabled AUR has a working paru even when
@@ -202,14 +216,17 @@ def _makepkg(self) -> None:
 - reflector: `daemon-reload` only when the override changed; a failed
   `start` is a notice and setup goes on; nothing started when nothing
   changed.
-- aur: paru after reflector; a failed build a notice, setup goes on.
+- aur: rustup, then paru, after reflector; a failed build a notice, setup
+  goes on.
+- ensure_rustup: rust swapped for rustup, then the default toolchain;
+  nothing when rustup has one.
 - install: a replaced package removed only when installed under its own
   name, before the install, and again before paru when the repository
   install pulled it in; one `pacman -S` with the repository names only; AUR
   names through paru with `--sudo false`; AUR names with `features.aur`
   off fail after the repository install; the 404 hint on failure.
 - ensure_paru: nothing when `paru --version` answers; otherwise clone,
-  `.SRCINFO` dependencies installed, makepkg, `pacman -U` as root, in
+  cargo through `ensure_rustup`, the other `.SRCINFO` dependencies installed, makepkg, `pacman -U` as root, in
   that order.
 - Every setup part off: no command runs.
 
@@ -246,3 +263,5 @@ def _makepkg(self) -> None:
    is missing.
 5. **Enabling multilib runs `pacman -Syu` once**, as the Arch wiki asks
    after enabling a repository.
+6. **Rust is rustup, never the rust package**: one toolchain manager on
+   every host, and no provider choice left to pacman for `cargo`.

@@ -27,6 +27,8 @@ from dotfiles.platforms.linux import Linux
 C = {**os.environ, "LC_ALL": "C"}
 PACMAN_CONF = "/etc/pacman.conf"
 PARU = "https://aur.archlinux.org/paru.git"
+# What a PKGBUILD asks for to build Rust: rustup provides both, the rust package never goes in.
+RUST = {"cargo", "rust"}
 STALE = "if downloads returned 404 the sync databases are stale: run {} -Syu and apply again"
 
 
@@ -121,7 +123,9 @@ class Arch(Linux):
     def _aur(self) -> None:
         # Only AUR packages need paru: a build that fails holds back those,
         # not the repositories. install builds it again and names the failure.
+        # rustup first, so no AUR build pulls the rust package for cargo.
         try:
+            self.ensure_rustup()
             self.ensure_paru()
         except (engine.Failed, subprocess.CalledProcessError) as e:
             notice(f"paru did not build ({e}) — AUR packages wait until it does")
@@ -199,13 +203,10 @@ class Arch(Linux):
                     run("git", "clone", "--quiet", "--depth", "1", PARU, str(src))
             info = (src / ".SRCINFO").read_text()
             deps = re.findall(r"^\s*(?:make)?depends = (\S+)$", info, re.MULTILINE)
-            self._sync(self.missing(sorted({re.split(r"[<>=]", d)[0] for d in deps})), "--asdeps")
-            # cargo through rustup runs only with a default toolchain, and the
-            # feature that sets one runs after the packages.
-            if output("rustup", "default") == "":
-                for attempt in retrying():
-                    with attempt:
-                        run("rustup", "default", "stable")
+            names = {re.split(r"[<>=]", d)[0] for d in deps}
+            if names & RUST:
+                self.ensure_rustup()
+            self._sync(self.missing(sorted(names - RUST)), "--asdeps")
             # makepkg as the user (it refuses root), the install as root.
             run("makepkg", "--noconfirm", cwd=src)
             built = (output("makepkg", "--packagelist", cwd=src) or "").split()
@@ -214,6 +215,24 @@ class Arch(Linux):
                 run("pacman", "-U", "--noconfirm", *[f for f in built if Path(f).exists()])
         changed("paru built from the AUR")
         return True
+
+    def ensure_rustup(self) -> bool:
+        """cargo and rustc come from rustup, with a stable default toolchain:
+        the rust package, which conflicts with it, is swapped out."""
+        edited = False
+        if self.missing(["rustup"]):
+            self._remove(["rust"])
+            self._sync(["rustup"])
+            changed("packages: rustup (cargo and rustc)")
+            edited = True
+        # cargo through rustup runs only with a default toolchain.
+        if output("rustup", "default") == "":
+            for attempt in retrying():
+                with attempt:
+                    run("rustup", "default", "stable")
+            changed("rustup default stable")
+            edited = True
+        return edited
 
     def _sync(self, names: list[str], *flags: str) -> None:
         """NAMES from the repositories, as root, retried; nothing when empty."""
