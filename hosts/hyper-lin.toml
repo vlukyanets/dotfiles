@@ -18,7 +18,6 @@ libvirt.enabled        = true
 uv.enabled             = true
 fnm.enabled            = true
 go.enabled             = true
-android.enabled        = true
 rustup.enabled         = true
 gh.enabled             = true
 cpp_gcc.enabled        = true
