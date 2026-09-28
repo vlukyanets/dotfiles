@@ -2,18 +2,17 @@
 #
 # What to try here:
 # - `dotfiles init dotfiles-node-arch`, then `config`, `config --explain`:
-#   the chain vm → laptop → base and the values each file sets.
-# - `apply --dry-run` on a fresh install: pacman.conf drop-ins, multilib,
+#   the chain vm → base and the values each file sets.
+# - `apply --dry-run` on a fresh install: pacman.conf drop-ins,
 #   makepkg, reflector, paru, the missing packages, no sudo asked.
 # - `apply`: packages in one transaction, `rust` replaced by `rustup`, the
 #   dotfiles deployed, docker.service up, the user in the docker group.
-# - Order: sccache after rustup (its package graph), gaming after pacman
-#   and nvidia (its requires); nvidia is a no-op without the GPU.
+# - Order: sccache after rustup (its package graph).
 # - A second `apply` prints only `nothing to change` and asks no password.
 # - Failure paths: the network down (deferred steps, a notice to retry),
 #   a package missing from the mirrors (its feature not run, exit 1).
 # - The desktop: niri, noctalia, greetd with noctalia-greeter, audio,
-#   fcitx5, zram as the only swap.
+#   zram as the only swap.
 extends = ["vm"]
 
 [features]
@@ -22,8 +21,3 @@ rustup.enabled  = true
 sccache.enabled = true
 uv.enabled      = true
 gh.enabled      = true
-nvidia.enabled  = true
-gaming.enabled  = true
-
-[features.pacman]
-multilib = true  # steam and the lib32 packages of gaming
