@@ -158,7 +158,8 @@ dotfiles/__main__.py     `python -m dotfiles`: calls cli.main
 dotfiles/config.py       load, chain, validate, merge — pure functions over dicts and a root Path
 dotfiles/defaults.toml   schema
 profiles/                base, server, laptop, vm
-hosts/                   hyper-lin (extends laptop), echo-server (extends server)
+hosts/                   hyper-lin (extends laptop), echo-server (extends server),
+                         dotfiles-node-{arch,debian,voidlinux} (extend vm; test VMs)
 tests/test_config.py     unit tests on tmp_path fixtures + checks on the real data
 docs/spec/               capability map, module specs
 ```
