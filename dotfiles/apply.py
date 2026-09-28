@@ -53,7 +53,8 @@ def steps(cfg: dict, system: Platform, package: str = PACKAGE) -> list[Step]:
             packages, replaces = frozenset(strategy.packages()), frozenset(strategy.replaces())
             requires = frozenset(strategy.requires())
             found.append(Step(name, feature, strategy, packages, replaces, requires))
-    if problems := unmet(cfg, {step.name: step.requires for step in found}):
+    requires = {step.name: step.requires for step in found}
+    if problems := unmet(cfg, requires) + circles(requires):
         raise ConfigError("; ".join(problems))
     return found
 
@@ -70,6 +71,38 @@ def unmet(cfg: dict, requires: dict[str, frozenset[str]]) -> list[str]:
     return problems
 
 
+def cycles(edges: dict[str, frozenset[str] | list[str]]) -> list[list[str]]:
+    """The cycles of EDGES (name -> the names it needs), each once, as the
+    names along it starting from the first by name. A name that is not a
+    key of EDGES needs nothing."""
+    found: dict[frozenset[str], list[str]] = {}
+    done: set[str] = set()
+
+    def visit(path: list[str]) -> None:
+        for name in sorted(edges.get(path[-1], ())):
+            if name in path:
+                cycle = path[path.index(name) :]
+                first = cycle.index(min(cycle))
+                found.setdefault(frozenset(cycle), cycle[first:] + cycle[:first])
+            elif name not in done and name in edges:
+                visit([*path, name])
+        done.add(path[-1])
+
+    for name in sorted(edges):
+        if name not in done:
+            visit([name])
+    return sorted(found.values())
+
+
+def circle(cycle: list[str]) -> str:
+    return " → ".join([*cycle, cycle[0]])
+
+
+def circles(requires: dict[str, frozenset[str]]) -> list[str]:
+    """Each cycle of REQUIRES, one line each: none of its features can run first."""
+    return [f"{circle(c)}: each requires the next, so none can run first" for c in cycles(requires)]
+
+
 def requirements(
     cfg: dict, package: str = PACKAGE, platform_package: str = platforms.PACKAGE
 ) -> None:
@@ -81,7 +114,7 @@ def requirements(
     for system in platforms.every(cfg, platform_package):
         strategies = {name: feature.strategy(system) for name, feature in found}
         requires = {n: frozenset(s.requires()) for n, s in strategies.items() if s is not None}
-        problems += [p for p in unmet(cfg, requires) if p not in problems]
+        problems += [p for p in unmet(cfg, requires) + circles(requires) if p not in problems]
     if problems:
         raise ConfigError("; ".join(problems))
 
@@ -90,7 +123,7 @@ def order(steps: list[Step], depends: dict[str, set[str]]) -> list[tuple[Step, l
     """STEPS in running order, each with the names of the steps it runs
     after: B after A when B requires A, or when a package of B needs a
     package that A has and B does not. Ties go by name; a cycle is broken by
-    name too."""
+    name too, so every step has a place, and apply runs none of its steps."""
     owners: dict[str, set[str]] = {}
     for step in steps:
         for pkg in step.packages:
@@ -163,7 +196,14 @@ def _phases(
         failed.add("dotfiles")
         _error("dotfiles", e)
 
-    for step, after in order(found, system.depends(wanted) if wanted else {}):
+    ordered = order(found, system.depends(wanted) if wanted else {})
+    for cycle in cycles({step.name: after for step, after in ordered}):
+        failed.update(cycle)  # features are cut so they never need each other
+        _error(", ".join(cycle), f"not run, they need each other: {circle(cycle)}")
+
+    for step, after in ordered:
+        if step.name in failed:
+            continue
         if not engine.DRY_RUN and step.packages & set(missing):
             failed.add(step.name)
             gone = " ".join(sorted(step.packages & set(missing)))
