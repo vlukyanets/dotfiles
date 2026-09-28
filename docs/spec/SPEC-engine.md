@@ -276,7 +276,9 @@ class Docker(Feature):
   Each must be enabled: otherwise `steps()` raises `ConfigError`, one
   `gaming: requires features.pacman.enabled = true` per requirement
   (`gaming: requires x, which is not a feature` for a name the schema
-  lacks), so `apply` stops before setup. `dotfiles check` asks
+  lacks), so `apply` stops before setup. A cycle of requirements is the
+  same kind of error, one line per cycle (`gaming → nvidia → gaming: each
+  requires the next, so none can run first`). `dotfiles check` asks
   `requires()` of every enabled schema feature on every platform
   (`platforms.every`), so a host that breaks one fails check wherever it
   would run. `requires()` reads `self.cfg` only, never the machine.
@@ -300,9 +302,11 @@ class Docker(Feature):
    requires A, or when a package of B needs a package that A has and B
    does not, by `system.depends(...)` on all their packages (a package
    both list, like `git`, orders neither). Features free to run at the same point run by
-   name, and a feature without packages has no edges. A cycle in the
-   graph is broken by name, not an error: its features need each
-   other and any order is as good.
+   name, and a feature without packages has no edges. Features whose
+   packages need each other in a cycle get a place by name but do not
+   run: one `error: glvnd, graphics: not run, they need each other:
+   glvnd → graphics → glvnd`, and the features after them are not run as
+   after any failure.
    Each runs as `Docker(cfg).apply(strategy)` does.
 5. **Notices.**
 

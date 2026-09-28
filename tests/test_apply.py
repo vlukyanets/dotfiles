@@ -8,7 +8,7 @@ import pytest
 
 from dotfiles import apply as runner
 from dotfiles import engine, platforms
-from dotfiles.apply import Step, apply, order, steps
+from dotfiles.apply import Step, apply, cycles, order, steps
 from dotfiles.config import ROOT, ConfigError
 from dotfiles.feature import Feature
 from dotfiles.platforms.arch import Arch
@@ -205,7 +205,64 @@ def test_order_puts_a_requirement_first():
 def test_order_breaks_a_cycle_by_name():
     graph = {"x": {"y"}, "y": {"x"}}
     got = [(s.name, after) for s, after in order([step("b", ["y"]), step("a", ["x"])], graph)]
-    assert got == [("a", ["b"]), ("b", ["a"])]
+    assert got == [("a", ["b"]), ("b", ["a"])]  # every step has a place; apply runs neither
+
+
+def test_cycles_each_once_from_the_first_name():
+    edges = {"c": {"a"}, "a": {"b", "x"}, "b": {"c"}, "d": {"a", "d"}, "e": {"b"}}
+    assert cycles(edges) == [["a", "b", "c"], ["d"]]  # x is no key: it needs nothing
+    assert cycles({"a": {"b"}, "b": set()}) == []
+
+
+def test_a_requires_cycle_is_a_config_error(root, system, tmp_path, monkeypatch):
+    (root / "dotfiles/defaults.toml").write_text(
+        "[features]\ngaming.enabled = true\nnvidia.enabled = true\npacman.enabled = true\n"
+    )
+    package = make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "gaming": feature("Gaming", "die('ran')", requires=["nvidia", "pacman"]),
+            "nvidia": feature("Nvidia", "die('ran')", requires=["gaming"]),
+            "pacman": feature("Pacman", "die('ran')"),
+        },
+    )
+    msg = "^gaming → nvidia → gaming: each requires the next, so none can run first$"
+    with pytest.raises(ConfigError, match=msg):
+        apply("h", root, package=package)
+    assert system.installs == []  # found before any change
+    cfg = {"features": {n: {"enabled": True} for n in ("gaming", "nvidia", "pacman")}}
+    with pytest.raises(ConfigError, match=msg):
+        runner.requirements(cfg, package, "dotfiles.platforms")
+
+
+def test_features_whose_packages_need_each_other_do_not_run(
+    root, system, tmp_path, monkeypatch, capsys
+):
+    (root / "dotfiles/defaults.toml").write_text(
+        "[features]\n"
+        + "".join(f"{n}.enabled = true\n" for n in ("graphics", "glvnd", "game", "shell"))
+    )
+    package = make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "graphics": feature("Graphics", 'print("graphics ran")', ["mesa"]),
+            "glvnd": feature("Glvnd", 'print("glvnd ran")', ["libglvnd"]),
+            "game": feature("Game", 'print("game ran")', ["steam"]),
+            "shell": feature("Shell", 'print("shell ran")', ["zsh"]),
+        },
+    )
+    system.installed = {"mesa", "libglvnd", "steam", "zsh"}
+    system.graph = {"mesa": {"libglvnd"}, "libglvnd": {"mesa"}, "steam": {"mesa", "libglvnd"}}
+    assert apply("h", root, package=package) == 1
+    assert capsys.readouterr() == (
+        "shell ran\n",
+        (
+            "error: glvnd, graphics: not run, they need each other: glvnd → graphics → glvnd\n"
+            "error: game: not run, glvnd, graphics failed\n"
+        ),
+    )
 
 
 def test_a_failure_alone_is_not_nothing_to_change(root, system, tmp_path, monkeypatch, capsys):
