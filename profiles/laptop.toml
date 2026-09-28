@@ -1,10 +1,9 @@
-# A machine someone sits at: encrypted btrfs with snapshots and swap, the
+# A machine someone sits at: btrfs with snapshots and swap, the
 # power and firmware services, and the niri desktop.
 extends = ["base"]
 
 [features]
 # storage and power
-luks_discard.enabled = true
 swap.enabled         = true
 snapper.enabled      = true
 btrfs_scrub.enabled  = true
