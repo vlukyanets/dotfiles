@@ -232,7 +232,7 @@ def resolve(root: Path, host: str) -> dict:
 2. `echo-server` extends `server`, so it has every server feature.
 3. `config --explain` is in this iteration.
 4. Profiles: `base` = package manager, locale, zsh, CLI tools, ssh agent;
-   `server` = base + sshd, tailscale; `laptop` = base + luks_discard, swap,
+   `server` = base + sshd, tailscale; `laptop` = base + swap,
    snapper, zram, bluetooth, fwupd + the desktop stack; `vm` = base
    without paccache, pkgfile, btop + btrfs_scrub, zram and the desktop
    stack without fcitx5; it does not extend `laptop`. Dev toolchains and

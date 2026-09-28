@@ -43,7 +43,6 @@ paccache.enabled       = false  # pacman-contrib + paccache.timer
 pkgfile.enabled        = false  # pkgfile + pkgfile-update.timer
 resolved.enabled       = false  # systemd-resolved + NetworkManager handoff
 tailscale.enabled      = false  # tailscale, tailscaled.service, user as operator
-luks_discard.enabled   = false  # rd.luks.options=<uuid>:discard in /etc/kernel/cmdline
 nvidia.enabled         = false  # driver for the detected GPU + nvtop
 plymouth.enabled       = false  # boot splash
 # shell

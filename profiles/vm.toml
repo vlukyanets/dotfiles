@@ -1,5 +1,5 @@
 # A virtual machine to try the desktop on: base plus the niri desktop, with
-# nothing that needs real hardware or a big disk. No LUKS, bluetooth,
+# nothing that needs real hardware or a big disk. No bluetooth,
 # firmware, GPU driver, snapshots or swap file; zram covers swap. No input
 # method, package cache cleanup, pkgfile or btop either.
 extends = ["base"]
