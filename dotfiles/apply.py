@@ -1,23 +1,26 @@
-"""dotfiles apply: the platform, the packages of every feature at once, the
-dotfiles, then the features in the order their packages and their declared
-requirements need each other, and the notices at the end."""
-
 import importlib
 import pkgutil
+import shlex
+import subprocess
 import sys
-from contextlib import ExitStack
+import sysconfig
+import traceback
+from contextlib import contextmanager
 from pathlib import Path
 from typing import NamedTuple
 
-from dotfiles import config, engine, platforms, render
-from dotfiles.config import ROOT, ConfigError
+from dotfiles import config, engine, render
+from dotfiles.config import ROOT, ConfigError, MissingKey
 from dotfiles.feature import Feature
-from dotfiles.platforms import Platform
+from dotfiles.platforms import discovery
+from dotfiles.platforms.operating_system import Platform
 
 PACKAGE = "dotfiles.features"
 
 
 class Step(NamedTuple):
+    """One enabled feature on this platform, with what it installs and needs."""
+
     name: str  # the module's name, and the feature's in the schema
     feature: Feature
     strategy: Platform
@@ -27,16 +30,14 @@ class Step(NamedTuple):
 
 
 def features(cfg: dict, package: str = PACKAGE) -> list[tuple[str, Feature]]:
-    """The features of PACKAGE that CFG does not switch off, by name. A
-    module whose name is not a feature in the schema is not switched by
-    one: it always runs and reads its flags itself."""
+    """(name, instance) of every feature module whose feature CFG does not disable."""
     found = []
     for info in sorted(pkgutil.iter_modules(importlib.import_module(package).__path__)):
         name = info.name
         if name in cfg["features"] and not cfg["features"][name]["enabled"]:
             continue
         module = importlib.import_module(f"{package}.{name}")
-        classes = [c for c in platforms.classes(module) if issubclass(c, Feature)]
+        classes = [c for c in discovery.classes(module) if issubclass(c, Feature)]
         if len(classes) != 1:
             raise ConfigError(f"{package}.{name}: defines {len(classes)} features, not one")
         found.append((name, classes[0](cfg)))
@@ -44,8 +45,7 @@ def features(cfg: dict, package: str = PACKAGE) -> list[tuple[str, Feature]]:
 
 
 def steps(cfg: dict, system: Platform, package: str = PACKAGE) -> list[Step]:
-    """The features of PACKAGE that are enabled and have a strategy for
-    SYSTEM, by name; a ConfigError when one requires a feature that is off."""
+    """A Step per feature that runs on SYSTEM; fails if a requirement is unmet or cyclic."""
     found = []
     for name, feature in features(cfg, package):
         strategy = feature.strategy(system)
@@ -72,13 +72,12 @@ def unmet(cfg: dict, requires: dict[str, frozenset[str]]) -> list[str]:
 
 
 def cycles(edges: dict[str, frozenset[str] | list[str]]) -> list[list[str]]:
-    """The cycles of EDGES (name -> the names it needs), each once, as the
-    names along it starting from the first by name. A name that is not a
-    key of EDGES needs nothing."""
+    """Every cycle of EDGES (name -> names it needs), each once, from its smallest name."""
     found: dict[frozenset[str], list[str]] = {}
     done: set[str] = set()
 
     def visit(path: list[str]) -> None:
+        """Walk on from the last name of PATH, recording each cycle back into it."""
         for name in sorted(edges.get(path[-1], ())):
             if name in path:
                 cycle = path[path.index(name) :]
@@ -95,6 +94,7 @@ def cycles(edges: dict[str, frozenset[str] | list[str]]) -> list[list[str]]:
 
 
 def circle(cycle: list[str]) -> str:
+    """CYCLE as `a → b → a`."""
     return " → ".join([*cycle, cycle[0]])
 
 
@@ -104,14 +104,12 @@ def circles(requires: dict[str, frozenset[str]]) -> list[str]:
 
 
 def requirements(
-    cfg: dict, package: str = PACKAGE, platform_package: str = platforms.PACKAGE
+    cfg: dict, package: str = PACKAGE, platform_package: str = discovery.PACKAGE
 ) -> None:
-    """The requirements of what CFG enables, on every platform: a ConfigError
-    naming each one left off. Only requires() is asked, so nothing is read
-    from this machine; modules the schema does not know are not checked."""
+    """Fail if a feature's requires() is unmet or cyclic on any platform: for check."""
     found = [(n, f) for n, f in features(cfg, package) if n in cfg["features"]]
     problems: list[str] = []
-    for system in platforms.every(cfg, platform_package):
+    for system in discovery.every(cfg, platform_package):
         strategies = {name: feature.strategy(system) for name, feature in found}
         requires = {n: frozenset(s.requires()) for n, s in strategies.items() if s is not None}
         problems += [p for p in unmet(cfg, requires) + circles(requires) if p not in problems]
@@ -120,10 +118,7 @@ def requirements(
 
 
 def order(steps: list[Step], depends: dict[str, set[str]]) -> list[tuple[Step, list[str]]]:
-    """STEPS in running order, each with the names of the steps it runs
-    after: B after A when B requires A, or when a package of B needs a
-    package that A has and B does not. Ties go by name; a cycle is broken by
-    name too, so every step has a place, and apply runs none of its steps."""
+    """STEPS in run order, each with the features it runs after (packages and requires)."""
     owners: dict[str, set[str]] = {}
     for step in steps:
         for pkg in step.packages:
@@ -155,72 +150,128 @@ def order(steps: list[Step], depends: dict[str, set[str]]) -> list[tuple[Step, l
 
 
 def _deploy(host: str, root: Path, cfg: dict) -> None:
-    for line in render.deploy(host, root, dry_run=engine.DRY_RUN, cfg=cfg):
-        engine.printed = True
-        print(line)
+    """The dotfiles into $HOME, printing each change."""
+    machine = engine.current()
+    for line in render.deploy(host, root, dry_run=machine.dry_run, cfg=cfg):
+        machine.report.line(line)
+
+
+def _where(e: BaseException) -> str:
+    """The innermost line of our own code that raised E: file:line and the line itself."""
+    libs = [sysconfig.get_paths()[k] for k in ("stdlib", "platstdlib", "purelib", "platlib")]
+    skip = (*libs, engine.__file__, config.__file__)
+    frames = [f for f in traceback.extract_tb(e.__traceback__) if not f.filename.startswith(skip)]
+    if not frames:
+        return ""
+    frame = frames[-1]
+    path = Path(frame.filename)
+    shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+    return f", at {shown}:{frame.lineno}: {frame.line}"
+
+
+def describe(e: BaseException) -> str:
+    """E as one line: die() and ConfigError as written, anything else with what and where."""
+    if isinstance(e, (engine.Failed, ConfigError)):
+        return str(e)
+    if isinstance(e, MissingKey):
+        return f"{e}{_where(e)}"
+    if isinstance(e, subprocess.CalledProcessError):
+        cmd = shlex.join(map(str, e.cmd)) if isinstance(e.cmd, list) else str(e.cmd)
+        return f"`{cmd}` failed with exit status {e.returncode}{_where(e)}"
+    detail = f" ({e})" if str(e) else ""
+    return f"unexpected {type(e).__name__}{detail}{_where(e)}"
 
 
 def _error(name: str, msg) -> None:
-    print(f"error: {name}: {msg}", file=sys.stderr)
+    """`error: NAME: …` on stderr; an exception is described by describe()."""
+    text = describe(msg) if isinstance(msg, BaseException) else msg
+    print(f"error: {name}: {text}", file=sys.stderr)
 
 
-def _phases(
-    host: str, root: Path, cfg: dict, system: Platform, found: list[Step], failed: set[str]
-) -> None:
-    """Setup, packages, dotfiles, features; FAILED collects what failed."""
-    wanted = sorted(set().union(*(step.packages for step in found)))
-    replaced = sorted(set().union(*(step.replaces for step in found)))
+class Apply:
+    """One apply on SYSTEM: setup, packages, dotfiles, then the features in order."""
 
-    try:
-        system.setup()
-        ready = True
-    except Exception as e:  # noqa: BLE001 — what needs no install still runs
-        failed.add("platform")
-        _error("platform", e)
-        ready = False
-    missing = system.missing(wanted)
-    if missing:
+    def __init__(self, host: str, root: Path, cfg: dict, system: Platform, found: list[Step]):
+        """The run of FOUND on SYSTEM for HOST; nothing failed yet."""
+        self.host, self.root, self.cfg = host, root, cfg
+        self.system = system
+        self.steps = found
+        self.failed: set[str] = set()  # phases and features, by name
+        self.wanted = sorted(set().union(*(step.packages for step in found)))
+        self.unavailable: set[str] = set()  # wanted, and still missing after the install
+
+    def run(self) -> int:
+        """Every phase in turn; 1 if anything failed."""
+        ready = self._setup()
+        self._packages(ready)
+        with self._guard("dotfiles"):
+            _deploy(self.host, self.root, self.cfg)
+        self._features()
+        if not engine.current().report.printed and not self.failed:
+            print("nothing to change")
+        return 1 if self.failed else 0
+
+    @contextmanager
+    def _guard(self, name: str):
+        """Any exception inside fails NAME alone: printed, recorded, and the apply goes on."""
+        try:
+            yield
+        except Exception as e:  # noqa: BLE001 — a failure ends only NAME
+            self._fail(name, e)
+
+    def _fail(self, name: str, msg) -> None:
+        """NAME failed with MSG, a text or an exception."""
+        self.failed.add(name)
+        _error(name, msg)
+
+    def _setup(self) -> bool:
+        """The package manager made ready; whether it is."""
+        with self._guard("platform"):
+            self.system.manager.setup()
+            return True
+        return False
+
+    def _packages(self, ready: bool) -> None:
+        """The missing packages installed in one go, what they replace removed first."""
+        manager = self.system.manager
+        missing = manager.missing(self.wanted)
+        if not missing:
+            return
         engine.changed(f"packages: {' '.join(missing)} (missing)")
-        try:
-            if ready and not engine.DRY_RUN:
-                system.install(missing, replaced)
-        except Exception as e:  # noqa: BLE001 — the features without them still run
-            failed.add("packages")
-            _error("packages", e)
-        if not engine.DRY_RUN:
-            missing = system.missing(wanted)
+        if engine.current().dry_run:
+            return  # nothing installed, so nothing failed to be
+        if ready:
+            replaced = sorted(set().union(*(step.replaces for step in self.steps)))
+            with self._guard("packages"):
+                manager.install(missing, replaced)
+        self.unavailable = set(manager.missing(self.wanted))
 
-    try:
-        _deploy(host, root, cfg)
-    except Exception as e:  # noqa: BLE001 — the features still run
-        failed.add("dotfiles")
-        _error("dotfiles", e)
+    def _features(self) -> None:
+        """Each feature in order, unless what it builds on failed."""
+        graph = self.system.manager.depends(self.wanted) if self.wanted else {}
+        ordered = order(self.steps, graph)
+        for cycle in cycles({step.name: after for step, after in ordered}):
+            self.failed.update(cycle)  # features are cut so they never need each other
+            _error(", ".join(cycle), f"not run, they need each other: {circle(cycle)}")
+        for step, after in ordered:
+            if step.name in self.failed:
+                continue
+            if why := self._blocked(step, after):
+                self._fail(step.name, f"not run, {why}")
+                continue
+            with self._guard(step.name):
+                try:
+                    step.feature.apply(step.strategy)
+                except engine.Deferred as e:
+                    engine.notice(f"{e} (network?) — the next apply retries")
 
-    ordered = order(found, system.depends(wanted) if wanted else {})
-    for cycle in cycles({step.name: after for step, after in ordered}):
-        failed.update(cycle)  # features are cut so they never need each other
-        _error(", ".join(cycle), f"not run, they need each other: {circle(cycle)}")
-
-    for step, after in ordered:
-        if step.name in failed:
-            continue
-        if not engine.DRY_RUN and step.packages & set(missing):
-            failed.add(step.name)
-            gone = " ".join(sorted(step.packages & set(missing)))
-            _error(step.name, f"not run, packages missing: {gone}")
-            continue
-        blocked = [name for name in after if name in failed]
-        if blocked:
-            failed.add(step.name)
-            _error(step.name, f"not run, {', '.join(blocked)} failed")
-            continue
-        try:
-            step.feature.apply(step.strategy)
-        except engine.Deferred as e:
-            engine.notice(f"{e} (network?) — the next apply retries")
-        except Exception as e:  # noqa: BLE001 — any failure ends only this feature
-            failed.add(step.name)
-            _error(step.name, e)
+    def _blocked(self, step: Step, after: list[str]) -> str | None:
+        """Why STEP cannot run: its packages missing, or what it runs after failed."""
+        if gone := sorted(step.packages & self.unavailable):
+            return f"packages missing: {' '.join(gone)}"
+        if blocked := [name for name in after if name in self.failed]:
+            return f"{', '.join(blocked)} failed"
+        return None
 
 
 def apply(
@@ -228,24 +279,14 @@ def apply(
     root: Path = ROOT,
     dry_run: bool = False,
     package: str = PACKAGE,
-    platform_package: str = platforms.PACKAGE,
+    platform_package: str = discovery.PACKAGE,
     cfg: dict | None = None,
 ) -> int:
-    """Bring this machine in line with HOST's config (CFG, resolved from ROOT
-    when not given); 1 when something failed or was not run."""
+    """Every enabled feature and the dotfiles on this machine; 1 if anything failed."""
     cfg = config.resolve(host, root) if cfg is None else cfg
-    engine.DRY_RUN = dry_run
-    engine.printed = False
-    failed: set[str] = set()
-    try:
-        system = platforms.detect(cfg, platform_package)
-        found = steps(cfg, system, package)
-        with ExitStack() as sessions:  # left after a failure and on Ctrl-C too
-            for step in found:
-                sessions.enter_context(step.feature.session(system))
-            _phases(host, root, cfg, system, found, failed)
-        if not engine.printed and not failed:
-            print("nothing to change")
-    finally:  # after a failure and on Ctrl-C too
-        engine.print_notices()
-    return 1 if failed else 0
+    with engine.current().fresh(dry_run).active() as machine:
+        try:
+            system = discovery.detect(cfg, platform_package)
+            return Apply(host, root, cfg, system, steps(cfg, system, package)).run()
+        finally:  # after a failure and on Ctrl-C too
+            machine.report.flush()

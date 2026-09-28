@@ -7,8 +7,6 @@
 # - `render --out DIR`, `deploy --dry-run`, `deploy`: the dotfiles in $HOME,
 #   and a second deploy that changes nothing.
 # - `apply --dry-run`: the error above, with nothing changed.
-# - Once a Void platform exists: xbps setup and install, and every place
-#   that assumes systemd — `Linux.ensure_service` (runit services instead),
-#   sysctl.d, the `Linux` strategies of nobeep, oomd, thp, timesyncd and
-#   resolved — which a Void platform has to override or skip.
+# - Once a Void platform exists: every place that assumes systemd
+#   (`Linux.ensure_service`, sysctl.d) has to be overridden there.
 extends = ["vm"]

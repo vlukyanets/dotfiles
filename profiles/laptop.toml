@@ -1,24 +1,2 @@
-# A machine someone sits at: btrfs with snapshots and swap, the
-# power and firmware services, and the niri desktop.
+# A machine someone sits at.
 extends = ["base"]
-
-[features]
-# storage and power
-swap.enabled         = true
-snapper.enabled      = true
-btrfs_scrub.enabled  = true
-zram.enabled         = true
-bluetooth.enabled    = true
-fwupd.enabled        = true
-# desktop
-niri.enabled         = true
-niri.numlock         = true
-noctalia.enabled     = true
-greetd.enabled       = true
-greetd.greeter       = "noctalia-greeter"  # AUR
-fcitx5.enabled       = true
-fonts.enabled        = true
-nerd_font.enabled    = true
-audio.enabled        = true
-kitty.enabled        = true
-firefox.enabled      = true

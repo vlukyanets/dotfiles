@@ -1,6 +1,3 @@
-"""What every Linux here shares: systemd, sysctl, the group database,
-gsettings. A distribution adds its package manager on top."""
-
 import grp
 import os
 import pwd
@@ -9,13 +6,14 @@ from contextlib import nullcontext
 
 from dotfiles import engine
 from dotfiles.engine import as_root, changed, die, ensure_line, notice, output, run
-from dotfiles.platforms import Platform
+from dotfiles.platforms.operating_system import Platform
 
 
 class Linux(Platform):
+    """What every Linux has: systemd, sysctl, gsettings, groups; no package manager of its own."""
+
     def ensure_service(self, unit: str, user: bool = False) -> bool:
-        """UNIT is enabled and active; static units (no [Install]) are only
-        started. USER: the user's systemd, no root."""
+        """UNIT enabled and running, system-wide or USER's; whether it changed."""
         scope = ["--user"] if user else []
         enabled = output("systemctl", *scope, "is-enabled", unit) or ""
         active = output("systemctl", *scope, "is-active", unit) or ""
@@ -43,8 +41,7 @@ class Linux(Platform):
         return True
 
     def ensure_gsetting(self, schema: str, key: str, value: str) -> bool:
-        """VALUE in GVariant text form, e.g. "'prefer-dark'" with the inner
-        quotes. Nothing without gsettings."""
+        """SCHEMA KEY is VALUE; nothing where gsettings is missing."""
         current = output("gsettings", "get", schema, key)
         if current is None or current == value:
             return False
@@ -53,13 +50,12 @@ class Linux(Platform):
         return True
 
     def ensure_group_member(self, group: str) -> bool:
-        """The current user is in GROUP. Read from the group database, not
-        the session's groups (id -nG), which change only at the next login."""
+        """This user in GROUP; a notice to log in again when added."""
         me = pwd.getpwuid(os.geteuid())
         try:
             entry = grp.getgrnam(group)
         except KeyError:
-            if not engine.DRY_RUN:
+            if not engine.current().dry_run:
                 die(f"group {group} does not exist")
             entry = None  # its package, not installed by a dry run, brings it
         if entry and (me.pw_name in entry.gr_mem or me.pw_gid == entry.gr_gid):

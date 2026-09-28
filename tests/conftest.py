@@ -22,16 +22,10 @@ def isolate(monkeypatch, base):
         path.mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv(var, str(path))
     monkeypatch.setenv("SUDO_CMD", "false")
-    # features.snapper sets it for an apply; setenv first so the monkeypatch
-    # removes it again even when it was not set before.
-    monkeypatch.setenv("SNAP_PAC_SKIP", "")
-    monkeypatch.delenv("SNAP_PAC_SKIP")
 
 
 @pytest.fixture(scope="session", autouse=True)
 def isolated_session(tmp_path_factory):
-    """The same for session- and module-scoped fixtures, which are set up
-    before any function-scoped one."""
     with pytest.MonkeyPatch.context() as mp:
         isolate(mp, tmp_path_factory.mktemp("session"))
         yield
@@ -39,23 +33,13 @@ def isolated_session(tmp_path_factory):
 
 @pytest.fixture(autouse=True)
 def isolated(tmp_path_factory, monkeypatch):
-    """No test reaches the real home directory or root: every test gets its
-    own HOME and XDG directories in pytest's temp dir, the engine's helpers
-    work under a temp SYSROOT, and sudo is a command that fails, so a
-    mutation that would need root fails the test instead of prompting."""
     base = tmp_path_factory.mktemp("isolated")
     isolate(monkeypatch, base)
-    monkeypatch.setattr(engine, "DRY_RUN", False)
-    monkeypatch.setattr(engine, "SYSROOT", base / "sysroot")
-    monkeypatch.setattr(engine, "notices", [])
-    return base
+    with engine.Machine(sysroot=base / "sysroot").active():
+        yield base
 
 
 class Fake:
-    """Stands in for engine._run: answers from ANSWERS (argv tuple -> (rc,
-    stdout)), 0 and "" otherwise, and records every argv in CALLS. With
-    PROGRAMS, only those are faked; anything else really runs."""
-
     def __init__(self, programs=None):
         self.answers: dict[tuple, tuple[int, str]] = {}
         self.calls: list[list[str]] = []
@@ -74,15 +58,11 @@ class Fake:
 @pytest.fixture
 def fake(monkeypatch) -> Fake:
     fake = Fake()
-    monkeypatch.setattr(engine, "_run", fake)
+    monkeypatch.setattr(engine.current().shell, "execute", fake)
     return fake
 
 
 class AsRoot(Fake):
-    """Fakes every command, but carries out `install`, `ln -sfn` and an
-    empty `git clone` as the test user, so root's files land under SYSROOT; engine._owner then reads
-    them as root's (patched by the fixture)."""
-
     def __call__(self, argv, check=False, **kwargs):
         if argv[0] == "install":
             dst = Path(argv[-1])
@@ -102,7 +82,7 @@ class AsRoot(Fake):
 def machine(monkeypatch) -> AsRoot:
     """Every command faked, root's files written under SYSROOT, no sudo prefix."""
     fake = AsRoot()
-    monkeypatch.setattr(engine, "_run", fake)
+    monkeypatch.setattr(engine.current().shell, "execute", fake)
     monkeypatch.setattr(engine, "_owner", lambda path: "root:root")
     monkeypatch.setenv("SUDO_CMD", "")
     return fake

@@ -1,3 +1,4 @@
+import copy
 import tomllib
 from pathlib import Path
 
@@ -6,6 +7,7 @@ import pytest
 from dotfiles.config import (
     DEFAULTS,
     ROOT,
+    RULES,
     ConfigError,
     chain,
     check,
@@ -71,10 +73,53 @@ def test_int_is_not_bool(root):
         resolve("h", root)
 
 
+def test_a_missing_key_names_its_path(root):
+    cfg = resolve("h", root)
+    assert cfg["features"]["a"] is False
+    with pytest.raises(KeyError) as e:
+        cfg["features"]["nope"]
+    assert str(e.value) == "features.nope: no such key in dotfiles/defaults.toml"
+    assert copy.deepcopy(cfg)["features"] == {"a": False, "b": False}
+
+
 def test_arrays_are_replaced(root):
     write(root, "dotfiles/defaults.toml", '[locale]\nlocales = ["en_US.UTF-8 UTF-8"]\n')
     write(root, "hosts/h.toml", '[locale]\nlocales = ["ru_RU.UTF-8 UTF-8"]\n')
     assert resolve("h", root) == {"locale": {"locales": ["ru_RU.UTF-8 UTF-8"]}}
+
+
+@pytest.mark.parametrize(
+    ("makepkg", "error"),
+    [
+        ("jobs = 4.0", "hosts/h.toml: features.packaging.makepkg.jobs: must be integer or string, got float"),
+        ('jobs = "0%"', 'h: features.packaging.makepkg.jobs: must be a number of threads, or a percent of the cores like "50%", got "0%"'),
+        ("jobs = -1", 'h: features.packaging.makepkg.jobs: must be a number of threads, or a percent of the cores like "50%", got -1'),
+        ('packager = "Ann"', 'h: features.packaging.makepkg.packager: must be "Name <email>", got "Ann"'),
+    ],
+)  # fmt: skip
+def test_values_the_type_cannot_check(tmp_path, makepkg, error):
+    write(tmp_path, "dotfiles/defaults.toml", (ROOT / "dotfiles/defaults.toml").read_text())
+    write(tmp_path, "hosts/h.toml", f"[features.packaging.makepkg]\n{makepkg}\n")
+    with pytest.raises(ConfigError) as e:
+        resolve("h", tmp_path)
+    assert str(e.value) == error
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "good"),
+    [
+        ("features.packaging.makepkg.jobs", 0, True),
+        ("features.packaging.makepkg.jobs", 8, True),
+        ("features.packaging.makepkg.jobs", "150%", True),
+        ("features.packaging.makepkg.packager", "", True),
+        ("features.packaging.makepkg.packager", "Ann Lee <ann@lee.org>", True),
+        ("features.packaging.pacman.flags", ["Color", "VerbosePkgLists"], True),
+        ("features.packaging.pacman.flags", ["Colour"], False),
+        ("features.packaging.pacman.parallel_downloads", -1, False),
+    ],
+)
+def test_rules(key, value, good):
+    assert bool(RULES[key][0](value)) is good
 
 
 def test_secrets_backend_is_checked(root):
@@ -161,9 +206,7 @@ def test_real_profiles():
         "profiles/server.toml",
         "hosts/echo-server.toml",
     ]
-    echo = resolve("echo-server")
-    assert echo["features"]["sshd"]["enabled"] and echo["features"]["zsh"]["enabled"]
-    assert not echo["features"]["niri"]["enabled"]
+    assert resolve("echo-server")["git"]["name"] == "Valentin Lukyanets"
 
 
 def test_check_reports_every_broken_host(root):

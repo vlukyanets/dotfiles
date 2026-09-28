@@ -31,13 +31,13 @@ Out of scope: provisioning (features, packages, root files — `engine`,
 
 | To get | write |
 |---|---|
-| a dotfile | the file at its real path: `home/.zshrc`, `home/.config/…` |
+| a dotfile | the file at its real path: `home/.gitconfig.j2`, `home/.config/…` |
 | a template | `*.j2` (Jinja2); the suffix is dropped on output |
 | a private file or directory | `mode = "600"` / `"700"` in `home.toml` |
 | an executable | `mode = "755"` in `home.toml` |
 | a file only some hosts get | `when = "<jinja expression>"` in `home.toml` |
 | a file an application also rewrites | an ordinary `.j2` that reads `current` (the file as it is in `$HOME`) |
-| a lookup table | `data/ssh-pubkeys-collection.toml`, `data/fcitx5-languages-config.toml` |
+| a lookup table | `data/ssh-pubkeys-collection.toml` |
 | the home directory, the user id | `home`, `uid` |
 | a template error | `{{ fail("…") }}` (a global that raises) |
 | TOML in and out, deep merge, regex | filters `from_toml`, `to_toml`, `merge_over`, `regex_search` |
@@ -49,9 +49,6 @@ needs a mode or a gate. Paths not listed: files 0644, directories 0755,
 always deployed.
 
 ```toml
-[".zshrc"]
-when = "features.zsh.enabled"
-
 [".ssh"]
 mode = "700"
 
@@ -61,9 +58,6 @@ when = "ssh.authorized_keys"
 
 [".config/rbw"]
 when = "secrets.backend == 'rbw'"
-
-[".config/niri/lock-screen.sh"]
-mode = "755"
 ```
 
 - `when` is a Jinja2 expression over the same context as the templates;
@@ -77,7 +71,7 @@ mode = "755"
 features, git, ssh, secrets    the resolved config (config.resolve)
 host                           the host name
 home, uid                      target home directory and user id
-languages, ssh_keys            data/fcitx5-languages-config.toml, data/ssh-pubkeys-collection.toml
+ssh_keys                       data/ssh-pubkeys-collection.toml
 current                        the target file's current text, "" if absent
 ```
 
@@ -129,12 +123,23 @@ uv run --exact dotfiles deploy
 uv run --isolated dotfiles check        # now also renders every host into a temp dir
 ```
 
+## System templates: `system/`
+
+A file a feature writes outside `$HOME` is a template at its path from
+`/` under `system/`: `system/etc/makepkg.conf.d/dotfiles.conf.j2` for
+`/etc/makepkg.conf.d/dotfiles.conf`. `render.template(dst, **context)`
+renders it with the same environment and filters as `home/`, with only
+the context the feature passes; an error names `system/<path>:<line>`.
+The feature writes the text through `engine.ensure_file`, so the check,
+the dry run and root stay the engine's.
+
 ## Project Structure
 
 ```
 home/                  the dotfiles, real names, *.j2 for templates
 home.toml              modes and gates
-data/                  ssh-pubkeys-collection.toml, fcitx5-languages-config.toml
+system/                templates of the files features write outside $HOME
+data/                  ssh-pubkeys-collection.toml
 dotfiles/render.py     context, Jinja2 env and filters, render(), deploy()
 tests/test_render.py   fixture trees in tmp_path; deploy against the tmp HOME
 ```

@@ -49,18 +49,16 @@ extends = ["laptop"]           # optional; names of profiles or hosts, merged le
 name  = "Valentin Lukyanets"
 email = "valikluks95@gmail.com"
 
-[features]
-docker.enabled = true          # a feature with no settings: one dotted key
-
-[features.swap]                # a feature with settings: its own table
+[features.packaging]           # a feature: its own table
 enabled = true
-size    = "20g"
+
+[features.packaging.makepkg]   # settings may nest
+jobs = "50%"
 ```
 
 Every feature is a table `features.<name>` with `enabled` (default
 `false`) and its settings; `git`, `secrets` and `ssh` are not features and
-stay at the top level. `features.locale.console` holds the console font,
-which the `locale` feature applies.
+stay at the top level.
 
 Resolution for host `H`:
 
@@ -74,17 +72,22 @@ Resolution for host `H`:
 3. **Validation, per file, before merging.** Every key must exist in
    `dotfiles/defaults.toml` at the same path, at any depth, with the same
    type. `bool` and `int` are different types; lists match any list;
-   tables recurse. `extends` is the only key not in the schema and must be a list
+   tables recurse. A key in `config.EITHER` takes one of two types
+   (`features.packaging.makepkg.jobs`: integer or string). `extends` is the only key not in the schema and must be a list
    of strings. Errors name the file and the dotted key path:
    `hosts/hyper-lin.toml: features.nvidai: unknown key`.
 4. **Merge.** Tables merge recursively; scalars and lists are replaced by
    the later file, so lists never append.
-5. **Value checks:** `secrets.backend` ∈ {`none`, `rbw`},
-   checked on the merged result.
+5. **Value checks** on the merged result, from `config.RULES`: what a
+   type cannot say (`secrets.backend` ∈ {`none`, `rbw`}, the settings of
+   `features.packaging`), as `<host>: <key>: must be <what>, got <value>`.
 6. **Unknown host** (no `hosts/<name>.toml`): the defaults alone. Not an
    error.
 
-The resolved config does not contain `extends`.
+The resolved config does not contain `extends`. It is a tree of
+`config.Settings`, dicts that name the dotted path of a key that is not
+there: `features.packaging.pacmen: no such key in dotfiles/defaults.toml`
+(a `KeyError`). Templates get plain dicts.
 
 ## Machine config
 
@@ -142,9 +145,8 @@ Output of `config` is TOML, the same shape as the input files. `--explain`
 prints one line per leaf, itself valid TOML:
 
 ```
-features.docker.enabled = true  # hosts/hyper-lin.toml
-features.sshd.enabled = true  # profiles/server.toml
-features.swap.size = ""  # dotfiles/defaults.toml
+git.name = "Valentin Lukyanets"  # hosts/hyper-lin.toml
+features.packaging.enabled = false  # dotfiles/defaults.toml
 ```
 
 Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
@@ -167,9 +169,8 @@ docs/spec/               capability map, module specs
 Flat layout (no `src/`), so `python -m dotfiles` runs from a checkout
 without installing the package.
 
-Registries (`ssh-pubkeys-collection.toml`, `fcitx5-languages-config.toml`,
-`firefox-privacy-config.toml`, `vscode-extensions.toml`) are not host config;
-each lands in `data/` with the module that first reads it.
+Registries (`ssh-pubkeys-collection.toml`) are not host config; each
+lands in `data/` with the module that first reads it.
 
 ## Code Style
 
@@ -199,7 +200,7 @@ def resolve(root: Path, host: str) -> dict:
   merged once); host extends host; cycle; unknown parent; name in both
   directories; unknown key at depth 1 and 2; wrong type incl. `bool` vs
   `int`; `extends` of wrong type; list replaced not appended; unknown host
-  = defaults; `secrets.backend` enum.
+  = defaults; every rule of `RULES`; a key of `EITHER` with a third type.
 - `--explain` names the right file for a value set in defaults, a profile
   and the host.
 - `uv run --isolated dotfiles check` passes on the real data.
@@ -231,12 +232,9 @@ def resolve(root: Path, host: str) -> dict:
 1. Output is TOML (`tomli-w`), not JSON.
 2. `echo-server` extends `server`, so it has every server feature.
 3. `config --explain` is in this iteration.
-4. Profiles: `base` = package manager, locale, zsh, CLI tools, ssh agent;
-   `server` = base + sshd, tailscale; `laptop` = base + swap,
-   snapper, zram, bluetooth, fwupd + the desktop stack; `vm` = base
-   without paccache, pkgfile, btop + btrfs_scrub, zram and the desktop
-   stack without fcitx5; it does not extend `laptop`. Dev toolchains and
-   personal apps stay in `hyper-lin`.
+4. Profiles: `base`; `server`, `laptop` and `vm` extend it. Since the
+   features restarted (2026-09-28) they set nothing yet; each feature that
+   comes back lands in the profile of the machines that want it.
 5. Every feature is a table under `features` with `enabled` and its own
    settings, so a feature's switch and its settings sit in one place.
 6. **The machine keeps its own resolved config** in

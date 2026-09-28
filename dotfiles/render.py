@@ -1,5 +1,3 @@
-"""Dotfiles: home/ rendered with a host's resolved config."""
-
 import json
 import os
 import re
@@ -18,6 +16,8 @@ from dotfiles import config
 from dotfiles.config import ROOT, ConfigError
 
 SUFFIX = ".j2"
+# Templates of files outside $HOME, at their path from / (system/etc/... for /etc/...).
+SYSTEM = "system"
 DEFAULT_MODE = {False: 0o644, True: 0o755}  # by is_dir
 
 
@@ -26,10 +26,12 @@ class TemplateFail(Exception):
 
 
 def fail(message: str):
+    """fail(message) in a template: stop rendering with MESSAGE."""
     raise TemplateFail(message)
 
 
 def from_toml(text: str) -> dict:
+    """TEXT parsed as TOML; an error fails the template."""
     try:
         return tomllib.loads(text)
     except tomllib.TOMLDecodeError as e:
@@ -37,8 +39,7 @@ def from_toml(text: str) -> dict:
 
 
 def merge_over(want: dict, base: dict) -> dict:
-    """BASE with WANT's keys on top, tables merged recursively: what an
-    application wrote survives unless the repo sets that key."""
+    """BASE with WANT merged over it, tables recursively."""
     out = dict(base)
     for key, value in want.items():
         if isinstance(value, dict) and isinstance(base.get(key), dict):
@@ -54,6 +55,7 @@ def regex_search(text: str, pattern: str) -> str:
 
 
 def environment(home: Path) -> jinja2.Environment:
+    """Jinja2 for templates under HOME, with this project's filters."""
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(home),
         undefined=jinja2.StrictUndefined,
@@ -98,8 +100,17 @@ def manifest(root: Path) -> dict[str, dict]:
     return entries
 
 
+def template(dst: str, root: Path = ROOT, **context) -> str:
+    """system/DST.j2 rendered with CONTEXT: the content a feature writes to DST."""
+    name = dst.lstrip("/") + SUFFIX
+    try:
+        return environment(root / SYSTEM).get_template(name).render(context)
+    except (jinja2.TemplateError, TemplateFail) as e:
+        raise _error(e, name, "", SYSTEM) from None
+
+
 # Registry in data/ -> the config key whose names must all be in it.
-REFERENCES = {"languages": "features.locale.languages", "ssh_keys": "ssh.authorized_keys"}
+REFERENCES = {"ssh_keys": "ssh.authorized_keys"}
 
 
 def registries(host: str, cfg: dict, root: Path) -> dict:
@@ -117,14 +128,15 @@ def registries(host: str, cfg: dict, root: Path) -> dict:
     return merged
 
 
-def _error(e: Exception, template: str, host: str) -> ConfigError:
+def _error(e: Exception, template: str, host: str, tree: str = "home") -> ConfigError:
     """The template's name and line, and the host, for any error raised while rendering."""
     line = getattr(e, "lineno", None)
     for frame in traceback.extract_tb(e.__traceback__):
         if frame.filename.endswith(template):
             line = frame.lineno
-    where = f"home/{template}" + (f":{line}" if line else "")
-    return ConfigError(f"{where}: {host}: {getattr(e, 'message', None) or e}")
+    where = f"{tree}/{template}" + (f":{line}" if line else "")
+    host = f" {host}:" if host else ""
+    return ConfigError(f"{where}:{host} {getattr(e, 'message', None) or e}")
 
 
 def render(
@@ -134,13 +146,7 @@ def render(
     current: Path | None = None,
     cfg: dict | None = None,
 ) -> list[str]:
-    """Write HOST's home tree into OUT, which must be missing or empty.
-
-    CURRENT is the home directory whose files merged templates read as
-    `current`; without it they see an empty file. CFG is HOST's config,
-    resolved from ROOT when not given. Returns the paths written, relative
-    to OUT.
-    """
+    """HOST's home tree rendered into the empty OUT; the paths written."""
     if out.exists() and any(out.iterdir()):
         raise ConfigError(f"{out}: not empty")
     home = root / "home"
@@ -149,8 +155,10 @@ def render(
     entries = manifest(root)
     env = environment(home)
     cfg = config.resolve(host, root) if cfg is None else cfg
+    # Plain dicts, so Jinja's errors say "dict object".
+    plain = cfg.plain() if isinstance(cfg, config.Settings) else cfg
     context = (
-        cfg
+        plain
         | registries(host, cfg, root)
         | {
             "host": host,
@@ -161,6 +169,7 @@ def render(
 
     def enabled(rel: Path) -> bool:
         # A gate on a directory covers everything under it.
+        """Whether the `when` of REL and of every directory above it holds."""
         for part in [rel, *rel.parents][:-1]:
             when = entries.get(part.as_posix(), {}).get("when")
             if when is None:
@@ -203,10 +212,7 @@ def render(
 
 
 def check(root: Path = ROOT, source: Path | None = None) -> dict[str, str | None]:
-    """config.check of SOURCE (default ROOT), plus the machine config as
-    "local" when there is one; everything that resolves has its features'
-    requirements checked on every platform and is rendered into a temp dir
-    with the templates of ROOT."""
+    """Every host, and this machine's config, resolved and rendered: host -> error or None."""
     from dotfiles import apply  # apply deploys through this module
 
     source = source or root
@@ -231,6 +237,7 @@ def check(root: Path = ROOT, source: Path | None = None) -> dict[str, str | None
 
 
 def _mode(path: Path) -> int:
+    """PATH's permission bits."""
     return stat.S_IMODE(path.stat().st_mode)
 
 
@@ -241,13 +248,7 @@ def deploy(
     dry_run: bool = False,
     cfg: dict | None = None,
 ) -> list[str]:
-    """Bring HOME in line with HOST's rendered tree (CFG as in render);
-    returns one line per change.
-
-    Only what differs is written, file by file through a temp file and a
-    rename; nothing is ever deleted. Directories get their mode when they are
-    created, and later only when home.toml sets one. A clean HOME yields [].
-    """
+    """HOST's dotfiles into HOME where they differ; one line per change."""
     home = home or Path.home()
     real_home = home.resolve()
     entries = manifest(root)

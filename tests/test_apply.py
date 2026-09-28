@@ -1,3 +1,4 @@
+import re
 import subprocess
 import sys
 import tomllib
@@ -7,18 +8,20 @@ from typing import ClassVar
 import pytest
 
 from dotfiles import apply as runner
-from dotfiles import engine, platforms
+from dotfiles import config, engine
 from dotfiles.apply import Step, apply, cycles, order, steps
 from dotfiles.config import ROOT, ConfigError
 from dotfiles.feature import Feature
+from dotfiles.platforms import discovery
 from dotfiles.platforms.arch import Arch
 from dotfiles.platforms.linux import Linux
+from dotfiles.platforms.package_manager import PackageManager
 
 HEAD = "from dotfiles.engine import defer, die, notice\nfrom dotfiles.feature import Feature\n\n\n"
 
 
-class FakeLinux(Linux):
-    """A platform whose package manager is a set and a dict."""
+class FakeManager(PackageManager):
+    """A package manager that is a set and a dict."""
 
     # Class-wide, so a test sets them before apply() creates the platform.
     installed: ClassVar[set[str]] = set()
@@ -40,23 +43,26 @@ class FakeLinux(Linux):
     def depends(self, names):
         return {n: self.graph.get(n, set()) for n in names}
 
+    def direct(self, names):
+        return self.depends(names)
 
-class FakeArch(FakeLinux):
-    pass
+
+class FakeArch(Linux):
+    manager_class = FakeManager
 
 
 FakeArch.__name__ = "Arch"
 
 
 @pytest.fixture
-def system(monkeypatch) -> type[FakeLinux]:
-    monkeypatch.setattr(FakeLinux, "installed", set())
-    monkeypatch.setattr(FakeLinux, "graph", {})
-    monkeypatch.setattr(FakeLinux, "installs", [])
-    monkeypatch.setattr(FakeLinux, "replaced", [])
-    monkeypatch.setattr(FakeLinux, "broken", False)
-    monkeypatch.setattr(runner.platforms, "detect", lambda cfg, package: FakeArch(cfg))
-    return FakeLinux
+def system(monkeypatch) -> type[FakeManager]:
+    monkeypatch.setattr(FakeManager, "installed", set())
+    monkeypatch.setattr(FakeManager, "graph", {})
+    monkeypatch.setattr(FakeManager, "installs", [])
+    monkeypatch.setattr(FakeManager, "replaced", [])
+    monkeypatch.setattr(FakeManager, "broken", False)
+    monkeypatch.setattr(discovery, "detect", lambda cfg, package: FakeArch(cfg))
+    return FakeManager
 
 
 def feature(
@@ -67,8 +73,6 @@ def feature(
     replaces: list[str] | None = None,
     requires: list[str] | None = None,
 ) -> str:
-    """A feature module: class CLS whose apply runs APPLY, supported on ON
-    with PACKAGES, which replace REPLACES, and needing REQUIRES."""
     body = f"class {cls}(Feature):\n    def apply(self, strategy):\n        {apply}\n\n"
     body += f"    class {on}:\n"
     body += f"        def packages(self):\n            return {packages or []!r}\n"
@@ -125,7 +129,7 @@ def test_gates_and_platforms(root, system, tmp_path, monkeypatch, capsys):
 def test_the_strategy_is_the_platform_plus_the_nested_class(system):
     class Tool(Feature):
         def apply(self, strategy):
-            return strategy.flag(), strategy.missing(["x"])
+            return strategy.flag(), strategy.manager.missing(["x"])
 
         class Linux:
             def flag(self):
@@ -271,6 +275,31 @@ def test_a_failure_alone_is_not_nothing_to_change(root, system, tmp_path, monkey
     assert capsys.readouterr() == ("", "error: on: broken\n")
 
 
+def test_errors_say_what_went_wrong_and_where(root, system, tmp_path, monkeypatch, capsys):
+    package = make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "on": feature("On", 'self.cfg["features"]["on"]["nope"]'),
+            "cmd": feature("Cmd", 'from dotfiles.engine import run; run("false")'),
+            "div": feature("Div", "1 / 0"),
+        },
+    )
+    assert apply("h", root, package=package) == 1
+    err = capsys.readouterr().err.splitlines()
+    assert [line.split(", at ")[0] for line in err] == [
+        "error: cmd: `false` failed with exit status 1",
+        "error: div: unexpected ZeroDivisionError (division by zero)",
+        "error: on: features.on.nope: no such key in dotfiles/defaults.toml",
+    ]
+    # The line of the feature, not engine.run's.
+    assert [line.split(", at ")[1].split("fakefeatures/")[1] for line in err] == [
+        'cmd.py:7: from dotfiles.engine import run; run("false")',
+        "div.py:7: 1 / 0",
+        'on.py:7: self.cfg["features"]["on"]["nope"]',
+    ]
+
+
 def test_failures_block_what_builds_on_them(root, system, tmp_path, monkeypatch, capsys):
     package = make_package(
         tmp_path,
@@ -295,8 +324,10 @@ def test_failures_block_what_builds_on_them(root, system, tmp_path, monkeypatch,
         "    cloning x failed (network?) — the next apply retries\n"
         "    reboot\n"
     )
+    crash, err = err.split("\n", 1)
+    assert crash.startswith("error: crash: unexpected RuntimeError (bug), at ")
+    assert crash.endswith("fakefeatures/crash.py:7: raise RuntimeError('bug')")
     assert err == (
-        "error: crash: bug\n"
         "error: db: broken\n"
         "warning: cloning x failed (network?) — the next apply retries\n"
         "warning: reboot\n"
@@ -362,7 +393,12 @@ def test_packages_that_did_not_install_block_their_features(
     assert apply("h", root, package=package) == 1
     out, err = capsys.readouterr()
     assert out == "-> packages: postgres (missing)\nok ran\nplain ran\n"
-    assert err == ("error: packages: mirror down\nerror: db: not run, packages missing: postgres\n")
+    assert re.fullmatch(
+        r"error: packages: unexpected RuntimeError \(mirror down\), "
+        r'at tests/test_apply.py:\d+: raise RuntimeError\("mirror down"\)\n'
+        r"error: db: not run, packages missing: postgres\n",
+        err,
+    )
 
 
 def test_notices_survive_ctrl_c(root, system, tmp_path, monkeypatch, capsys):
@@ -370,7 +406,7 @@ def test_notices_survive_ctrl_c(root, system, tmp_path, monkeypatch, capsys):
         raise KeyboardInterrupt
 
     package = make_package(tmp_path, monkeypatch, {"note": feature("Note", 'notice("reboot")')})
-    monkeypatch.setattr(FakeArch, "setup", lambda self: engine.notice("reboot"))
+    monkeypatch.setattr(FakeManager, "setup", lambda self: engine.notice("reboot"))
     monkeypatch.setattr("dotfiles.apply._deploy", interrupt)
     with pytest.raises(KeyboardInterrupt):
         apply("h", root, package=package)
@@ -383,12 +419,6 @@ def test_a_module_defines_one_feature(root, system, tmp_path, monkeypatch):
         steps({"features": {}}, FakeArch({}), package)
 
 
-# Modules that always run, switched by a setting outside [features].
-UNSWITCHED = {"ssh_key", "rbw"}
-# Features without a module: Arch.setup() does them.
-SETUP = {"pacman", "makepkg", "reflector", "aur"}
-
-
 def test_real_features_are_consistent():
     cfg = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())
     for table in cfg["features"].values():
@@ -396,103 +426,27 @@ def test_real_features_are_consistent():
     found = {s.name: s for s in steps(cfg, Arch(cfg))}  # packages() only reads files
     for name, s in found.items():
         assert type(s.feature).__name__ == name.title().replace("_", ""), name
-        assert name in cfg["features"] or name in UNSWITCHED, f"{name}: not in the schema"
-    missing = set(cfg["features"]) - set(found) - SETUP
+        assert name in cfg["features"], f"{name}: not in the schema"
+    missing = set(cfg["features"]) - set(found)
     assert not missing, f"features without a module: {sorted(missing)}"
-    # What depends on what on Arch; the package graph orders the rest.
-    assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {
-        "fcitx5": ["niri"],
-        "gaming": ["nvidia", "pacman"],
-        "kotlin": ["jdk"],
-        "niri": ["noctalia"],
-    }
+    assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {}
 
 
-@pytest.fixture
-def arch(monkeypatch):
-
-    monkeypatch.setattr(platforms.platform, "freedesktop_os_release", lambda: {"ID": "arch"})
-
-
-def test_nobeep(monkeypatch, capsys):
-    from dotfiles.features.nobeep import Nobeep
-
-    nobeep = Nobeep({})
-    strategy = nobeep.strategy(FakeArch({}))
-    assert type(strategy).__name__ == "Nobeep.Linux" and strategy.packages() == []
-    monkeypatch.setattr(engine, "DRY_RUN", True)
-    nobeep.apply(strategy)
-    assert capsys.readouterr().out == "-> /etc/modprobe.d/nobeep.conf (missing)\n"
-    assert not engine.SYSROOT.exists()
-
-    # Tests never become root: the install that would set root:root is only recorded.
-    monkeypatch.setattr(engine, "DRY_RUN", False)
-    calls = []
-    monkeypatch.setattr(engine, "_run", lambda argv, **kw: calls.append(argv))
-    monkeypatch.setenv("SUDO_CMD", "")
-    nobeep.apply(strategy)
-    dst = str(engine.SYSROOT / "etc/modprobe.d/nobeep.conf")
-    assert calls[0][:8] == ["install", "-D", "-m", "644", "-o", "root", "-g", "root"]
-    assert calls[0][-1] == dst
-    capsys.readouterr()
-
-    conf = Path(dst)
-    conf.parent.mkdir(parents=True)
-    conf.write_text("blacklist pcspkr\n")
-    conf.chmod(0o644)
-    monkeypatch.setattr(engine, "_owner", lambda path: "root:root")
-    nobeep.apply(strategy)
-    assert capsys.readouterr().out == ""
-
-
-def test_dry_run_on_a_real_host_never_calls_sudo(arch, monkeypatch, capsys):
-    """hyper-lin end to end on the real Arch platform: checks only (which
-    answer "nothing installed, nothing enabled"), nothing written, sudo
-    untouched."""
+def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
+    monkeypatch.setattr(discovery.platform, "freedesktop_os_release", lambda: {"ID": "arch"})
 
     def checks_only(argv, check=False, **kwargs):
         if check:  # run(): a mutation
             pytest.fail(f"ran {argv}")
-        btrfs = argv == ["findmnt", "-no", "FSTYPE", "/"]  # hyper-lin's root, for snapper and swap
-        return subprocess.CompletedProcess(argv, 1, "btrfs\n" if btrfs else "", "")
+        return subprocess.CompletedProcess(argv, 1, "", "")
 
-    monkeypatch.setattr(engine, "_run", checks_only)
-    assert apply("hyper-lin", dry_run=True) == 0
+    monkeypatch.setattr(engine.current().shell, "execute", checks_only)
+    cfg = config.resolve("hyper-lin")
+    for table in cfg["features"].values():
+        table["enabled"] = True
+    assert apply("hyper-lin", dry_run=True, cfg=cfg) == 0
     out = capsys.readouterr().out
-    assert "-> /etc/modprobe.d/nobeep.conf (missing)\n" in out
-    assert "-> ~/.zshrc (missing)\n" in out
-    assert not (Path.home() / ".zshrc").exists()
-
-
-SESSION = """
-from contextlib import contextmanager
-
-LOG = []
-
-
-class Snap(Feature):
-    @contextmanager
-    def session(self, system):
-        LOG.append("enter")
-        try:
-            yield
-        finally:
-            LOG.append("exit")
-
-    def apply(self, strategy):
-        LOG.append("apply")
-        die("broken")
-
-    class Linux:
-        pass
-"""
-
-
-def test_a_session_wraps_the_whole_apply(root, system, tmp_path, monkeypatch):
-    package = make_package(tmp_path, monkeypatch, {"on": SESSION, "off": SESSION})
-    monkeypatch.setattr(
-        FakeArch, "setup", lambda self: sys.modules[f"{package}.on"].LOG.append("setup")
-    )
-    assert apply("h", root, package=package) == 1
-    assert sys.modules[f"{package}.on"].LOG == ["enter", "setup", "apply", "exit"]
-    assert f"{package}.off" not in sys.modules  # a disabled feature is not even imported
+    assert "-> /etc/pacman.conf.d/options.conf (missing)\n" in out
+    assert "-> ~/.gitconfig (missing)\n" in out
+    assert not (Path.home() / ".gitconfig").exists()
+    assert not engine.path("/").exists()

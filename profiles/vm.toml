@@ -1,23 +1,2 @@
-# A virtual machine to try the desktop on: base plus the niri desktop, with
-# nothing that needs real hardware or a big disk. No bluetooth,
-# firmware, GPU driver, snapshots or swap file; zram covers swap. No input
-# method, package cache cleanup, pkgfile or btop either.
+# A virtual machine to try the tool on before a real machine.
 extends = ["base"]
-
-[features]
-paccache.enabled = false
-pkgfile.enabled  = false
-btop.enabled     = false
-# storage
-btrfs_scrub.enabled = true
-zram.enabled        = true
-# desktop
-niri.enabled      = true
-noctalia.enabled  = true
-greetd.enabled    = true
-greetd.greeter    = "noctalia-greeter"  # AUR
-fonts.enabled     = true
-nerd_font.enabled = true
-audio.enabled     = true
-kitty.enabled     = true
-firefox.enabled   = true

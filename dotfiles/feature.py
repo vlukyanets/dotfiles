@@ -1,34 +1,40 @@
 """The base class of every feature and the lookup of its strategy."""
 
-from contextlib import AbstractContextManager, nullcontext
+from dotfiles.platforms.operating_system import Platform
 
-from dotfiles.platforms import Platform
+
+class Strategy:
+    """What a feature's nested platform class declares; each default is nothing."""
+
+    def packages(self) -> list[str]:
+        """A strategy's packages on this platform, in its own names."""
+        return []
+
+    def replaces(self) -> list[str]:
+        """Installed packages a strategy's packages() replace, removed just before the install."""
+        return []
+
+    def requires(self) -> list[str]:
+        """Features a strategy needs: enabled, or check fails; they run first."""
+        return []
 
 
 class Feature:
-    """What a feature does everywhere is its apply(); what differs per
-    platform, its packages first of all, is a nested class named after the
-    platform class (Arch, Linux, …), which apply() receives as its strategy."""
+    """A feature: its settings in cfg, its strategies as nested platform classes."""
 
     def __init__(self, cfg: dict):
+        """The feature with the resolved CFG."""
         self.cfg = cfg  # the resolved config
 
     def apply(self, strategy: Platform) -> None:
         """What this feature does, through STRATEGY for what is platform's."""
 
-    def session(self, system: Platform) -> AbstractContextManager:
-        """A context around the whole apply of an enabled feature: entered
-        before the platform's setup, left after the last feature, after a
-        failure or Ctrl-C too. Nothing by default."""
-        return nullcontext()
-
     def strategy(self, system: Platform) -> Platform | None:
-        """The nested class for SYSTEM's platform, walking up its class
-        hierarchy (Arch, then Linux), combined with SYSTEM's class so it has
-        every platform method; None when this feature has none for it."""
+        """The nested class for SYSTEM's platform, or its nearest base, mixed into SYSTEM; None if none."""
         for base in type(system).__mro__:
             nested = getattr(type(self), base.__name__, None)
             if isinstance(nested, type) and not issubclass(nested, Platform):
                 name = f"{type(self).__name__}.{nested.__name__}"
-                return type(name, (nested, type(system)), {})(self.cfg)
+                mixed = type(name, (nested, Strategy, type(system)), {})
+                return mixed(self.cfg, system.manager)  # SYSTEM's, with its cache
         return None

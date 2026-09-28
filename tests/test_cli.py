@@ -33,9 +33,9 @@ def test_init_then_every_command_reads_the_machine_config(monkeypatch, capsys):
     _, repo, _ = run(monkeypatch, capsys, "config", "--host", "hyper-lin")
     assert run(monkeypatch, capsys, "config") == (0, repo, "")
     # The machine config wins until --source or --host points at a checkout.
-    local.write_text(local.read_text().replace("sshd]\nenabled = true", "sshd]\nenabled = false"))
+    local.write_text(local.read_text().replace('backend = "rbw"', 'backend = "none"'))
     _, mine, _ = run(monkeypatch, capsys, "config")
-    assert "[features.sshd]\nenabled = false" in mine
+    assert '[secrets]\nbackend = "none"' in mine
     assert run(monkeypatch, capsys, "config", "--source", str(config.ROOT))[1] != mine
     assert run(monkeypatch, capsys, "check")[1].endswith("local          ok\n")
 

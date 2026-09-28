@@ -14,15 +14,14 @@ SOURCE = "read the config from hosts/ of this checkout, not ~/.config/dotfiles"
 
 
 def where(args) -> tuple[str, Path, Path | None]:
-    """The host, the checkout its config comes from and the machine config
-    to read instead (None with --source or --host). The templates always
-    come from ROOT."""
+    """(host, checkout, local config or None) that ARGS point the command at."""
     host = getattr(args, "host", None)
     source = args.source or (ROOT if host else None)
     return host or socket.gethostname(), source or ROOT, None if source else config.local_path()
 
 
 def main() -> int:
+    """Parse the command line and run the command; the exit status."""
     parser = argparse.ArgumentParser(prog="dotfiles")
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("init", help="write a host's resolved config to ~/.config/dotfiles")

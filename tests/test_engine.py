@@ -28,9 +28,6 @@ def test_as_root_prefix(fake, monkeypatch):
         run("true", cwd="/")
         output("check")  # checks never get root
     run("true")
-    monkeypatch.setenv("SNAP_PAC_SKIP", "y")
-    with as_root():
-        run("true")
     monkeypatch.setenv("SUDO_CMD", "")
     with as_root():
         run("true")
@@ -45,7 +42,6 @@ def test_as_root_prefix(fake, monkeypatch):
         ["sudo", "-n", "true"],
         ["check"],
         ["true"],
-        ["sudo", "-n", "--preserve-env=SNAP_PAC_SKIP", "true"],
         ["true"],
         ["true"],
     ]
@@ -63,7 +59,7 @@ def test_mutations_must_succeed(fake):
 
 
 def test_dry_run_runs_nothing(fake, monkeypatch):
-    monkeypatch.setattr(engine, "DRY_RUN", True)
+    engine.current().dry_run = True
     with as_root():
         run("rm", "-rf", "/")
     run("touch", "x")
@@ -129,13 +125,13 @@ def test_notices_now_and_at_the_end(capsys):
 
 
 def me() -> str:
-    return engine._owner(engine.SYSROOT.parent)
+    return engine._owner(engine.path("/").parent)
 
 
 def test_ensure_file_changes_once(capsys):
     from dotfiles.engine import ensure_file
 
-    real = engine.SYSROOT / "etc/deep/er/f.conf"
+    real = engine.path("/") / "etc/deep/er/f.conf"
     assert ensure_file("/etc/deep/er/f.conf", "a\n", 0o600, owner=me()) is True
     assert ensure_file("/etc/deep/er/f.conf", b"a\n", 0o600, owner=me()) is False
     assert real.read_text() == "a\n" and oct(real.stat().st_mode & 0o777) == "0o600"
@@ -154,7 +150,7 @@ def test_ensure_file_changes_once(capsys):
 def test_ensure_file_goes_to_root_only_when_needed():
     from dotfiles.engine import ensure_file
 
-    locked = engine.SYSROOT / "etc"
+    locked = engine.path("/") / "etc"
     locked.mkdir(parents=True)
     locked.chmod(0o555)
     try:
@@ -170,11 +166,11 @@ def test_ensure_file_goes_to_root_only_when_needed():
 def test_dry_run_reports_and_writes_nothing(monkeypatch, capsys):
     from dotfiles.engine import ensure_file, ensure_line, ensure_symlink
 
-    monkeypatch.setattr(engine, "DRY_RUN", True)
+    engine.current().dry_run = True
     assert ensure_file("/etc/f", "x\n", owner="root:root") is True
     assert ensure_line("/etc/g", "^x=", "x=1") is True
     assert ensure_symlink("/usr/share/zoneinfo/UTC", "/etc/localtime") is True
-    assert not engine.SYSROOT.exists()
+    assert not engine.path("/").exists()
     assert capsys.readouterr().out == (
         "-> /etc/f (missing)\n-> /etc/g (missing)\n-> /etc/localtime -> /usr/share/zoneinfo/UTC\n"
     )
@@ -183,7 +179,7 @@ def test_dry_run_reports_and_writes_nothing(monkeypatch, capsys):
 def test_ensure_line():
     from dotfiles.engine import ensure_line
 
-    conf = engine.SYSROOT / "etc/conf"
+    conf = engine.path("/") / "etc/conf"
     conf.parent.mkdir(parents=True)
     conf.write_text("a=1\n#b=2\nc=3\n#b=9\n")
     conf.chmod(0o600)
@@ -199,17 +195,17 @@ def test_ensure_line():
     assert oct(conf.stat().st_mode & 0o777) == "0o600"
     assert ensure_line("/etc/new", "^x=", "x=1") is True
     assert ensure_line("/etc/new", "^x=", "x=1") is False
-    assert (engine.SYSROOT / "etc/new").read_text() == "x=1\n"
+    assert (engine.path("/") / "etc/new").read_text() == "x=1\n"
 
 
 def test_ensure_symlink():
     from dotfiles.engine import ensure_symlink
 
-    (engine.SYSROOT / "etc").mkdir(parents=True)
+    (engine.path("/") / "etc").mkdir(parents=True)
     assert ensure_symlink("/usr/share/zoneinfo/UTC", "/etc/localtime") is True
     assert ensure_symlink("/usr/share/zoneinfo/UTC", "/etc/localtime") is False
     assert ensure_symlink("/usr/share/zoneinfo/Europe/Berlin", "/etc/localtime") is True
-    assert (engine.SYSROOT / "etc/localtime").readlink().as_posix() == (
+    assert (engine.path("/") / "etc/localtime").readlink().as_posix() == (
         "/usr/share/zoneinfo/Europe/Berlin"
     )
 

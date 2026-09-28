@@ -8,8 +8,4 @@
 # - `render --out DIR` and `deploy --dry-run`, then `deploy`: the dotfiles
 #   land in $HOME the same as on Arch; a second deploy changes nothing.
 # - `apply --dry-run`: the error above, with nothing changed.
-# - Once a Debian platform exists: its setup and apt install, and the
-#   features whose `Linux` strategy is systemd only (nobeep, oomd, thp,
-#   timesyncd, resolved) running unchanged; features with only an `Arch`
-#   strategy skipped.
 extends = ["vm"]

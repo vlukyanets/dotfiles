@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from dotfiles.config import ROOT, ConfigError
-from dotfiles.render import check, deploy, render
+from dotfiles.render import check, deploy, render, template
 
 
 def write(root: Path, rel: str, text: str) -> None:
@@ -142,36 +142,44 @@ def test_check_renders_every_host(root):
     assert check(root) == {"on": None, "unknown-host": "home/f.j2:1: unknown-host: no name"}
 
 
-def test_check_names_a_requirement_left_off(tmp_path):
+def test_check_names_a_value_the_type_allows(tmp_path):
     for sub in ("hosts", "profiles", "data"):
         shutil.copytree(ROOT / sub, tmp_path / sub)
     (tmp_path / "dotfiles").mkdir()
     shutil.copy(ROOT / "dotfiles/defaults.toml", tmp_path / "dotfiles")
-    (tmp_path / "hosts/solo.toml").write_text(
-        'extends = ["laptop"]\n[features]\nnoctalia.enabled = false\n'
+    (tmp_path / "hosts/solo.toml").write_text('[features.packaging.makepkg]\njobs = "fast"\n')
+    assert check(source=tmp_path)["solo"] == (
+        "solo: features.packaging.makepkg.jobs: must be a number of threads, "
+        'or a percent of the cores like "50%", got "fast"'
     )
-    assert check(source=tmp_path)["solo"] == "niri: requires features.noctalia.enabled = true"
 
 
 def test_registries_reach_templates_and_names_are_checked(root, tmp_path):
     write(
         root,
         "dotfiles/defaults.toml",
-        '[git]\nname = ""\n[features.zsh]\nenabled = false\n'
-        '[features.locale]\nlanguages = ["en"]\n',
+        '[git]\nname = ""\n[features.zsh]\nenabled = false\n[ssh]\nauthorized_keys = ["a"]\n',
     )
-    write(root, "hosts/bad.toml", '[features.locale]\nlanguages = ["en", "xx"]\n')
-    write(root, "data/fcitx5-languages-config.toml", '[languages.en]\nxkb = "us"\n')
+    write(root, "hosts/bad.toml", '[ssh]\nauthorized_keys = ["a", "xx"]\n')
+    write(root, "data/ssh-pubkeys-collection.toml", '[ssh_keys.a]\nkey = "ssh-ed25519 A"\n')
     write(
         root,
-        "home/kb.j2",
-        '{{ features.locale.languages | map("extract", languages) | map(attribute="xkb") | join(",") }}\n',
+        "home/keys.j2",
+        '{{ ssh.authorized_keys | map("extract", ssh_keys) | map(attribute="key") | join(",") }}\n',
     )
     render("on", tmp_path / "out", root)
-    assert (tmp_path / "out/kb").read_text() == "us\n"
+    assert (tmp_path / "out/keys").read_text() == "ssh-ed25519 A\n"
     with pytest.raises(ConfigError) as e:
         render("bad", tmp_path / "bad", root)
-    assert str(e.value) == "bad: features.locale.languages: 'xx' is not in data/ (languages)"
+    assert str(e.value) == "bad: ssh.authorized_keys: 'xx' is not in data/ (ssh_keys)"
+
+
+def test_system_templates(root):
+    write(root, "system/etc/x.conf.j2", "a = {{ a }}\n{% if b %}\nb\n{% endif %}\n")
+    assert template("/etc/x.conf", root, a=1, b=False) == "a = 1\n"
+    write(root, "system/etc/y.conf.j2", "\n{{ fail('no a') }}")
+    with pytest.raises(ConfigError, match="^system/etc/y.conf.j2:2: no a$"):
+        template("/etc/y.conf", root)
 
 
 def test_quote_and_inline_if(root, tmp_path):

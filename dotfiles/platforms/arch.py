@@ -1,295 +1,84 @@
-"""Arch Linux: pacman, set up before any install (its options, multilib,
-makepkg's build flags, fresh mirrors, the AUR helper)."""
+"""Arch Linux: packages through pacman, from the repositories."""
 
 import os
 import re
-import shutil
 import subprocess
-import tempfile
-from pathlib import Path
 
-from dotfiles import engine
-from dotfiles.engine import (
-    as_root,
-    changed,
-    die,
-    ensure_file,
-    ensure_line,
-    notice,
-    output,
-    retrying,
-    run,
-)
-from dotfiles.platforms import transaction
+from dotfiles.engine import as_root, changed, die, output, retrying, run
 from dotfiles.platforms.linux import Linux
+from dotfiles.platforms.package_manager import PackageManager
 
 # pacman's field names are translated; the parser reads the English ones.
 C = {**os.environ, "LC_ALL": "C"}
-PACMAN_CONF = "/etc/pacman.conf"
-PARU = "https://aur.archlinux.org/paru.git"
-# What a PKGBUILD asks for to build Rust: rustup provides both, the rust package never goes in.
-RUST = {"cargo", "rust"}
 STALE = "if downloads returned 404 the sync databases are stale: run {} -Syu and apply again"
 
 
-class Arch(Linux):
-    def __init__(self, cfg: dict):
-        super().__init__(cfg)
-        self._direct: dict[str, set[str]] = {}  # package -> Depends On, per apply
-
-    def setup(self) -> None:
-        features = self.cfg["features"]
-        if features["pacman"]["enabled"]:
-            self._pacman()
-        if features["makepkg"]["enabled"]:
-            self._makepkg()
-        if features["reflector"]["enabled"]:
-            self._reflector()
-        if features["aur"]["enabled"]:
-            self._aur()
-
-    def _pacman(self) -> None:
-        pacman = self.cfg["features"]["pacman"]
-        options = "/etc/pacman.conf.d/options.conf"
-        ensure_file(
-            options, f"ParallelDownloads = {pacman['parallel_downloads']}\n", owner="root:root"
-        )
-        # Options after the first repository section would be ignored.
-        include = f"Include = {options}"
-        ensure_line(PACMAN_CONF, f"^{re.escape(include)}$", include, before=r"^\[(?!options\])")
-        conf = engine.path(PACMAN_CONF)
-        lines = conf.read_text().splitlines() if conf.exists() else []  # a dry run on nothing
-        if not pacman["multilib"] or "[multilib]" in lines:
-            return  # a [multilib] enabled in pacman.conf itself is left alone
-        multilib = "/etc/pacman.conf.d/multilib.conf"
-        ensure_file(multilib, "[multilib]\nInclude = /etc/pacman.d/mirrorlist\n", owner="root:root")
-        include = f"Include = {multilib}"
-        ensure_line(PACMAN_CONF, f"^{re.escape(include)}$", include)
-        # Keyed on the database, not the line just added, so a sync the network
-        # cut off is redone. -Syu, not -Sy: -Sy then -S is a partial upgrade.
-        if not engine.path("/var/lib/pacman/sync/multilib.db").exists():
-            transaction()
-            for attempt in retrying():
-                with attempt, as_root():
-                    run("pacman", "-Syu", "--noconfirm")
-            changed("multilib database synced (pacman -Syu)")
-
-    def _makepkg(self) -> None:
-        makepkg = self.cfg["features"]["makepkg"]
-        lines = [f'MAKEFLAGS="-j{_jobs(makepkg["jobs"])}"']
-        if makepkg["options"]:
-            lines.append(f"OPTIONS+=({' '.join(makepkg['options'])})")
-        git = self.cfg["git"]
-        lines.append(f'PACKAGER="{git["name"]} <{git["email"]}>"')
-        ensure_file("/etc/makepkg.conf.d/dotfiles.conf", "\n".join(lines) + "\n", owner="root:root")
-
-    def _reflector(self) -> None:
-        reflector = self.cfg["features"]["reflector"]
-        edits = []
-        if missing := self.missing(["reflector"]):
-            changed(f"packages: {' '.join(missing)} (missing)")
-            self.install(missing)
-            edits.append(True)
-        args = ["--save /etc/pacman.d/mirrorlist"]
-        if reflector["country"]:
-            args.append(f"--country {','.join(reflector['country'])}")
-        for key in ("protocol", "latest", "sort", "age", "completion_percent", "download_timeout"):
-            args.append(f"--{key.replace('_', '-')} {reflector[key]}")
-        conf = "\n".join(args) + "\n"
-        edits.append(ensure_file("/etc/xdg/reflector/reflector.conf", conf, owner="root:root"))
-        timer = (
-            f"[Timer]\nOnCalendar=\nOnCalendar={reflector['on_calendar']}\n"
-            f"OnBootSec=\nOnBootSec={reflector['on_boot_sec']}\n"
-        )
-        override = "/etc/systemd/system/reflector.timer.d/override.conf"
-        if ensure_file(override, timer, owner="root:root"):
-            with as_root():
-                run("systemctl", "daemon-reload")
-            edits.append(True)
-        edits.append(self.ensure_service("reflector.timer"))
-        # Something changed: refresh now, before the install downloads,
-        # rather than at the timer's next run.
-        if any(edits):
-            try:
-                with as_root():
-                    run("systemctl", "start", "reflector.service")
-                changed("mirrorlist refreshed")
-            except subprocess.CalledProcessError:
-                notice(
-                    "refreshing the mirrorlist failed (network?) — the old one stays, "
-                    "reflector.timer tries again"
-                )
-
-    def _aur(self) -> None:
-        # Only AUR packages need paru: a build that fails holds back those,
-        # not the repositories. install builds it again and names the failure.
-        # rustup first, so no AUR build pulls the rust package for cargo.
-        try:
-            self.ensure_rustup()
-            self.ensure_paru()
-        except (engine.Failed, subprocess.CalledProcessError) as e:
-            notice(f"paru did not build ({e}) — AUR packages wait until it does")
-
-    def multilib(self) -> bool:
-        """The [multilib] repository is enabled through features.pacman."""
-        pacman = self.cfg["features"]["pacman"]
-        return pacman["enabled"] and pacman["multilib"]
-
-    def initramfs_hooks(self) -> list[str]:
-        """HOOKS=(...) of mkinitcpio.conf, in order; [] without the line."""
-        conf = engine.path("/etc/mkinitcpio.conf")
-        text = conf.read_text() if conf.exists() else ""
-        found = re.search(r"^HOOKS=\((.*)\)", text, re.MULTILINE)
-        return found.group(1).split() if found else []
+class Pacman(PackageManager):
+    """pacman: the repositories, one transaction per install, root through as_root."""
 
     def missing(self, names: list[str]) -> list[str]:
+        """NAMES that are not installed (pacman -T). A check: no root, no change."""
         if not names:
             return []
         found = output("pacman", "-T", *names)  # prints exactly the ones not installed
         return list(names) if found is None else found.split()
 
     def install(self, names: list[str], replaces: list[str] = ()) -> None:
+        """REPLACES removed, then NAMES installed in one transaction; fails first on unknown names."""
         self._remove(replaces)
-        known = _parse(output("pacman", "-Si", *names, env=C) or "") if names else {}
-        repo = [n for n in names if n in known]
-        aur = [n for n in names if n not in known]
-        if repo:
-            self._sync(repo)
-        if not aur:
-            return
-        if not self.cfg["features"]["aur"]["enabled"]:
-            die(f"not in the repositories: {' '.join(aur)} — enable features.aur to build them")
-        self.ensure_paru()
-        # The repositories fill a virtual dependency with their first provider
-        # (steam's lib32-vulkan-driver: lib32-nvidia-utils) when the one wanted
-        # comes from the AUR; that pick conflicts with it and goes again here.
-        self._remove(replaces)
-        # paru runs as the user and calls sudo itself: the same one run() would.
-        sudo = engine._sudo()
-        flags = ["--sudo", sudo[0]] if sudo else []
-        if sudo[1:]:
-            flags += ["--sudoflags", " ".join(sudo[1:])]
-        transaction()
-        try:
-            for attempt in retrying():
-                with attempt:
-                    run("paru", *flags, "-S", "--needed", "--noconfirm", *aur)
-        except subprocess.CalledProcessError:
-            die(f"paru -S failed; {STALE.format('paru')}")
+        known = self.parse(output("pacman", "-Si", *names, env=C) or "") if names else {}
+        if unknown := [n for n in names if n not in known]:
+            die(f"not in the repositories: {' '.join(unknown)}")
+        self._sync(names)
 
-    def _remove(self, replaces: list[str]) -> None:
-        for name in replaces:
-            # -Qq also answers for a package that only provides NAME (rustup for rust).
-            if output("pacman", "-Qq", name) == name:
-                transaction()
-                with as_root():
-                    run("pacman", "-Rdd", "--noconfirm", name)
-                changed(f"removed {name}, its replacement follows")
+    def upgrade(self) -> None:
+        """pacman -Syu, as root, retried: never -Sy alone, which then -S is a partial upgrade."""
+        for attempt in retrying():
+            with attempt, as_root():
+                run("pacman", "-Syu", "--noconfirm")
 
-    def ensure_paru(self) -> bool:
-        """paru runs. A paru left behind by a libalpm bump does not, so the
-        check is paru --version, not the package."""
-        if (output("paru", "--version") or "").startswith("paru "):
-            return False
-        if engine.DRY_RUN:  # nothing cloned to read the dependencies from
-            changed("paru built from the AUR")
-            return True
-        self._sync(self.missing(["base-devel", "git"]))
-        with tempfile.TemporaryDirectory() as tmp:
-            src = Path(tmp) / "paru"
-            for attempt in retrying():
-                with attempt:
-                    shutil.rmtree(src, ignore_errors=True)  # a clone cut off halfway
-                    run("git", "clone", "--quiet", "--depth", "1", PARU, str(src))
-            info = (src / ".SRCINFO").read_text()
-            deps = re.findall(r"^\s*(?:make)?depends = (\S+)$", info, re.MULTILINE)
-            names = {re.split(r"[<>=]", d)[0] for d in deps}
-            if names & RUST:
-                self.ensure_rustup()
-            self._sync(self.missing(sorted(names - RUST)), "--asdeps")
-            # makepkg as the user (it refuses root), the install as root.
-            run("makepkg", "--noconfirm", cwd=src)
-            built = (output("makepkg", "--packagelist", cwd=src) or "").split()
-            transaction()
-            with as_root():
-                run("pacman", "-U", "--noconfirm", *[f for f in built if Path(f).exists()])
-        changed("paru built from the AUR")
-        return True
-
-    def ensure_rustup(self) -> bool:
-        """cargo and rustc come from rustup, with a stable default toolchain:
-        the rust package, which conflicts with it, is swapped out."""
-        edited = False
-        if self.missing(["rustup"]):
-            self._remove(["rust"])
-            self._sync(["rustup"])
-            changed("packages: rustup (cargo and rustc)")
-            edited = True
-        # cargo through rustup runs only with a default toolchain.
-        if output("rustup", "default") == "":
-            for attempt in retrying():
-                with attempt:
-                    run("rustup", "default", "stable")
-            changed("rustup default stable")
-            edited = True
-        return edited
-
-    def _sync(self, names: list[str], *flags: str) -> None:
-        """NAMES from the repositories, as root, retried; nothing when empty."""
-        if not names:
-            return
-        transaction()
-        try:
-            for attempt in retrying():
-                with attempt, as_root():
-                    run("pacman", "-S", "--needed", "--noconfirm", *flags, *names)
-        except subprocess.CalledProcessError:
-            die(f"pacman -S failed; {STALE.format('pacman')}")
-
-    def depends(self, names: list[str]) -> dict[str, set[str]]:
-        todo = set(names)
-        while todo := todo - self._direct.keys():
-            self._direct.update(self._depends_on(sorted(todo)))
-            todo = set().union(*(self._direct[n] for n in todo))
-        result = {}
-        for name in names:
-            seen: set[str] = set()
-            stack = list(self._direct[name])
-            while stack:
-                dep = stack.pop()
-                if dep not in seen:
-                    seen.add(dep)
-                    stack.extend(self._direct.get(dep, ()))
-            result[name] = seen
-        return result
-
-    def _depends_on(self, names: list[str]) -> dict[str, set[str]]:
-        """Each of NAMES -> its direct dependencies, from the sync database
-        and, for what is not there (built locally, from the AUR), the local
-        one. Version constraints are dropped; a name pacman knows nowhere
-        needs nothing."""
+    def direct(self, names: list[str]) -> dict[str, set[str]]:
+        """Each of NAMES -> its Depends On, from the sync databases, else the local one."""
         found: dict[str, set[str]] = {}
         for query in ("-Si", "-Qi"):
             rest = [n for n in names if n not in found]
             if rest:
-                found.update(_parse(output("pacman", query, *rest, env=C) or ""))
+                found.update(self.parse(output("pacman", query, *rest, env=C) or ""))
         return {n: found.get(n, set()) for n in names}
 
+    def _remove(self, replaces: list[str]) -> None:
+        """Each of REPLACES installed under that very name removed, as root."""
+        for name in replaces:
+            # -Qq also answers for a package that only provides NAME (rustup for rust).
+            if output("pacman", "-Qq", name) == name:
+                with as_root():
+                    run("pacman", "-Rdd", "--noconfirm", name)
+                changed(f"removed {name}, its replacement follows")
 
-def _parse(info: str) -> dict[str, set[str]]:
-    """pacman -Si/-Qi output -> {Name: set of Depends On}."""
-    result = {}
-    for record in info.split("\n\n"):
-        fields = dict(re.findall(r"^(\S[^:\n]*?)\s*: (.*)$", record, re.MULTILINE))
-        if "Name" in fields:
-            deps = fields.get("Depends On", "None").split()
-            result[fields["Name"]] = {re.split(r"[<>=]", d)[0] for d in deps if d != "None"}
-    return result
+    def _sync(self, names: list[str]) -> None:
+        """NAMES from the repositories, as root, retried; nothing when empty."""
+        if not names:
+            return
+        try:
+            for attempt in retrying():
+                with attempt, as_root():
+                    run("pacman", "-S", "--needed", "--noconfirm", *names)
+        except subprocess.CalledProcessError:
+            die(f"pacman -S failed; {STALE.format('pacman')}")
+
+    @staticmethod
+    def parse(info: str) -> dict[str, set[str]]:
+        """pacman -Si/-Qi output -> {Name: set of Depends On}."""
+        result = {}
+        for record in info.split("\n\n"):
+            fields = dict(re.findall(r"^(\S[^:\n]*?)\s*: (.*)$", record, re.MULTILINE))
+            if "Name" in fields:
+                deps = fields.get("Depends On", "None").split()
+                result[fields["Name"]] = {re.split(r"[<>=]", d)[0] for d in deps if d != "None"}
+        return result
 
 
-def _jobs(value: str) -> str:
-    """ "NN%" of the cores, at least 1; anything else verbatim, for makepkg's
-    shell to evaluate at every build ("$(nproc)")."""
-    if value.endswith("%") and value[:-1].isdigit():
-        return str(max(1, int(value[:-1]) * (os.cpu_count() or 1) // 100))
-    return value
+class Arch(Linux):
+    """Arch Linux: packages through pacman, from the repositories."""
+
+    manager_class = Pacman
