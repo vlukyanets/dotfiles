@@ -233,8 +233,9 @@ def resolve(root: Path, host: str) -> dict:
 3. `config --explain` is in this iteration.
 4. Profiles: `base` = package manager, locale, zsh, CLI tools, ssh agent;
    `server` = base + sshd, tailscale; `laptop` = base + luks_discard, swap,
-   snapper, zram, bluetooth, fwupd + the desktop stack; `vm` = laptop
-   without luks_discard, bluetooth, fwupd and swap. Dev toolchains and
+   snapper, zram, bluetooth, fwupd + the desktop stack; `vm` = base
+   without paccache, pkgfile, btop + btrfs_scrub, zram and the desktop
+   stack without fcitx5; it does not extend `laptop`. Dev toolchains and
    personal apps stay in `hyper-lin`.
 5. Every feature is a table under `features` with `enabled` and its own
    settings, so a feature's switch and its settings sit in one place.
