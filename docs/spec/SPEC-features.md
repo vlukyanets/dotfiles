@@ -180,15 +180,6 @@ AUR, or fails naming them and `features.aur`.
 
 ### Boot, disks and drivers (batch 4)
 
-- **`luks_discard`** — `/etc/kernel/cmdline` gets `:discard` on every
-  `rd.luks.options=<uuid>:…` of each `rd.luks.name=<uuid>`, or a new
-  `rd.luks.options=<uuid>:discard` at the end of its one line. The file
-  keeps its mode and owner. A notice to rebuild the initramfs when
-  something changed. There are three cases where nothing changes and a
-  notice says what to do by hand:
-  - no `sd-encrypt` hook in mkinitcpio.conf;
-  - no `/etc/kernel/cmdline`;
-  - no `rd.luks.name=` in it.
 - **`swap`**
   - The swap file lives on its own `@swap` subvolume, so it does not block
     snapshots of `/`.
@@ -207,7 +198,7 @@ AUR, or fails naming them and `features.aur`.
 - **`plymouth`**
   - plymouth.
   - `plymouth` goes into mkinitcpio.conf's `HOOKS=` (read by
-    `Arch.initramfs_hooks()`, as `locale` and `luks_discard` do) after `systemd`, else
+    `Arch.initramfs_hooks()`, as `locale` does) after `systemd`, else
     after `udev`, else after `base`. The line is edited in place with
     `ensure_line`.
   - `plymouth-set-default-theme -R bgrt` when the theme is not bgrt or
@@ -433,7 +424,7 @@ their batches (the second as TOML, like every other registry).
   - the notices and the `die`/`defer` paths named in this spec.
 - **Pure functions that decide something** have table tests: the nvidia
   generation from a GPU name, the snapper important-package check, the
-  luks cmdline edit, the plymouth HOOKS edit.
+  plymouth HOOKS edit.
 - **The snapshot pair:** a fake snapper and platform cover
   - no transaction → no snapshots;
   - several transactions → one pre, one post;
