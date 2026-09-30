@@ -75,8 +75,11 @@ Resolution for host `H`:
 3. **Validation, per file, before merging.** Every key must exist in
    `dotfiles/defaults.toml` at the same path, at any depth, with the same
    type. `bool` and `int` are different types; lists match any list;
-   tables recurse. A key in a feature's `either` takes one of two types
-   (`Packaging.either`, `makepkg.jobs`: integer or string). `extends` is the only key not in the schema and must be a list
+   tables recurse. A feature's `types` gives a key its types where no
+   default says them: several (`makepkg.jobs`: integer or string, the
+   default's first), or a key with no default at all (every key of
+   `Packaging.types`), which is in the resolved config only when a file
+   sets it. `extends` is the only key not in the schema and must be a list
    of strings. Errors name the file and the dotted key path:
    `hosts/hyper-lin.toml: features.nvidai: unknown key`.
 4. **Merge.** Tables merge recursively; scalars and lists are replaced by
@@ -86,7 +89,7 @@ Resolution for host `H`:
    `rbw`}) and from each feature's `rules` for its own (`Packaging.rules`),
    as `<host>: <key>: must be <what>, got <value>`. The rules live with the
    code that reads the keys; `feature.checks()` gathers them from every platform and
-   the entry points pass them in as `checks=` (a `Checks(rules, either)`), so
+   the entry points pass them in as `checks=` (a `Checks(rules, types)`), so
    `config` imports no feature.
 6. **Unknown host** (no host of that name under `hosts/`): the defaults alone. Not an
    error.
@@ -156,7 +159,7 @@ prints one line per leaf, itself valid TOML:
 
 ```
 git.name = "Valentin Lukyanets"  # hosts/hyper-lin.toml
-features.packaging.pacman.multilib = false  # dotfiles/defaults.toml
+secrets.backend = "none"  # dotfiles/defaults.toml
 ```
 
 Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
@@ -204,8 +207,8 @@ def resolve(
   merged once); host extends host; cycle; unknown parent; a bare name found twice
   (ambiguous); a nested host by name and by path; unknown key at depth 1 and 2; wrong type incl. `bool` vs
   `int`; `extends` of wrong type; list replaced not appended; unknown host
-  = defaults; every rule of `Packaging.rules`; a key of its `either` with a
-  third type; the schema of the code, not of `--source`.
+  = defaults; every rule of `Packaging.rules`; a key of its `types` with a
+  third type; a key without default absent until a file sets it; the schema of the code, not of `--source`.
 - `--explain` names the right file for a value set in defaults, a profile
   and the host.
 - `uv run --isolated dotfiles check` passes on the real data.

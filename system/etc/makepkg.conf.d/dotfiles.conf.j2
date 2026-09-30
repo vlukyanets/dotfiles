@@ -5,9 +5,9 @@
 {% if jobs %}
 MAKEFLAGS="-j{{ jobs }}"
 {% endif %}
-{% if makepkg.packager %}
+{% if makepkg.packager is defined %}
 PACKAGER="{{ makepkg.packager }}"
 {% endif %}
-{% if makepkg.options %}
+{% if makepkg.options | default([]) %}
 OPTIONS+=({{ makepkg.options | join(" ") }})
 {% endif %}

@@ -24,11 +24,13 @@ class Checks(NamedTuple):
     """What the schema's types cannot say, from the code that reads the keys.
 
     RULES: dotted key -> (test, what it must be), checked on the merged config.
-    EITHER: dotted key -> the types it takes; the default's type is the first.
+    TYPES: dotted key -> the types it takes, where its default's type does not
+    say: a key of several types, the default's first, or one with no default,
+    in the resolved config only when a file sets it.
     """
 
     rules: dict[str, tuple]
-    either: dict[str, tuple[type, ...]]
+    types: dict[str, tuple[type, ...]]
 
 
 # The config's own rule, for the secrets table; the features' come from the entry points.
@@ -85,20 +87,20 @@ def _kind(value) -> str:
     return _KINDS.get(type(value), type(value).__name__)
 
 
-def _validate(data: dict, schema: dict, either: dict, where: str, prefix: str = "") -> None:
-    """Every key of DATA exists in SCHEMA at the same path, with its type or those in EITHER."""
+def _validate(data: dict, schema: dict, types: dict, where: str, prefix: str = "") -> None:
+    """Every key of DATA in SCHEMA at the same path or in TYPES, of the type they give it."""
     for key, value in data.items():
         dotted = prefix + key
-        if key not in schema:
+        if key not in schema and dotted not in types:
             raise ConfigError(f"{where}: {dotted}: unknown key")
-        want = schema[key]
-        types = either.get(dotted, (type(want),))
+        want = schema.get(key)
+        kinds = types.get(dotted, (type(want),))
         # type() rather than isinstance(): a bool is an int to isinstance.
-        if type(value) not in types:
-            must = " or ".join(_KINDS[t] for t in types)
+        if type(value) not in kinds:
+            must = " or ".join(_KINDS[t] for t in kinds)
             raise ConfigError(f"{where}: {dotted}: must be {must}, got {_kind(value)}")
         if isinstance(want, dict):
-            _validate(value, want, either, where, dotted + ".")
+            _validate(value, want, types, where, dotted + ".")
 
 
 def merge_over(want: dict, base: dict) -> dict:
@@ -170,7 +172,6 @@ def resolve_with_sources(
     come from the caller: entry points pass feature.checks().
     """
     schema = load(Layout(root).defaults, root)
-    either = checks.either
     config = schema
     sources = {key: Layout.DEFAULTS for key, _ in _leaves(schema)}
     if local is None:
@@ -182,7 +183,7 @@ def resolve_with_sources(
             f"no {shown(local)} — run dotfiles init <host>, or pass --source <checkout>"
         )
     for where, data in files:
-        _validate(data, schema, either, where)
+        _validate(data, schema, checks.types, where)
         config = merge_over(data, config)
         sources.update((key, where) for key, _ in _leaves(data))
     values = dict(_leaves(config))

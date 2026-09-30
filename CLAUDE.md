@@ -54,8 +54,8 @@ master and every PR; uv is pinned there by version and sha256.
 - Features: `platforms/<name>/features/<feature>.py`, one `Feature`
   subclass each, named after the module (`packaging` → `Packaging`), built
   with its table `features.<feature>` as `self.settings` and the platform
-  as `self.system`; checks the types cannot make are its `rules` and
-  `either`. It declares its packages (`packages()`, from the
+  as `self.system`; checks the types cannot make are its `rules`, the
+  types of keys without a default its `types`. It declares its packages (`packages()`, from the
   repositories), the ones they replace (`replaces()`) and the features it
   needs (`requires()`: enabled, or check fails; run first), then does the
   rest in `apply()`. The name gates it; the order comes from the package

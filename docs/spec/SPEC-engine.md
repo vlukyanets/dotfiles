@@ -322,7 +322,7 @@ class Docker(Feature):  # platforms/arch/features/docker.py
   (the nvidia driver, the languages).
 - What the schema's types cannot check about a feature's keys is its
   `rules` (key under `features.<name>` → `(test, what it must be)`), and a
-  key that takes two types is in its `either`. `feature.checks()` gathers
+  the types of a key with several or with no default are its `types`. `feature.checks()` gathers
   both from every feature of every platform (the schema is one) into a
   `config.Checks`, and the entry points (`cli`, `apply`) pass it to
   `config` as `checks=`: config never imports features. Without it only

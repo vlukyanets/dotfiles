@@ -31,7 +31,7 @@ package manager and the machine through it (`self.system.files.ensure(...)`,
 
 The schema is one for every platform: `features.<name>` in
 `dotfiles/defaults.toml`, and the checks the types cannot make are the
-`rules` and `either` of that name's classes, gathered from every platform
+`rules` and `types` of that name's classes, gathered from every platform
 by `feature.checks()` and passed to `config` by the entry points.
 
 A file a feature writes outside `$HOME` is a Jinja2 template under
@@ -56,22 +56,26 @@ options  = ["ccache", "!debug"]
 
 Arch only (`platforms/arch/features/packaging.py`), no packages, no
 requirements: `apply()` does it all. It has no `enabled`: every Arch
-machine has pacman, so it always runs there.
-Only drop-ins are written; the
-main files keep everything the drop-ins do not set. A setting left at its
-default writes nothing, so the main file's own value stays.
+machine has pacman, so it always runs there. Its keys have no default:
+the schema holds only the empty `pacman` and `makepkg` tables, and
+`Packaging.types` gives each key its type, so a key is in the resolved
+config only when a host or profile sets it. Only drop-ins are written, and
+only for what is set: with nothing set the feature touches nothing, and
+the main files keep everything the drop-ins do not set.
 
-- `/etc/pacman.conf.d/options.conf` (`root:root` 644), from its template:
-  `ParallelDownloads = N` when `parallel_downloads > 0`, then one line per
+- `/etc/pacman.conf.d/options.conf` (`root:root` 644) and its `Include`,
+  when `parallel_downloads` or `flags` is set, from its template:
+  `ParallelDownloads = N` when `parallel_downloads` is set, then one line per
   name in `flags`, the options pacman takes without a value (`Color`,
   `VerbosePkgLists`, `CheckSpace`, `ILoveCandy`, …): present means on.
 - pacman does not read `/etc/pacman.conf.d` on its own, so `pacman.conf`
   gets `Include = /etc/pacman.conf.d/options.conf`, before its first
   repository section: options after it would be ignored. That line and
   multilib's are the only edits to `pacman.conf`.
-- `/etc/pacman.conf.d/multilib.conf` (`root:root` 644) and its `Include`
-  line appended to `pacman.conf` are written either way, so the setting
-  follows `multilib` both ways: `true` puts `[multilib]` (`Include =
+- `multilib` not set: its drop-in, its `Include` and `pacman.conf`'s own
+  `[multilib]` are left as they are. Set, `/etc/pacman.conf.d/multilib.conf`
+  (`root:root` 644) and its `Include` line appended to `pacman.conf` are
+  written either way, so the setting follows `multilib` both ways: `true` puts `[multilib]` (`Include =
   /etc/pacman.d/mirrorlist`) in it, whatever `pacman.conf` says; `false`
   leaves it only its header, which takes the repository out again after a
   `true`. While multilib is on and `/var/lib/pacman/sync/multilib.db` does not exist:
@@ -81,22 +85,22 @@ default writes nothing, so the main file's own value stays.
   section out`): pacman refuses a second section of the same repository
   (`could not register 'multilib' database`). With `multilib = false`
   that section is `pacman.conf`'s own business.
-- `/etc/makepkg.conf.d/dotfiles.conf` (`root:root` 644), which makepkg
-  reads after `makepkg.conf`: `MAKEFLAGS="-jN"` when `jobs` is set,
+- `/etc/makepkg.conf.d/dotfiles.conf` (`root:root` 644), when any `makepkg`
+  key is set; makepkg reads it after `makepkg.conf`: `MAKEFLAGS="-jN"` when `jobs` is set,
   `PACKAGER="…"` when `packager` is, `OPTIONS+=(…)` when `options` is not
   empty.
 - `jobs` is an integer, the threads, or a string `"NN%"`, that share of
-  `os.cpu_count()` at the apply, at least 1; `0` leaves `makepkg.conf`'s.
+  `os.cpu_count()` at the apply, at least 1; not set leaves `makepkg.conf`'s.
 
 The config checks what a type cannot (`Packaging.rules`), so `dotfiles check`
-names the key: `parallel_downloads` and an integer `jobs` not below 0, a
-string `jobs` a positive percent, `packager` empty or `Name <email>`,
+names the key: `parallel_downloads` and an integer `jobs` at least 1, a
+string `jobs` a positive percent, `packager` `Name <email>`,
 `flags` from pacman's list of valueless options.
 
 ## Project Structure
 
 ```
-dotfiles/platforms/arch/features/packaging.py  Packaging: rules, either (jobs), drop-ins, multilib
+dotfiles/platforms/arch/features/packaging.py  Packaging: rules, types, drop-ins, multilib
 system/etc/pacman.conf.d/options.conf.j2       its templates
 system/etc/pacman.conf.d/multilib.conf.j2
 system/etc/makepkg.conf.d/dotfiles.conf.j2

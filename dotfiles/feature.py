@@ -18,8 +18,9 @@ class Feature:
 
     # What the schema's types cannot say, under features.<name>: key -> (test, what it must be).
     rules: ClassVar[dict[str, tuple]] = {}
-    # Keys that take either of several types; the default's type is the first.
-    either: ClassVar[dict[str, tuple[type, ...]]] = {}
+    # Keys and their types where no default says it: several types, the
+    # default's first, or none in the schema, so absent unless a file sets it.
+    types: ClassVar[dict[str, tuple[type, ...]]] = {}
 
     def __init__(self, settings: dict, system: OperatingSystem):
         """The feature with SETTINGS, its features.<name> of the resolved config, on SYSTEM."""
@@ -78,9 +79,9 @@ def every() -> list[tuple[str, type[Feature]]]:
 
 
 def checks() -> Checks:
-    """The rules and either of every feature, under features.<name>: what config checks."""
-    rules, either = {}, {}
+    """The rules and types of every feature, under features.<name>: what config checks."""
+    rules, types = {}, {}
     for name, cls in every():  # every platform's: the schema is theirs together
         rules |= {f"features.{name}.{key}": rule for key, rule in cls.rules.items()}
-        either |= {f"features.{name}.{key}": types for key, types in cls.either.items()}
-    return Checks(rules, either)
+        types |= {f"features.{name}.{key}": kinds for key, kinds in cls.types.items()}
+    return Checks(rules, types)

@@ -48,28 +48,28 @@ def settings(name: str) -> list[str]:
 PACMAN_CONF = "[options]\nParallelDownloads = 5\n\n[core]\nInclude = /etc/pacman.d/mirrorlist\n"
 
 
-def test_packaging_by_default_writes_only_the_includes(machine, capsys):
+def test_packaging_with_nothing_set_touches_nothing(machine, capsys):
     conf = write("/etc/pacman.conf", PACMAN_CONF)
     apply("packaging")
-    assert settings("/etc/pacman.conf.d/options.conf") == []
-    assert settings("/etc/makepkg.conf.d/dotfiles.conf") == []
-    # Options after the first repository section would be ignored.
-    assert settings("/etc/pacman.conf.d/multilib.conf") == []
-    assert (
-        conf.read_text()
-        == PACMAN_CONF.replace("[core]", "Include = /etc/pacman.conf.d/options.conf\n[core]")
-        + "Include = /etc/pacman.conf.d/multilib.conf\n"
-    )
-    assert capsys.readouterr().out == (
-        "-> /etc/pacman.conf.d/options.conf (missing)\n"
-        "-> /etc/pacman.conf (content differs)\n"
-        "-> /etc/pacman.conf.d/multilib.conf (missing)\n"
-        "-> /etc/pacman.conf (content differs)\n"
-        "-> /etc/makepkg.conf.d/dotfiles.conf (missing)\n"
-    )
-    apply("packaging")
+    assert conf.read_text() == PACMAN_CONF
+    assert not engine.current().files.path("/etc/pacman.conf.d").exists()
+    assert not engine.current().files.path("/etc/makepkg.conf.d").exists()
     assert capsys.readouterr().out == ""
-    assert not [c for c in machine.calls if c[0] == "pacman"]
+    assert machine.calls == []
+
+
+def test_packaging_writes_only_the_drop_ins_of_what_is_set(machine, capsys):
+    conf = write("/etc/pacman.conf", PACMAN_CONF)
+    apply("packaging", defaults(packaging={"pacman": {"flags": ["Color"]}}))
+    assert settings("/etc/pacman.conf.d/options.conf") == ["Color"]
+    # Options after the first repository section would be ignored.
+    assert conf.read_text() == PACMAN_CONF.replace(
+        "[core]", "Include = /etc/pacman.conf.d/options.conf\n[core]"
+    )
+    assert not engine.current().files.path("/etc/pacman.conf.d/multilib.conf").exists()
+    assert not engine.current().files.path("/etc/makepkg.conf.d").exists()
+    apply("packaging", defaults(packaging={"makepkg": {"jobs": 4}}))
+    assert settings("/etc/makepkg.conf.d/dotfiles.conf") == ['MAKEFLAGS="-j4"']
 
 
 def test_packaging_writes_what_is_set(machine, monkeypatch):
@@ -90,7 +90,7 @@ def test_packaging_writes_what_is_set(machine, monkeypatch):
     ]
 
 
-@pytest.mark.parametrize(("value", "threads"), [(0, 0), (4, 4), ("50%", 8), ("1%", 1)])
+@pytest.mark.parametrize(("value", "threads"), [(4, 4), ("50%", 8), ("1%", 1)])
 def test_jobs(monkeypatch, value, threads):
     monkeypatch.setattr(os, "cpu_count", lambda: 16)
     assert _jobs(value) == threads  # a percent never below one thread
@@ -112,7 +112,10 @@ def test_packaging_multilib(machine, capsys):
     write("/var/lib/pacman/sync/multilib.db", "")
     apply("packaging", cfg)
     assert capsys.readouterr().out == ""
-    apply("packaging")  # off again: the repository goes, the Include stays
+    apply("packaging")  # not set: left as it is
+    assert capsys.readouterr().out == ""
+    apply("packaging", defaults(packaging={"pacman": {"multilib": False}}))
+    # Off: the repository goes, the Include stays.
     assert settings("/etc/pacman.conf.d/multilib.conf") == []
     assert conf.read_text().endswith("\nInclude = /etc/pacman.conf.d/multilib.conf\n")
     assert capsys.readouterr().out == "-> /etc/pacman.conf.d/multilib.conf (content differs)\n"

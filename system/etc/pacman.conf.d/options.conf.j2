@@ -2,9 +2,9 @@
 # system/etc/pacman.conf.d/options.conf.j2 in the repo, not this file.
 # Included from the [options] section of /etc/pacman.conf; what is not set
 # here keeps the value pacman.conf gives it.
-{% if pacman.parallel_downloads %}
+{% if pacman.parallel_downloads is defined %}
 ParallelDownloads = {{ pacman.parallel_downloads }}
 {% endif %}
-{% for flag in pacman.flags %}
+{% for flag in pacman.flags | default([]) %}
 {{ flag }}
 {% endfor %}

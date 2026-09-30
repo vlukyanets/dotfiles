@@ -105,17 +105,31 @@ def test_values_the_type_cannot_check(tmp_path, makepkg, error):
     assert str(e.value) == error
 
 
+def test_a_key_without_default_is_there_only_when_set(tmp_path):
+    write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
+    write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = true\n")
+    cfg = resolve("h", tmp_path, checks=feature.checks())
+    assert cfg["features"]["packaging"] == {"pacman": {"multilib": True}, "makepkg": {}}
+    write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = 1\n")
+    with pytest.raises(ConfigError, match=r"multilib: must be boolean, got integer$"):
+        resolve("h", tmp_path, checks=feature.checks())
+    write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nnope = 1\n")
+    with pytest.raises(ConfigError, match=r"pacman\.nope: unknown key$"):
+        resolve("h", tmp_path, checks=feature.checks())
+
+
 @pytest.mark.parametrize(
     ("key", "value", "good"),
     [
-        ("features.packaging.makepkg.jobs", 0, True),
+        ("features.packaging.makepkg.jobs", 0, False),
         ("features.packaging.makepkg.jobs", 8, True),
         ("features.packaging.makepkg.jobs", "150%", True),
-        ("features.packaging.makepkg.packager", "", True),
+        ("features.packaging.makepkg.packager", "", False),
         ("features.packaging.makepkg.packager", "Ann Lee <ann@lee.org>", True),
         ("features.packaging.pacman.flags", ["Color", "VerbosePkgLists"], True),
         ("features.packaging.pacman.flags", ["Colour"], False),
-        ("features.packaging.pacman.parallel_downloads", -1, False),
+        ("features.packaging.pacman.parallel_downloads", 0, False),
+        ("features.packaging.pacman.parallel_downloads", 1, True),
     ],
 )
 def test_rules(key, value, good):
@@ -258,7 +272,7 @@ def test_check_reports_every_broken_host(root):
 
 
 def test_check_real_data():
-    assert not any(check().values())
+    assert not any(check(checks=feature.checks()).values())
 
 
 def test_explain_names_the_file_of_each_value(root):
