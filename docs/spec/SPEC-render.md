@@ -39,7 +39,7 @@ comes back with the first template that needs it).
 | a file an application also rewrites | an ordinary `.j2` that reads `current` (the file as it is in `$HOME`) |
 | the home directory, the user id | `home`, `uid` |
 | a template error | `{{ fail("…") }}` (a global that raises) |
-| TOML in and out, deep merge, regex | filters `from_toml`, `to_toml`, `merge_over`, `regex_search` |
+| TOML in and out, deep merge, regex, a quoted string | filters `from_toml`, `to_toml`, `merge_over`, `regex_search`, `quote` (valid TOML and JSON) |
 
 ## The manifest: `home.toml`
 
@@ -48,11 +48,12 @@ needs a mode or a gate. Paths not listed: files 0644, directories 0755,
 always deployed.
 
 ```toml
+[".config/rbw"]
+when = "secrets.backend == 'rbw'"
+
 [".ssh"]
 mode = "700"
 
-[".config/rbw"]
-when = "secrets.backend == 'rbw'"
 ```
 
 - `when` is a Jinja2 expression over the same context as the templates;
@@ -63,7 +64,7 @@ when = "secrets.backend == 'rbw'"
 ## Template context
 
 ```
-features, git, secrets         the resolved config (config.resolve)
+features, git, secrets        the resolved config (config.resolve)
 host                           the host name
 home, uid                      target home directory and user id
 current                        the target file's current text, "" if absent
@@ -78,17 +79,11 @@ template and host), `keep_trailing_newline=True`, `trim_blocks=True`,
 
 ## Merged files
 
-The two files an application rewrites itself stay templates; they read
-`current` and merge:
-
-- `.local/state/noctalia/settings.toml.j2`:
-  `{{ want | merge_over(current | from_toml) | to_toml }}`. Desired keys win,
-  every other key noctalia wrote passes through.
-- `.config/fcitx5/profile.j2`: DefaultIM carried over from `current` when
-  it is still one of the listed input methods.
-
-`to_toml` is tomli-w: the first deploy rewrites noctalia's file into
-tomli-w's layout once; from then on it is stable.
+A file an application rewrites itself stays a template that reads
+`current` and merges: `{{ want | merge_over(current | from_toml) | to_toml }}`
+keeps every key the application wrote, and the desired ones win. `to_toml`
+is tomli-w: the first deploy rewrites the file into tomli-w's layout once;
+from then on it is stable. No file under `home/` needs it at the moment.
 
 ## Deploy
 
@@ -96,8 +91,9 @@ For each rendered path, in order:
 
 1. Directory missing → create with its mode. Existing directory with
    another mode, listed in `home.toml` → chmod.
-2. File missing, content differs, or mode differs → write to a temp file
-   in the same directory, chmod, `os.replace`. One line:
+2. File missing, content differs, or mode differs (`engine.differs`, the
+   comparison `files.ensure` makes) → write to a temp file in the same
+   directory, chmod, `os.replace`. One line:
    `-> ~/.zshrc (content differs)` / `(missing)` / `(mode 644)`.
 3. Otherwise nothing.
 
@@ -114,7 +110,7 @@ uv run --exact dotfiles render --host hyper-lin --out /tmp/home-hyper-lin
 uv run --exact dotfiles render --host hyper-lin --out DIR --current ~   # with merges from the real files
 uv run --exact dotfiles deploy --dry-run
 uv run --exact dotfiles deploy
-uv run --isolated dotfiles check        # now also renders every host into a temp dir
+uv run --isolated dotfiles check        # apply.check: also renders every host into a temp dir
 ```
 
 ## System templates: `system/`
@@ -124,7 +120,7 @@ A file a feature writes outside `$HOME` is a template at its path from
 `/etc/makepkg.conf.d/dotfiles.conf`. `render.template(dst, **context)`
 renders it with the same environment and filters as `home/`, with only
 the context the feature passes; an error names `system/<path>:<line>`.
-The feature writes the text through `engine.ensure_file`, so the check,
+The feature writes the text through `files.ensure`, so the check,
 the dry run and root stay the engine's.
 
 ## Project Structure
@@ -135,12 +131,19 @@ home.toml              modes and gates
 system/                templates of the files features write outside $HOME
 dotfiles/render.py     context, Jinja2 env and filters, render(), deploy()
 tests/test_render.py   fixture trees in tmp_path; deploy against the tmp HOME
+tests/test_home.py     the real home/ rendered for every host
 ```
 
 ## Code Style
 
 ```python
-def render(host: str, out: Path, root: Path = ROOT, current: Path | None = None) -> list[Path]:
+def render(
+    host: str,
+    out: Path,
+    root: Path = Layout.root,
+    current: Path | None = None,
+    cfg: dict | None = None,
+) -> list[str]:
     """Write HOST's home tree into OUT; returns the paths written, relative."""
 ```
 
@@ -153,13 +156,14 @@ the message, comments on why.
   dropped; mode 600/755/700; gate on a file and on a directory, on and off;
   undefined variable → error naming template and host; `fail()`; unknown
   `home.toml` entry; filters.
-- Merges: noctalia with a captured settings file (unknown keys kept,
-  desired keys win, missing file); fcitx5 DefaultIM kept / reset.
+- Merges: `current` reaches the templates; `merge_over` and `from_toml`
+  (unknown keys kept, desired keys win); an invalid current file names the
+  template.
 - Deploy (tmp `HOME` from `conftest.py`): first run writes and reports,
   second run changes nothing; mode drift fixed; `--dry-run` writes nothing; symlink
   escaping `$HOME` refused.
 - Real data: `check` renders hyper-lin, echo-server and an unknown host;
-  tests pin what the templates with logic (loops, gates, registries)
+  tests pin what the templates with logic (loops, gates)
   produce for the real hosts.
 
 ## Boundaries

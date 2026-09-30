@@ -1,19 +1,18 @@
-import importlib
 import os
 import tomllib
 
 import pytest
 
 from dotfiles import engine
-from dotfiles.config import ROOT
-from dotfiles.features.packaging import jobs
-from dotfiles.platforms import discovery
-from dotfiles.platforms.arch import Arch
+from dotfiles.feature import classes
+from dotfiles.layout import Layout
+from dotfiles.platforms.arch import ArchLinuxOs
+from dotfiles.platforms.arch.features.packaging import _jobs
 
 
 def defaults(**features) -> dict:
     """The schema's config with FEATURES' settings changed, tables merged."""
-    cfg = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())
+    cfg = tomllib.loads(Layout().defaults.read_text())
     for name, settings in features.items():
         for key, value in settings.items():
             table = cfg["features"][name]
@@ -24,21 +23,14 @@ def defaults(**features) -> dict:
     return cfg
 
 
-def feature(name: str, cfg: dict | None = None):
-    """Feature NAME and its Arch strategy."""
-    cfg = cfg or defaults()
-    module = importlib.import_module(f"dotfiles.features.{name}")
-    instance = discovery.classes(module)[-1](cfg)
-    return instance, instance.strategy(Arch(cfg))
-
-
 def apply(name: str, cfg: dict | None = None) -> None:
-    instance, strategy = feature(name, cfg)
-    instance.apply(strategy)
+    """Arch's feature NAME applied with CFG."""
+    cfg = cfg or defaults()
+    classes(ArchLinuxOs)[name](cfg["features"][name], ArchLinuxOs(engine.current())).apply()
 
 
 def write(name: str, text: str):
-    real = engine.path(name)
+    real = engine.current().files.path(name)
     real.parent.mkdir(parents=True, exist_ok=True)
     real.write_text(text)
     return real
@@ -46,7 +38,11 @@ def write(name: str, text: str):
 
 def settings(name: str) -> list[str]:
     """The lines of NAME under SYSROOT that are not comments."""
-    return [line for line in engine.path(name).read_text().splitlines() if line[:1] != "#"]
+    return [
+        line
+        for line in engine.current().files.path(name).read_text().splitlines()
+        if line[:1] != "#"
+    ]
 
 
 PACMAN_CONF = "[options]\nParallelDownloads = 5\n\n[core]\nInclude = /etc/pacman.d/mirrorlist\n"
@@ -58,12 +54,16 @@ def test_packaging_by_default_writes_only_the_includes(machine, capsys):
     assert settings("/etc/pacman.conf.d/options.conf") == []
     assert settings("/etc/makepkg.conf.d/dotfiles.conf") == []
     # Options after the first repository section would be ignored.
-    assert conf.read_text() == PACMAN_CONF.replace(
-        "[core]", "Include = /etc/pacman.conf.d/options.conf\n[core]"
+    assert settings("/etc/pacman.conf.d/multilib.conf") == []
+    assert (
+        conf.read_text()
+        == PACMAN_CONF.replace("[core]", "Include = /etc/pacman.conf.d/options.conf\n[core]")
+        + "Include = /etc/pacman.conf.d/multilib.conf\n"
     )
-    assert not engine.path("/etc/pacman.conf.d/multilib.conf").exists()
     assert capsys.readouterr().out == (
         "-> /etc/pacman.conf.d/options.conf (missing)\n"
+        "-> /etc/pacman.conf (content differs)\n"
+        "-> /etc/pacman.conf.d/multilib.conf (missing)\n"
         "-> /etc/pacman.conf (content differs)\n"
         "-> /etc/makepkg.conf.d/dotfiles.conf (missing)\n"
     )
@@ -93,7 +93,7 @@ def test_packaging_writes_what_is_set(machine, monkeypatch):
 @pytest.mark.parametrize(("value", "threads"), [(0, 0), (4, 4), ("50%", 8), ("1%", 1)])
 def test_jobs(monkeypatch, value, threads):
     monkeypatch.setattr(os, "cpu_count", lambda: 16)
-    assert jobs(value) == threads  # a percent never below one thread
+    assert _jobs(value) == threads  # a percent never below one thread
 
 
 def test_packaging_multilib(machine, capsys):
@@ -106,11 +106,16 @@ def test_packaging_multilib(machine, capsys):
         "Include = /etc/pacman.d/mirrorlist",
     ]
     # -Syu, not -Sy: -Sy then -S is a partial upgrade.
-    assert ["pacman", "-Syu", "--noconfirm"] in machine.calls
+    assert ["pacman", "-Syuw", "--noconfirm"] in machine.calls
+    assert ["pacman", "-Su", "--noconfirm"] in machine.calls
     assert "-> multilib database synced (pacman -Syu)\n" in capsys.readouterr().out
     write("/var/lib/pacman/sync/multilib.db", "")
     apply("packaging", cfg)
     assert capsys.readouterr().out == ""
+    apply("packaging")  # off again: the repository goes, the Include stays
+    assert settings("/etc/pacman.conf.d/multilib.conf") == []
+    assert conf.read_text().endswith("\nInclude = /etc/pacman.conf.d/multilib.conf\n")
+    assert capsys.readouterr().out == "-> /etc/pacman.conf.d/multilib.conf (content differs)\n"
 
 
 def test_packaging_multilib_of_pacman_conf_fails_before_any_change(machine):
@@ -121,14 +126,14 @@ def test_packaging_multilib_of_pacman_conf_fails_before_any_change(machine):
     ):
         apply("packaging", defaults(packaging={"pacman": {"multilib": True}}))
     assert conf.read_text() == PACMAN_CONF + multilib
-    assert not engine.path("/etc/pacman.conf.d").exists()
+    assert not engine.current().files.path("/etc/pacman.conf.d").exists()
     assert machine.calls == []
 
 
 def test_packaging_multilib_commented_out_or_off(machine):
     write("/etc/pacman.conf", PACMAN_CONF + "\n#[multilib]\n#Include = /etc/pacman.d/mirrorlist\n")
     apply("packaging", defaults(packaging={"pacman": {"multilib": True}}))
-    assert engine.path("/etc/pacman.conf.d/multilib.conf").exists()
+    assert engine.current().files.path("/etc/pacman.conf.d/multilib.conf").exists()
     # Off: a [multilib] of pacman.conf is its own business.
     write("/etc/pacman.conf", PACMAN_CONF + "\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n")
     apply("packaging")

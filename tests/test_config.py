@@ -4,11 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from dotfiles import feature
 from dotfiles.config import (
-    DEFAULTS,
-    ROOT,
-    RULES,
-    ConfigError,
     chain,
     check,
     explain,
@@ -16,6 +13,8 @@ from dotfiles.config import (
     resolve,
     resolve_with_sources,
 )
+from dotfiles.errors import ConfigError
+from dotfiles.layout import Layout
 
 
 def write(root: Path, rel: str, text: str) -> None:
@@ -41,7 +40,7 @@ def test_broken_toml_names_file(root):
 
 
 def test_real_defaults_parse():
-    with (ROOT / "dotfiles/defaults.toml").open("rb") as f:
+    with Layout().defaults.open("rb") as f:
         assert resolve("unknown-host") == tomllib.load(f)
 
 
@@ -98,10 +97,10 @@ def test_arrays_are_replaced(root):
     ],
 )  # fmt: skip
 def test_values_the_type_cannot_check(tmp_path, makepkg, error):
-    write(tmp_path, "dotfiles/defaults.toml", (ROOT / "dotfiles/defaults.toml").read_text())
+    write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
     write(tmp_path, "hosts/h.toml", f"[features.packaging.makepkg]\n{makepkg}\n")
     with pytest.raises(ConfigError) as e:
-        resolve("h", tmp_path)
+        resolve("h", tmp_path, checks=feature.checks())
     assert str(e.value) == error
 
 
@@ -119,7 +118,9 @@ def test_values_the_type_cannot_check(tmp_path, makepkg, error):
     ],
 )
 def test_rules(key, value, good):
-    assert bool(RULES[key][0](value)) is good
+    from dotfiles.platforms.arch.features.packaging import Packaging
+
+    assert bool(Packaging.rules[key.removeprefix("features.packaging.")][0](value)) is good
 
 
 def test_secrets_backend_is_checked(root):
@@ -127,6 +128,13 @@ def test_secrets_backend_is_checked(root):
     write(root, "hosts/h.toml", '[secrets]\nbackend = "pass"\n')
     with pytest.raises(ConfigError, match="^h: secrets.backend: must be one of none, rbw"):
         resolve("h", root)
+
+
+def test_the_schema_comes_from_the_code_not_the_source(root):
+    source = root / "old-checkout"
+    write(source, "dotfiles/defaults.toml", "[features]\na = false\n")  # older: no b yet
+    write(source, "hosts/h.toml", "[features]\na = true\n")
+    assert resolve("h", root, source=source) == {"features": {"a": True, "b": False}}
 
 
 def test_host_extends_profile_and_overrides_it(root):
@@ -196,12 +204,12 @@ def test_bad_inheritance(root, files, error):
 
 
 def test_real_profiles():
-    assert [w for w, _ in chain("hyper-lin", ROOT)] == [
+    assert [w for w, _ in chain("hyper-lin", Layout.root)] == [
         "profiles/base.toml",
         "profiles/laptop.toml",
         "hosts/hyper-lin.toml",
     ]
-    assert [w for w, _ in chain("echo-server", ROOT)] == [
+    assert [w for w, _ in chain("echo-server", Layout.root)] == [
         "profiles/base.toml",
         "profiles/server.toml",
         "hosts/echo-server.toml",
@@ -277,7 +285,7 @@ def test_local_config_replaces_the_hosts_chain(root, tmp_path):
     # hosts/h.toml is not read; the key the file lacks gets its default.
     got, sources = resolve_with_sources("h", root, tmp_path / "config.toml")
     assert got == {"features": {"a": True, "b": False}}
-    assert sources == {"features.a": str(tmp_path / "config.toml"), "features.b": DEFAULTS}
+    assert sources == {"features.a": str(tmp_path / "config.toml"), "features.b": Layout.DEFAULTS}
 
 
 @pytest.mark.parametrize(

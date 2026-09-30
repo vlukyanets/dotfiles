@@ -1,49 +1,65 @@
-"""Finding classes in modules: this machine's platform, every platform."""
+"""Finding classes in modules by name: this machine's platform, every platform.
+
+A platform is a package, `platforms/<name>/`, holding its OperatingSystem
+subclass (`ArchLinuxOs`, with the os-release `id` it runs on) and its
+`features/`; `linux/` holds `LinuxOs`, the base the others fall back to.
+"""
 
 import importlib
-import importlib.util
 import pkgutil
 import platform
 from inspect import isabstract
 
-from dotfiles.config import ConfigError
-from dotfiles.platforms.operating_system import Platform
-
-PACKAGE = "dotfiles.platforms"
-
-
-def classes(module) -> list[type]:
-    """The classes MODULE itself defines, in the order it defines them."""
-    return [
-        value
-        for value in vars(module).values()
-        if isinstance(value, type) and value.__module__ == module.__name__
-    ]
+from dotfiles.engine import Machine
+from dotfiles.errors import ConfigError
+from dotfiles.platforms.operating_system import OperatingSystem
 
 
-def detect(cfg: dict, package: str = PACKAGE) -> Platform:
-    """This machine's platform, from os-release ID then ID_LIKE."""
+def _class_name(name: str) -> str:
+    """The class a module NAME holds: packaging -> Packaging, nvidia_driver -> NvidiaDriver."""
+    return name.title().replace("_", "")
+
+
+def named(module, name: str, base: type, what: str) -> type:
+    """The BASE class of MODULE named after NAME; WHAT names it in the error."""
+    found = getattr(module, _class_name(name), None)
+    if not (isinstance(found, type) and issubclass(found, base)):
+        raise ConfigError(f"{module.__name__}: no {what} class {_class_name(name)}")
+    return found
+
+
+def detect(machine: Machine) -> OperatingSystem:
+    """This machine's platform on MACHINE: the one whose id is os-release's ID, else ID_LIKE's."""
     try:
         release = platform.freedesktop_os_release()
     except OSError:
         release = {}
     ids = [release.get("ID", ""), *release.get("ID_LIKE", "").split()]
+    known = {cls.id: cls for cls in platforms()}
     for id in filter(None, ids):
-        name = f"{package}.{id.replace('-', '_')}"
-        if importlib.util.find_spec(name) is None:
-            continue
-        module = importlib.import_module(name)
-        found = [c for c in classes(module) if issubclass(c, Platform)]
-        if len(found) != 1:
-            raise ConfigError(f"{name}: defines {len(found)} platforms, not one")
-        return found[0](cfg)
+        if id in known:
+            return known[id](machine)
     raise ConfigError(f"no platform for {' or '.join(filter(None, ids)) or 'this system'}")
 
 
-def every(cfg: dict, package: str = PACKAGE) -> list[Platform]:
-    """An instance of every concrete platform, for checks that cover them all."""
-    found = []
-    for info in sorted(pkgutil.iter_modules(importlib.import_module(package).__path__)):
-        module = importlib.import_module(f"{package}.{info.name}")
-        found += [c(cfg) for c in classes(module) if issubclass(c, Platform) and not isabstract(c)]
-    return found
+def _descendants(cls: type) -> list[type]:
+    """Every subclass of CLS, at any depth."""
+    return [c for sub in cls.__subclasses__() for c in (sub, *_descendants(sub))]
+
+
+def platforms() -> list[type[OperatingSystem]]:
+    """Every concrete platform under platforms/, by name: ArchLinuxOs; LinuxOs, a base, is none."""
+    for info in pkgutil.iter_modules(importlib.import_module(__package__).__path__):
+        if info.ispkg:
+            importlib.import_module(f"{__package__}.{info.name}")
+    found = {
+        cls
+        for cls in _descendants(OperatingSystem)
+        if cls.__module__.startswith(f"{__package__}.") and not isabstract(cls)
+    }
+    return sorted(found, key=lambda cls: cls.__name__)
+
+
+def every(machine: Machine) -> list[OperatingSystem]:
+    """An instance of every concrete platform on MACHINE, for checks that cover them all."""
+    return [cls(machine) for cls in platforms()]

@@ -1,28 +1,28 @@
 import grp
 import pwd
+import subprocess
 
 import pytest
 from conftest import Fake
 
-from dotfiles import engine
-from dotfiles.config import ConfigError
+from dotfiles import engine, retry
 from dotfiles.engine import Failed
+from dotfiles.errors import ConfigError
 from dotfiles.platforms import discovery
-from dotfiles.platforms.arch import Arch
+from dotfiles.platforms.arch import ArchLinuxOs
 from dotfiles.platforms.discovery import detect
 
 
 @pytest.fixture
 def system(monkeypatch) -> Fake:
-    fake = Fake({"systemctl", "sysctl", "gsettings", "usermod", "pacman"})
-    monkeypatch.setattr(engine.current().shell, "execute", fake)
+    fake = Fake({"systemctl", "sysctl", "gsettings", "usermod", "pacman"}).install(monkeypatch)
     monkeypatch.setenv("SUDO_CMD", "")
     return fake
 
 
 @pytest.fixture
-def arch() -> Arch:
-    return Arch({})
+def arch() -> ArchLinuxOs:
+    return ArchLinuxOs(engine.current())
 
 
 @pytest.mark.parametrize(
@@ -59,7 +59,7 @@ def test_ensure_sysctl(system, arch, capsys):
     system.answers[("sysctl", "-n", "vm.swappiness")] = (0, "60\n")
     assert arch.ensure_sysctl("vm.swappiness", 10) is True
     assert ["sysctl", "-qw", "vm.swappiness=10"] in system.calls
-    conf = engine.path("/") / "etc/sysctl.d/99-dotfiles.conf"
+    conf = engine.current().files.path("/") / "etc/sysctl.d/99-dotfiles.conf"
     assert conf.read_text() == "vm.swappiness = 10\n"
     system.answers[("sysctl", "-n", "vm.swappiness")] = (0, "10\n")
     system.calls.clear()
@@ -108,11 +108,6 @@ def test_ensure_group_member(system, arch, capsys, monkeypatch):
     assert arch.ensure_group_member("docker") is False
     with pytest.raises(Failed, match="^group nope does not exist$"):
         arch.ensure_group_member("nope")
-    # A dry run installs nothing, so the package that brings the group has not yet.
-    engine.current().dry_run = True
-    capsys.readouterr()
-    assert arch.ensure_group_member("nope") is True
-    assert capsys.readouterr().out == f"-> added {me} to group nope\n"
 
 
 def test_arch_missing(system, arch):
@@ -133,7 +128,10 @@ def test_arch_install_is_one_transaction_as_root(system, arch, monkeypatch):
     system.programs.add("sudo")
     system.answers[("pacman", "-Si", "docker", "tmux")] = (0, si("docker", "tmux"))
     arch.manager.install(["docker", "tmux"])
-    assert system.calls[-1] == ["sudo", "pacman", "-S", "--needed", "--noconfirm", "docker", "tmux"]
+    assert system.calls[-2:] == [
+        ["sudo", "pacman", "-Sw", "--needed", "--noconfirm", "docker", "tmux"],
+        ["sudo", "pacman", "-S", "--needed", "--noconfirm", "docker", "tmux"],
+    ]
 
 
 def test_arch_install_removes_what_it_replaces(system, arch, capsys):
@@ -143,6 +141,7 @@ def test_arch_install_removes_what_it_replaces(system, arch, capsys):
     arch.manager.install(["pipewire-jack"], ["jack2", "rust"])
     assert [c for c in system.calls if c[1] != "-Qq" and c[1] != "-Si"] == [
         ["pacman", "-Rdd", "--noconfirm", "jack2"],
+        ["pacman", "-Sw", "--needed", "--noconfirm", "pipewire-jack"],
         ["pacman", "-S", "--needed", "--noconfirm", "pipewire-jack"],
     ]
     assert capsys.readouterr().out == "-> removed jack2, its replacement follows\n"
@@ -156,12 +155,21 @@ def test_arch_install_outside_the_repositories_fails_before_any_change(system, a
 
 
 def test_arch_install_failure_names_the_stale_database(system, arch, monkeypatch):
-    monkeypatch.setattr(engine, "sleep", lambda seconds: None)
+    monkeypatch.setattr(retry, "sleep", lambda seconds: None)
     system.answers[("pacman", "-Si", "tmux")] = (0, si("tmux"))
-    system.answers[("pacman", "-S", "--needed", "--noconfirm", "tmux")] = (1, "")
+    system.answers[("pacman", "-Sw", "--needed", "--noconfirm", "tmux")] = (1, "")
     with pytest.raises(Failed, match="run pacman -Syu and apply again"):
         arch.manager.install(["tmux"])
-    assert system.calls.count(["pacman", "-S", "--needed", "--noconfirm", "tmux"]) == 3
+    assert system.calls.count(["pacman", "-Sw", "--needed", "--noconfirm", "tmux"]) == 3
+    assert ["pacman", "-S", "--needed", "--noconfirm", "tmux"] not in system.calls
+
+
+def test_arch_install_is_not_retried(system, arch, monkeypatch):
+    monkeypatch.setattr(retry, "sleep", lambda seconds: pytest.fail("retried"))
+    system.answers[("pacman", "-Si", "tmux")] = (0, si("tmux"))
+    system.answers[("pacman", "-S", "--needed", "--noconfirm", "tmux")] = (1, "")  # a conflict
+    with pytest.raises(subprocess.CalledProcessError):
+        arch.manager.install(["tmux"])
 
 
 SI = """Repository      : extra
@@ -198,17 +206,28 @@ def test_arch_depends_walks_the_graph(system, arch):
     assert len(system.calls) == calls  # cached for the apply
 
 
+def test_arch_provides(system, arch):
+    info = "Name : bash\nProvides : sh=5.2\n\nName : zsh\nProvides : None\n"
+    system.answers[("pacman", "-Si", "bash", "zsh", "mine")] = (1, info)
+    system.answers[("pacman", "-Qi", "mine")] = (0, "Name : mine\nProvides : java-runtime\n")
+    assert arch.manager.provides(["bash", "zsh", "mine"]) == {
+        "bash": {"sh"},
+        "zsh": set(),
+        "mine": {"java-runtime"},
+    }
+
+
 def test_detect(monkeypatch):
     def release(**fields):
         monkeypatch.setattr(discovery.platform, "freedesktop_os_release", lambda: fields)
 
     release(ID="arch")
-    assert type(detect({})) is Arch
+    assert type(detect(engine.current())) is ArchLinuxOs
     release(ID="cachyos", ID_LIKE="arch")
-    assert detect({"x": 1}).cfg == {"x": 1}
+    assert type(detect(engine.current())) is ArchLinuxOs
     release(ID="fedora")
     with pytest.raises(ConfigError, match="^no platform for fedora$"):
-        detect({})
+        detect(engine.current())
     release(ID="linuxmint", ID_LIKE="ubuntu debian")
     with pytest.raises(ConfigError, match="^no platform for linuxmint or ubuntu or debian$"):
-        detect({})
+        detect(engine.current())

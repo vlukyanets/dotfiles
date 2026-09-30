@@ -54,12 +54,20 @@ class Fake:
             raise subprocess.CalledProcessError(rc, argv)
         return subprocess.CompletedProcess(argv, rc, out, "")
 
+    def root(self, sudo, argv, **kwargs):
+        """Shell.root: the command with its sudo prefix, like any other."""
+        return self([*sudo, *argv], **kwargs)
+
+    def install(self, monkeypatch):
+        """Every command of the current machine's shell through this fake."""
+        monkeypatch.setattr(engine.current().shell, "execute", self)
+        monkeypatch.setattr(engine.current().shell, "root", self.root)
+        return self
+
 
 @pytest.fixture
 def fake(monkeypatch) -> Fake:
-    fake = Fake()
-    monkeypatch.setattr(engine.current().shell, "execute", fake)
-    return fake
+    return Fake().install(monkeypatch)
 
 
 class AsRoot(Fake):
@@ -81,8 +89,7 @@ class AsRoot(Fake):
 @pytest.fixture
 def machine(monkeypatch) -> AsRoot:
     """Every command faked, root's files written under SYSROOT, no sudo prefix."""
-    fake = AsRoot()
-    monkeypatch.setattr(engine.current().shell, "execute", fake)
+    fake = AsRoot().install(monkeypatch)
     monkeypatch.setattr(engine, "_owner", lambda path: "root:root")
     monkeypatch.setenv("SUDO_CMD", "")
     return fake

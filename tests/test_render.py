@@ -3,8 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from dotfiles.config import ROOT, ConfigError
-from dotfiles.render import check, deploy, render, template
+from dotfiles.apply import check
+from dotfiles.errors import ConfigError
+from dotfiles.layout import Layout
+from dotfiles.render import deploy, render, template
 
 
 def write(root: Path, rel: str, text: str) -> None:
@@ -144,9 +146,9 @@ def test_check_renders_every_host(root):
 
 def test_check_names_a_value_the_type_allows(tmp_path):
     for sub in ("hosts", "profiles"):
-        shutil.copytree(ROOT / sub, tmp_path / sub)
+        shutil.copytree(Layout.root / sub, tmp_path / sub)
     (tmp_path / "dotfiles").mkdir()
-    shutil.copy(ROOT / "dotfiles/defaults.toml", tmp_path / "dotfiles")
+    shutil.copy(Layout().defaults, tmp_path / "dotfiles")
     (tmp_path / "hosts/solo.toml").write_text('[features.packaging.makepkg]\njobs = "fast"\n')
     assert check(source=tmp_path)["solo"] == (
         "solo: features.packaging.makepkg.jobs: must be a number of threads, "
@@ -169,7 +171,8 @@ def test_quote_and_inline_if(root, tmp_path):
 
 
 def test_merge_filters():
-    from dotfiles.render import merge_over, regex_search
+    from dotfiles.config import merge_over
+    from dotfiles.render import regex_search
 
     assert merge_over({"a": {"x": 1}, "b": 2}, {"a": {"x": 0, "y": 0}, "c": 3}) == {
         "a": {"x": 1, "y": 0},

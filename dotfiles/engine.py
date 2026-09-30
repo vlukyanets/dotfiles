@@ -1,17 +1,18 @@
+import atexit
 import grp
 import os
 import pwd
 import re
 import shlex
+import socket
 import stat
 import subprocess
 import sys
 import tempfile
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from contextvars import ContextVar
-from dataclasses import dataclass
+from multiprocessing.connection import Connection
 from pathlib import Path
-from time import sleep
 
 
 class Failed(Exception):
@@ -77,10 +78,11 @@ def _subprocess(argv: list[str], check: bool = False, **kwargs) -> subprocess.Co
 class Shell:
     """External commands: checks always, mutations only outside a dry run, root on request."""
 
-    def __init__(self, dry_run: bool = False, execute=_subprocess):
-        """EXECUTE runs every command; tests pass a fake."""
+    def __init__(self, dry_run: bool = False, execute=_subprocess, root=None):
+        """EXECUTE runs every command, ROOT (SUDO argv, **kwargs) every root one; tests fake both."""
         self.dry_run = dry_run
         self.execute = execute
+        self.root = root or _Root()
         self._root = False
 
     def output(self, *cmd: str, **kwargs) -> str | None:
@@ -94,7 +96,9 @@ class Shell:
         """CMD run, failing on a non-zero exit; nothing in a dry run."""
         if self.dry_run:
             return None
-        return self.execute([*(_sudo() if self._root else []), *cmd], check=True, **kwargs)
+        if self._root and (sudo := _sudo()):
+            return self.root(sudo, list(cmd), check=True, **kwargs)
+        return self.execute(list(cmd), check=True, **kwargs)
 
     @contextmanager
     def as_root(self):
@@ -104,6 +108,52 @@ class Shell:
             yield
         finally:
             self._root = was
+
+
+class _Root:
+    """One root process, started by the first command: SUDO_CMD asks once, for all of them."""
+
+    def __init__(self):
+        """Nothing started yet."""
+        self._conn: Connection | None = None
+
+    def __call__(self, sudo: list[str], argv: list[str], **kwargs) -> subprocess.CompletedProcess:
+        """ARGV run as root with subprocess.run KWARGS; its errors raised here."""
+        if self._conn is None:
+            self._start(sudo)
+        self._conn.send((argv, kwargs))
+        result = self._conn.recv()
+        if isinstance(result, BaseException):
+            raise result
+        return result
+
+    def _start(self, sudo: list[str]) -> None:
+        """SUDO + dotfiles/root.py started and connected; CalledProcessError if it exits."""
+        self._dir = tempfile.TemporaryDirectory()
+        address = str(Path(self._dir.name) / "root")
+        listener = socket.socket(socket.AF_UNIX)
+        listener.bind(address)
+        listener.listen(1)
+        listener.settimeout(0.2)
+        argv = [*sudo, sys.executable, "-I", str(Path(__file__).with_name("root.py")), address]
+        self._process = subprocess.Popen(argv)
+        while True:  # sudo may be asking for the password
+            try:
+                sock, _ = listener.accept()
+                break
+            except TimeoutError:
+                if self._process.poll() is not None:
+                    raise subprocess.CalledProcessError(self._process.returncode, argv) from None
+        listener.close()
+        sock.setblocking(True)
+        self._conn = Connection(sock.detach())
+        atexit.register(self._close)
+
+    def _close(self) -> None:
+        """Hang up; the root process exits and sudo gives the terminal back."""
+        self._conn.close()
+        self._process.wait()
+        self._dir.cleanup()
 
 
 def _sudo() -> list[str]:
@@ -121,6 +171,23 @@ def _writable(path: Path) -> bool:
     while not parent.exists():
         parent = parent.parent
     return os.access(parent, os.W_OK)
+
+
+def differs(real: Path, data: bytes, mode: int, owner: str | None = None) -> str | None:
+    """Why REAL is not DATA with MODE and OWNER (missing, content, mode, owner); None if it is."""
+    try:
+        current = real.read_bytes()
+    except FileNotFoundError:
+        return "missing"
+    except OSError:  # unreadable without root: looks different every time
+        return "content differs"
+    if current != data:
+        return "content differs"
+    if stat.S_IMODE(real.stat().st_mode) != mode:
+        return f"mode {stat.S_IMODE(real.stat().st_mode):o}"
+    if owner and _owner(real) != owner:
+        return f"owner {_owner(real)}"
+    return None
 
 
 def _owner(path: Path) -> str:
@@ -158,21 +225,8 @@ class Files:
         data = content.encode() if isinstance(content, str) else content
         user, _, group = (owner or "").partition(":")
         group = group or user
-        try:
-            current = real.read_bytes()
-        except FileNotFoundError:
-            current = None
-        except OSError:  # unreadable without root: looks different every time
-            current = b""
-        if current is None:
-            why = "missing"
-        elif current != data:
-            why = "content differs"
-        elif stat.S_IMODE(real.stat().st_mode) != mode:
-            why = f"mode {stat.S_IMODE(real.stat().st_mode):o}"
-        elif owner and _owner(real) != f"{user}:{group}":
-            why = f"owner {_owner(real)}"
-        else:
+        why = differs(real, data, mode, owner and f"{user}:{group}")
+        if why is None:
             return False
         if not self.shell.dry_run:
             me = pwd.getpwuid(os.geteuid()).pw_name
@@ -203,8 +257,12 @@ class Files:
         real = self.path(file)
         if not real.exists():
             return self.ensure(file, line + "\n")
+        try:
+            text = real.read_text()
+        except PermissionError:
+            die(f"{file}: not readable without root; features keep root files world-readable")
         lines, done = [], False
-        for old in real.read_text().splitlines():
+        for old in text.splitlines():
             if not done and re.search(regex, old):
                 old, done = line, True
             lines.append(old)
@@ -222,10 +280,12 @@ class Files:
 class Machine:
     """One apply's view of the system: its report, its shell, its files."""
 
-    def __init__(self, dry_run: bool = False, sysroot: Path = Path("/"), execute=_subprocess):
-        """A fresh report; commands through EXECUTE; files under SYSROOT."""
+    def __init__(
+        self, dry_run: bool = False, sysroot: Path = Path("/"), execute=_subprocess, root=None
+    ):
+        """A fresh report; commands through EXECUTE, root ones through ROOT; files under SYSROOT."""
         self.report = Report()
-        self.shell = Shell(dry_run, execute)
+        self.shell = Shell(dry_run, execute, root)
         self.files = Files(self.shell, self.report, sysroot)
 
     @property
@@ -240,11 +300,11 @@ class Machine:
 
     def fresh(self, dry_run: bool) -> "Machine":
         """The same system and commands, with a new report and DRY_RUN: one per apply."""
-        return Machine(dry_run, self.files.sysroot, self.shell.execute)
+        return Machine(dry_run, self.files.sysroot, self.shell.execute, self.shell.root)
 
     @contextmanager
     def active(self):
-        """This machine is the one the helpers below act on, inside the block."""
+        """This machine is the one current() gives entry points, inside the block."""
         token = _current.set(self)
         try:
             yield self
@@ -252,136 +312,11 @@ class Machine:
             _current.reset(token)
 
 
-# The system itself, for helpers called outside any active() block.
-REAL = Machine()
+# The system itself, for an entry point called outside any active() block.
+_REAL = Machine()
 _current: ContextVar[Machine | None] = ContextVar("machine", default=None)
 
 
 def current() -> Machine:
-    """The machine the helpers act on: an apply's, or REAL."""
-    return _current.get() or REAL
-
-
-# The helpers features call: each the same method of the current machine.
-
-
-def warn(msg: str) -> None:
-    """`warning: MSG` on stderr."""
-    current().report.warn(msg)
-
-
-def changed(msg: str) -> None:
-    """A mutation: the only kind of line a clean apply never prints."""
-    current().report.changed(msg)
-
-
-def notice(msg: str) -> None:
-    """Print now and again at the end, where it is not lost under package output."""
-    current().report.notice(msg)
-
-
-def print_notices() -> None:
-    """Replay this apply's notices, once, at its end."""
-    current().report.flush()
-
-
-def output(*cmd: str, **kwargs) -> str | None:
-    """CMD's stdout without its last newline, whatever it exits with; None if not found."""
-    return current().shell.output(*cmd, **kwargs)
-
-
-def run(*cmd: str, **kwargs) -> subprocess.CompletedProcess | None:
-    """CMD run, failing on a non-zero exit; nothing in a dry run."""
-    return current().shell.run(*cmd, **kwargs)
-
-
-def as_root():
-    """Every run() inside goes through SUDO_CMD (sudo) unless already root."""
-    return current().shell.as_root()
-
-
-def path(name) -> Path:
-    """NAME, an absolute path on the system, under SYSROOT: where to read it."""
-    return current().files.path(name)
-
-
-def ensure_file(dst, content: str | bytes, mode: int = 0o644, owner: str | None = None) -> bool:
-    """DST holds CONTENT with MODE and OWNER; root where needed; whether it changed."""
-    return current().files.ensure(dst, content, mode, owner)
-
-
-def ensure_symlink(target, link) -> bool:
-    """LINK is a symlink to TARGET."""
-    return current().files.symlink(target, link)
-
-
-def ensure_line(file, regex: str, line: str, before: str | None = None) -> bool:
-    """The line of FILE matching REGEX is LINE, else LINE added before BEFORE or at the end."""
-    return current().files.line(file, regex, line, before)
-
-
-@dataclass(frozen=True)
-class RetryPolicy:
-    """How often and how long apart retrying() tries again."""
-
-    attempts: int = 3  # in total, the first one included
-    delay: float = 10  # seconds before the second attempt
-    backoff: float = 2  # each next delay is the previous one times this
-    max_delay: float = 60  # no single wait longer than this
-    retry_on: tuple[type[Exception], ...] = (subprocess.CalledProcessError, OSError)
-
-    def wait(self, attempt: int) -> float:
-        """Seconds to wait after failed attempt number ATTEMPT."""
-        return min(self.delay * self.backoff ** (attempt - 1), self.max_delay)
-
-
-# For anything that goes to the network: 3 attempts, 10 s then 20 s apart.
-NETWORK = RetryPolicy()
-
-
-class Attempt:
-    """One try of retrying(): a failure it swallows makes the loop go again."""
-
-    def __init__(self, policy: RetryPolicy, number: int):
-        """Try NUMBER of POLICY."""
-        self.policy = policy
-        self.number = number
-        self.failed = False
-
-    def __enter__(self):
-        """The attempt itself."""
-        return self
-
-    def __exit__(self, kind, error, traceback) -> bool:
-        """Swallow a retryable error, warn and wait, unless it is the last attempt."""
-        if error is None or not isinstance(error, self.policy.retry_on):
-            return False
-        if self.number == self.policy.attempts:
-            return False
-        what = error.cmd if isinstance(error, subprocess.CalledProcessError) else None
-        what = " ".join(map(str, what)) if isinstance(what, list) else str(error)
-        wait = self.policy.wait(self.number)
-        warn(f"{what} failed (attempt {self.number}/{self.policy.attempts}), retrying in {wait:g}s")
-        sleep(wait)
-        self.failed = True
-        return True
-
-
-def retrying(policy: RetryPolicy = NETWORK):
-    """Attempts to run `with attempt:` until one succeeds; the last failure propagates."""
-    for number in range(1, policy.attempts + 1):
-        attempt = Attempt(policy, number)
-        yield attempt
-        if not attempt.failed:
-            return
-
-
-def network(*cmd: str, failure: str, **kwargs) -> None:
-    """CMD run, retried; still failing, the feature is deferred with FAILURE."""
-    kwargs.setdefault("stdout", subprocess.DEVNULL)
-    try:
-        for attempt in retrying():
-            with attempt:
-                run(*cmd, **kwargs)
-    except subprocess.CalledProcessError:
-        defer(failure)
+    """The machine an entry point builds on: the active one (a test's), or REAL."""
+    return _current.get() or _REAL

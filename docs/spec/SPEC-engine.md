@@ -2,7 +2,7 @@
 
 Status: draft 2026-09-24, revises the version approved the same day
 (platforms, features as classes, order from the package graph and each
-strategy's requirements). Module of
+feature's requirements); platforms in directories of their own 2026-09-29. Module of
 the [capability map](CAPABILITY-MAP.md); depends on `config` (and `render`
 for the deploy step of `apply`).
 
@@ -28,9 +28,9 @@ depend on each other; the order of the features follows from that.
    packages depend on.
 5. Print the notices collected along the way.
 
-Out of scope: the Arch package manager's setup (pacman.conf drop-ins,
-mirrors, reflector), the AUR and paru (all `packages`), and every feature
-but one sample, `nobeep` (the rest go to `features`).
+Out of scope: mirrors and reflector, the AUR and paru (all `packages`),
+and every feature but `packaging`, which writes pacman's and makepkg's
+drop-ins (the rest go to `features`).
 
 ## Tech Stack
 
@@ -41,85 +41,109 @@ Stdlib only: `subprocess`, `shutil`, `os`, `pwd`/`grp`, `platform`
 ## Project Structure
 
 ```
-dotfiles/engine.py             Report, Shell, Files, Machine; retrying(), die, defer; the
-                               helpers features call, each a method of the current Machine
-dotfiles/platforms/discovery.py       detect(), every(), classes(); __init__.py is empty
-dotfiles/platforms/operating_system.py        Platform (abstract): cfg and its package manager
-dotfiles/platforms/package_manager.py PackageManager (abstract): depends from direct()
-dotfiles/platforms/linux.py    Linux(Platform): systemd, sysctl, groups, gsettings
-dotfiles/platforms/arch.py     Pacman(PackageManager); Arch(Linux) with Pacman
-dotfiles/feature.py            Feature and Strategy; strategy lookup
-dotfiles/features/<name>.py    one feature per file, flat
-dotfiles/apply.py              the runner
-tests/test_engine.py           shared helpers
-tests/test_platforms.py        Linux and Pacman against a fake execute
-tests/test_apply.py            the runner with a fake platform and fake features
+dotfiles/engine.py                     Report, Shell, Files, Machine; die, defer; current()
+dotfiles/retry.py                      RetryPolicy, Attempt, retrying()
+dotfiles/root.py                       the root process: runs what the shell sends, stdlib only
+dotfiles/platforms/discovery.py        detect(), platforms(), every(), named(); __init__.py is empty
+dotfiles/platforms/operating_system.py OperatingSystem (abstract): id, machine, package manager
+dotfiles/platforms/package_manager.py  PackageManager (abstract): depends from direct()
+dotfiles/platforms/linux/_os.py        LinuxOs(OperatingSystem): systemd, sysctl, groups, gsettings
+dotfiles/platforms/linux/features/     features every Linux runs the same, the fallback
+dotfiles/platforms/arch/_os.py         ArchLinuxOs(LinuxOs), id "arch", with Pacman
+dotfiles/platforms/arch/_pacman.py     Pacman(PackageManager)
+dotfiles/platforms/arch/features/      Arch's features, one per file
+dotfiles/feature.py                    Feature; classes(platform), every(), checks()
+dotfiles/plan.py                       Step, steps(), requirements(), order(), cycles()
+dotfiles/apply.py                      the runner, check()
+dotfiles/errors.py                     ConfigError, raised by every layer
+tests/test_engine.py                   Shell, Files, Report, retries
+tests/test_platforms.py                LinuxOs and Pacman against a fake shell
+tests/test_apply.py                    plan and runner with a fake platform and fake features
 ```
 
 ## `dotfiles/engine.py` — the same on every system
 
 The engine is four classes, one instance each per apply:
 
-- `Report`: what the apply prints, `warn`, `changed`, `notice`, and
-  `printed`, whether it printed a change or a warning.
-- `Shell(dry_run, execute)`: `output`, `run`, `as_root`. EXECUTE runs
-  every command (`subprocess.run` by default); tests pass a fake.
+- `Report`: what the apply prints, `line`, `warn`, `changed`, `notice`,
+  `flush` (the notices again, at the end), and `printed`, whether it
+  printed a change or a warning.
+- `Shell(dry_run, execute, root)`: `output`, `run`, `as_root`. EXECUTE runs
+  every command (`subprocess.run` by default), ROOT every one that needs
+  root (`root(sudo, argv, **kwargs)`, the root process by default); tests
+  pass fakes for both (`conftest.Fake.install`).
 - `Files(shell, report, sysroot)`: `path`, `ensure`, `line`, `symlink`,
   under SYSROOT.
-- `Machine(dry_run, sysroot, execute)` holds the three.
-  `with machine.active():` makes it the one the module's helpers act on
-  (a `ContextVar`); outside any block they act on `engine.REAL`.
-  `apply` runs in `current().fresh(dry_run)`: the same system and
-  commands, a new report.
+- `Machine(dry_run, sysroot, execute, root)` holds the three.
 
-Features call the module's functions, each the same method of
-`current()`, so they never hold a machine:
+The machine is passed, never looked up: `apply()` builds one,
+`engine.current().fresh(dry_run)` (the same system and commands, a new
+report), and hands it to the platform (`OperatingSystem(machine)`),
+which gives it to its package manager and to every feature. A platform
+has `self.shell`, `self.files` and `self.report`.
+`current()` is read only by entry points (`apply()`, `requirements()`):
+it is the machine of the enclosing `with machine.active():` (a
+`ContextVar`; the tests' temp one), else `engine._REAL`.
 
-| Helper | Does |
+| Call | Does |
 |---|---|
-| `warn(msg)` | `warning: MSG` on stderr |
 | `die(msg)` | raises `Failed`: the feature fails (see Failures) |
-| `changed(msg)` | prints `-> MSG`: the only kind of line a clean apply never prints |
-| `notice(msg)` | prints now, kept in memory, replayed at the end |
-| `output(*cmd)` | stdout without the trailing newline, whatever the exit status (`systemctl is-enabled` prints `disabled` and exits 1); `None` when the command is not installed. For checks only |
-| `run(*cmd)` | a mutation (`git clone`, `pacman -S`); must succeed. As the user, or as root inside `as_root()` |
-| `with as_root():` | every `run` in the block runs as root; see Root |
-| `for attempt in retrying(policy):` / `with attempt:` | the block again on failure, as often and as late as the `RetryPolicy` says; see Retries |
 | `defer(msg)` | raises `Deferred`; the runner turns it into the notice `MSG (network?) — the next apply retries` and goes on |
-| `ensure_file(dst, content, mode=0o644, owner=None)` | DST has CONTENT (str or bytes), MODE and OWNER (`"user:group"`) |
-| `ensure_symlink(target, link)` | LINK points to TARGET |
-| `ensure_line(file, regex, line)` | the first line matching REGEX (Python `re`) becomes LINE, appended when none does |
+| `report.warn(msg)` | `warning: MSG` on stderr |
+| `report.changed(msg)` | prints `-> MSG`: the only kind of line a clean apply never prints |
+| `report.notice(msg)` | prints now, kept in memory, replayed at the end |
+| `report.line(msg)` | prints MSG as is: the runner's headings |
+| `shell.output(*cmd)` | stdout without the trailing newline, whatever the exit status (`systemctl is-enabled` prints `disabled` and exits 1); `None` when the command is not installed. For checks only |
+| `shell.run(*cmd)` | a mutation (`git clone`, `pacman -S`); must succeed. As the user, or as root inside `shell.as_root()` |
+| `with shell.as_root():` | every `run` in the block runs as root; see Root |
+| `for attempt in retrying(report, policy):` / `with attempt:` | the block again on failure, as often and as late as the `RetryPolicy` says; see Retries |
+| `files.ensure(dst, content, mode=0o644, owner=None)` | DST has CONTENT (str or bytes), MODE and OWNER (`"user:group"`) |
+| `files.symlink(target, link)` | LINK points to TARGET |
+| `files.line(file, regex, line, before=None)` | the first line matching REGEX (Python `re`) becomes LINE, else LINE goes before the line matching BEFORE, or at the end |
 
-Every helper checks first. If nothing differs it returns `False` and prints
-nothing. Otherwise it mutates, calls `changed(...)` and returns `True`, so
-a feature reacts to a change with `if ensure_file(...): ...`.
+Every `files` method checks first. If nothing differs it returns `False`
+and prints nothing. Otherwise it mutates, calls `report.changed(...)` and
+returns `True`, so a feature reacts to a change with
+`if self.files.ensure(...): ...`.
 
-- `ensure_file` compares without root. It writes as the user when the path
+- `files.ensure` compares without root. It writes as the user when the path
   is writable (the file itself, and the nearest existing directory above
   it) and the owner is the user (or not given); otherwise it writes
   through `as_root install -D -m MODE [-o U -g G]` from a private temp file.
   A root-only file the user cannot read looks different every time:
   features keep root files world-readable.
-- `ensure_line` keeps the mode and owner of the file it edits.
+- `files.line` keeps the mode and owner of the file it edits. A file the
+  user cannot read fails the feature (`not readable without root`).
+- `engine.differs(path, data, mode, owner=None)` is the comparison both
+  `files.ensure` and `render.deploy` make: `missing`, `content differs`,
+  `mode 644`, `owner …`, or `None`.
 
 ### Root
 
 ```python
-with as_root():
-    run("systemctl", "enable", "--now", unit)
+with self.shell.as_root():
+    self.shell.run("systemctl", "enable", "--now", unit)
 ```
 
-Inside `as_root()`, `run` puts `SUDO_CMD` (default `sudo`, split with
-`shlex`; empty means no prefix) before the command; no prefix when the
-process already runs as root. The block sets a `ContextVar`, so blocks
-nest and the previous value comes back on exit (`Shell` keeps it). Only mutations get root:
+Inside `as_root()`, `run` goes through `SUDO_CMD` (default `sudo`, split
+with `shlex`; empty means none); none when the process already runs as
+root. The first such `run` starts one root process,
+`SUDO_CMD python -I dotfiles/root.py SOCKET`: sudo asks for the password
+once, and every root command of the shell after it goes over that unix
+socket (in a private temp dir) as `(argv, kwargs)` and comes back as the
+`CompletedProcess` or the exception `subprocess.run` raised. The command
+inherits the terminal, so its output shows as before. The process exits
+when the shell hangs up (at exit, or when the apply dies); if it cannot
+start (`SUDO_CMD=false`, a wrong password) the `run` raises
+`CalledProcessError`. That is the shell's ROOT; a test's fake gets the
+prefix and the command as one argv (`["sudo", …]`) and starts nothing. The block sets a flag on the `Shell`
+and puts the previous value back on exit, so blocks nest. Only mutations get root:
 `output()` runs as the user inside the block too, so a check never asks
-for a password. `ensure_file` and `ensure_symlink` choose root themselves
+for a password. `files.ensure` and `files.symlink` choose root themselves
 (the path is not writable, or another owner); `as_root()` around them
 forces it. The command must
-succeed (`check=True`): a failed mutation fails the feature. `sudo`
-prompts on its own when its timestamp has expired; a clean apply never
-gets that far.
+succeed (`check=True`): a failed mutation fails the feature. A clean
+apply never gets that far, so never asks for a password.
 
 ### Retries
 
@@ -134,20 +158,20 @@ class RetryPolicy:
     delay: float = 10  # seconds before the second attempt
     backoff: float = 2  # each next delay is the previous one times this
     max_delay: float = 60  # no single wait longer than this
-    retry_on: tuple[type[Exception], ...] = (CalledProcessError, OSError)
+    retry_on: tuple[type[Exception], ...] = (CalledProcessError,)
 
 
-NETWORK = RetryPolicy()  # 3 attempts, 10 s then 20 s apart
+_NETWORK = RetryPolicy()  # 3 attempts, 10 s then 20 s apart: the default
 
-for attempt in retrying(NETWORK):
+for attempt in retrying(self.report):
     with attempt:
-        run("git", "clone", url, tmp)
-        run("makepkg", "-si", cwd=tmp)
+        self.shell.run("git", "clone", url, tmp)
+        self.shell.run("makepkg", "-si", cwd=tmp)
 ```
 
-- `retrying(policy=NETWORK)`; a call that needs other numbers makes its
-  own: `retrying(RetryPolicy(attempts=5, delay=2))`, or
-  `dataclasses.replace(NETWORK, attempts=5)`.
+- `dotfiles/retry.py`: `retrying(report, policy=_NETWORK)`, its warnings
+  into REPORT, each attempt an `Attempt`; a call that needs other numbers
+  makes its own: `retrying(report, RetryPolicy(attempts=5, delay=2))`.
 - The whole block is the unit: a failure anywhere in it runs it again from
   the top, so it must be safe to repeat (clone into a fresh temp dir, not
   into the destination).
@@ -157,8 +181,11 @@ for attempt in retrying(NETWORK):
   ends at the first success. Any other exception propagates at once.
 - The last failure propagates: the feature fails, or a feature that can
   wait catches it and calls `defer(...)`.
-- Combines with root: `with attempt, as_root():`.
-- Tests pass `RetryPolicy(delay=0)`; nothing patches `sleep`.
+- Combines with root: `with attempt, self.shell.as_root():`.
+- Only what goes to the network goes in the block: a failure that repeats
+  (a file conflict, a missing program) must not cost the waits. pacman
+  downloads with `-Sw`/`-Syuw` in the block and installs after it, once.
+- Tests pass `RetryPolicy(delay=0)`, or patch `retry.sleep`.
 
 ### Dry run
 
@@ -171,83 +198,95 @@ run would, never less.
 ### The sysroot
 
 The machine's `Files.sysroot` (default `/`) is prefixed to every path a
-helper touches; `engine.path(name)` is where to read NAME. The tests make
+`files` method touches; `files.path(name)` is where to read NAME. The tests make
 a `Machine` with a temp dir (autouse, like `HOME`), so a feature can be
 run against an empty tree. It is not a command-line option.
 
 ## Platforms — `dotfiles/platforms/`
 
-A platform is a class that does, with its own tools, what differs between
-systems. Features call it; they never run a package manager or systemctl
-themselves.
+A platform is a package, `platforms/<name>/`, that shares nothing with
+the others but `linux/`, their base: its `OperatingSystem` subclass in
+`_os.py`, named `<Name>Os`, its package manager and its `features/`.
+`__init__.py` only imports what the rest of the code uses (`ArchLinuxOs`,
+`Pacman`); a module nothing outside imports starts with `_`. Features call
+the platform; they never run a package manager or systemctl themselves.
 
-Every class here, platforms, features and strategies, is instantiated once
-per apply with the resolved config (`__init__(self, cfg)`, kept as
-`self.cfg`); methods are instance methods and take no config argument.
+Every class here is instantiated once per apply: a platform with the
+machine alone, a feature with its own table of the resolved config
+(`self.settings`) and the platform; methods are instance methods
+and take no config argument.
 Static methods and classes used as mere namespaces are avoided.
 
 ```python
-class PackageManager(ABC):  # package_manager.py: one per apply, shared by every strategy
+class PackageManager(ABC):  # package_manager.py: one per apply, shared by every feature
     def setup(self) -> None: ...  # ready to install; once per apply
     @abstractmethod
     def missing(self, names: list[str]) -> list[str]: ...  # not installed; no root
     @abstractmethod
     def install(self, names: list[str], replaces: list[str] = ()) -> None: ...  # one transaction
     @abstractmethod
+    def upgrade(self) -> None: ...  # full upgrade, databases synced; never a partial one
+    @abstractmethod
     def direct(self, names: list[str]) -> dict[str, set[str]]: ...  # direct dependencies
+    def provides(self, names: list[str]) -> dict[str, set[str]]: ...  # other names; none by default
     def depends(self, names: list[str]) -> dict[str, set[str]]: ...  # transitive, cached
 
 
-class Platform(ABC):  # operating_system.py
+class OperatingSystem(ABC):  # operating_system.py
+    id: ClassVar[str] = ""  # the os-release ID it runs on; a base has none
     manager_class: type[PackageManager]  # abstract until a platform names one
 
-    def __init__(self, cfg: dict, manager: PackageManager | None = None):
-        self.cfg = cfg  # the resolved config
-        self.manager = manager or self.manager_class()
+    def __init__(self, machine: Machine):
+        self.machine = machine  # and its shell, files, report as attributes
+        self.manager = self.manager_class(machine)
 
 
-class Linux(Platform):  # linux.py: what every Linux here shares
+class LinuxOs(OperatingSystem):  # linux/_os.py: what every Linux here shares
     def ensure_service(self, unit: str, user: bool = False) -> bool: ...
     def ensure_sysctl(self, key: str, value) -> bool: ...
     def ensure_gsetting(self, schema: str, key: str, value: str) -> bool: ...
     def ensure_group_member(self, group: str) -> bool: ...
 
 
-class Pacman(PackageManager):  # arch.py
-    ...  # missing: pacman -T; install: pacman -S; direct: pacman -Si, else -Qi; upgrade: -Syu
+class Pacman(PackageManager):  # arch/_pacman.py
+    ...  # missing: -T; install: -Sw, -S; direct, provides: -Si, else -Qi; upgrade: -Syuw, -Su
 
 
-class Arch(Linux):  # arch.py
+class ArchLinuxOs(LinuxOs):  # arch/_os.py
+    id = "arch"
     manager_class = Pacman
 ```
 
-- `detect(cfg)` reads `/etc/os-release`: the platform is the class in
-  `platforms/<ID>.py`, else in `platforms/<first of ID_LIKE that has a
-  file>.py`, instantiated with `cfg`. No file → `apply` fails:
-  `error: no platform for fedora`.
-- The `ensure_*` methods keep the contracts they have as helpers:
+- `detect(machine)` reads `/etc/os-release`: the platform is the
+  concrete `OperatingSystem` subclass whose `id` is ID, else the first of
+  ID_LIKE that one has (`cachyos` → `arch`), instantiated with
+  `machine`. `platforms()` imports every package of `platforms/` and
+  lists those classes; none → `apply` fails: `error: no platform for fedora`.
+- The `ensure_*` methods check first and return whether they changed, like `files`:
   - `ensure_service`: `is-enabled` and `is-active` first; `enabled` or
     `static`/`alias`/`indirect` units that are not active get `start`,
     anything else `enable --now`. `user=True` uses `--user` and no root.
-  - `ensure_sysctl`: `ensure_line` on `/etc/sysctl.d/99-dotfiles.conf`,
+  - `ensure_sysctl`: `files.line` on `/etc/sysctl.d/99-dotfiles.conf`,
     then live through `sysctl -w` when `sysctl -n` differs.
   - `ensure_gsetting`: VALUE in GVariant text form; nothing without
     gsettings.
   - `ensure_group_member`: read from the group database (`grp`), not
     `id -nG`, which changes only at the next login; adds a notice to log
-    out and back in. A group that does not exist is an error, except in
-    a dry run: its package, which a dry run does not install, brings it.
+    out and back in. A group that does not exist is an error; a dry run
+    does not get that far while the package that brings it is missing.
 - `Pacman.direct` answers from the sync database without root;
   `PackageManager.depends` walks it and caches per apply, so a new
   platform's manager says only what a package depends on directly.
-- A strategy shares its system's manager (`Feature.strategy` passes it),
-  and with it the cache.
+- A feature reaches its system's manager (`self.system.manager`), and
+  with it the cache.
 
-## Features — `dotfiles/feature.py`, `dotfiles/features/`
+## Features — `dotfiles/feature.py`, `platforms/<name>/features/`
 
-A feature is a class. What it does everywhere is its `apply`; what differs
-per platform, its packages first of all, is a strategy: a nested class
-named after the platform class, which `apply` receives as an object.
+A feature is a class per platform: `platforms/arch/features/docker.py`
+holds Arch's `Docker`, `platforms/debian/features/docker.py` Debian's.
+They share no code; what is the same on every Linux is one module in
+`platforms/linux/features/`, which a platform runs where it has none of
+that name.
 
 ```python
 """Docker with the applying user in its group."""
@@ -255,46 +294,51 @@ named after the platform class, which `apply` receives as an object.
 from dotfiles.feature import Feature
 
 
-class Docker(Feature):
-    def apply(self, strategy):
-        strategy.ensure_service("docker.service")
-        strategy.ensure_group_member("docker")
+class Docker(Feature):  # platforms/arch/features/docker.py
+    def packages(self):
+        return ["docker", "docker-buildx", "docker-compose"]
 
-    class Arch:
-        def packages(self):
-            return ["docker", "docker-buildx", "docker-compose"]
-
-    class Debian:
-        def packages(self):
-            return ["docker.io", "docker-buildx-plugin", "docker-compose-plugin"]
+    def apply(self):
+        self.system.ensure_service("docker.service")
+        self.system.ensure_group_member("docker")
 ```
 
-- The runner picks the strategy by walking the platform's class
-  hierarchy: on Arch `Docker.Arch`, else `Docker.Linux`. It builds the
-  strategy's class from that nested class and the detected platform class
-  (`Docker.Arch` + `platforms.Arch`), so the strategy has every platform
-  method (`ensure_service`, …) and whatever the feature adds or overrides
-  for that platform. The runner creates `Docker(cfg)` and the strategy
-  with the same `cfg`, and calls `docker.apply(strategy)`.
-- A feature with no strategy for this platform does not apply to this
-  machine and is skipped silently.
-- `packages()` defaults to `[]` (on `Platform`); `apply` to nothing.
-  Both read `self.cfg`, the whole resolved config, so a list can depend on
-  settings (the nvidia driver, the languages). A step that differs per platform
-  beyond packages is one more method on the strategies, called by `apply`.
+- `feature.classes(platform)` walks the platform's class hierarchy from
+  the base down (`LinuxOs`, then `ArchLinuxOs`), each class's package's
+  `features/`, so the platform's own module of a name wins. Modules
+  starting with `_` are helpers, not features. The runner builds each with
+  `(settings, system)`: `features.docker` of the resolved config and the
+  platform, reaching `ensure_service`, its package manager and the machine
+  through `self.system`, and calls `apply()`. A feature sees its own
+  table only; the rest of the config does not reach it.
+- A feature with no module for this platform, nor on Linux, does not apply
+  to this machine and is skipped.
+- A feature in `linux/features/` runs on every platform below `LinuxOs`,
+  so it uses only what `LinuxOs` and the base `PackageManager` have
+  (`self.system.manager.upgrade()`, not a `Pacman` method); what needs
+  more goes in the platform's own `features/`.
+- `packages()`, `replaces()` and `requires()` default to `[]`, `apply()`
+  to nothing. They read `self.settings`, so a list can depend on settings
+  (the nvidia driver, the languages).
+- What the schema's types cannot check about a feature's keys is its
+  `rules` (key under `features.<name>` → `(test, what it must be)`), and a
+  key that takes two types is in its `either`. `feature.checks()` gathers
+  both from every feature of every platform (the schema is one) into a
+  `config.Checks`, and the entry points (`cli`, `apply`) pass it to
+  `config` as `checks=`: config never imports features. Without it only
+  the types and the config's own `secrets.backend` rule are checked.
 - Every platform has its own package names; nothing maps one onto
   another, and a platform may need packages the others do not.
 - The feature's name is its file name: it runs only when
   `features.<name>.enabled`. A file whose name is not a feature in the
   schema runs always and reads its flags itself (services, tools, apps).
-- A strategy may declare the features it needs on its platform,
+- A feature may declare the features it needs on its platform,
   `requires()` (default `[]`), with the reason next to it:
 
   ```python
-  class Gaming(Feature):
-      class Arch:
-          def requires(self):
-              return ["pacman"]  # its multilib: steam and the lib32 packages
+  class Gaming(Feature):  # platforms/arch/features/gaming.py
+      def requires(self):
+          return ["pacman"]  # its multilib: steam and the lib32 packages
   ```
 
   Each must be enabled: otherwise `steps()` raises `ConfigError`, one
@@ -304,17 +348,17 @@ class Docker(Feature):
   same kind of error, one line per cycle (`gaming → nvidia → gaming: each
   requires the next, so none can run first`). `dotfiles check` asks
   `requires()` of every enabled schema feature on every platform
-  (`platforms.every`), so a host that breaks one fails check wherever it
-  would run. `requires()` reads `self.cfg` only, never the machine.
+  (`discovery.every`), so a host that breaks one fails check wherever it
+  would run. `requires()` reads `self.settings` only, never the machine.
   Requirements are for what the package graph cannot see: a config that
   starts another feature's program, a setup part (`pacman`), a virtual
   dependency a feature chooses (`jdk` for kotlin). A required setup
   feature orders nothing: setup runs before every feature.
 - Nothing else is declared: no gate, no order but through `requires()`.
 
-## `dotfiles apply` — `dotfiles/apply.py`
+## `dotfiles apply` — `dotfiles/plan.py`, `dotfiles/apply.py`
 
-1. **Platform.** `system = detect(cfg)`, an instance of the platform
+1. **Platform.** `system = detect(machine)`, an instance of the platform
    class, then `system.manager.setup()`, on every apply (it checks first).
 2. **Packages.** The packages of every enabled feature that applies here,
    together: `manager.missing(...)`, and when something is missing, one
@@ -325,13 +369,15 @@ class Docker(Feature):
 4. **Features, in order.** Feature A runs before feature B when B
    requires A, or when a package of B needs a package that A has and B
    does not, by `manager.depends(...)` on all their packages (a package
-   both list, like `git`, orders neither). Features free to run at the same point run by
+   both list, like `git`, orders neither). A dependency on a name that a
+   package provides (`java-runtime`, `manager.provides(...)`) is one on
+   that package. Features free to run at the same point run by
    name, and a feature without packages has no edges. Features whose
    packages need each other in a cycle get a place by name but do not
    run: one `error: glvnd, graphics: not run, they need each other:
    glvnd → graphics → glvnd`, and the features after them are not run as
    after any failure.
-   Each runs as `Docker(cfg).apply(strategy)` does.
+   Each runs as `Docker(settings, system).apply()` does.
 5. **Notices.**
 
 stdout is line-buffered, so `->` lines and the output of child commands appear in
@@ -348,23 +394,27 @@ order.
   <message>` on stderr; the features whose packages need its packages are
   not run (`error: foo: not run, docker failed`), and so on transitively.
   The others run.
-- The message (`apply.describe`) keeps the words of a failure the code
+- The message (`apply._describe`) keeps the words of a failure the code
   reports (`die`, `ConfigError`). Anything else says what went wrong and
   the innermost line of our code that raised it, past the stdlib, the
-  installed packages, `engine.py` and `config.py`, so a failed `run` or a
+  installed packages, `engine.py`, `retry.py` and `config.py`, so a failed `run` or a
   missing key points at the feature's line:
   - a failed command: ``error: cmd: `pacman -S x` failed with exit status
-    1, at dotfiles/features/x.py:12: run("pacman", "-S", "x")``;
+    1, at dotfiles/platforms/arch/features/x.py:12: self.shell.run("pacman", "-S", "x")``;
   - a key the schema lacks: `error: packaging: features.packaging.pacmen:
     no such key in dotfiles/defaults.toml, at …`;
   - a bug: `error: div: unexpected ZeroDivisionError (division by zero),
     at …`.
 - `defer` in a feature: it ends, its notice is kept, nothing is blocked.
 - `apply` exits 1 when any feature failed or was not run. Ctrl-C stops the
-  run, replays the notices and exits 130. Notices are printed at the end
-  in every case, from the runner's `finally`.
-- In a dry run the runner does not call `install`, and step 4 runs every
-  feature anyway: its checks report what the real run would change.
+  run, replays the notices and exits 130 (`128 + signal.SIGINT`); so does
+  every other command, and the root process. Notices are printed at the
+  end in every case, from the runner's `finally`.
+- In a dry run the runner does not call `install`. A feature with a
+  package still missing, or running after such a feature, is not checked
+  (its checks would only see what is not there yet): `-> docker (after
+  its packages)`. Every other feature runs its checks and reports what
+  the real run would change.
 
 ```
 Notices from this apply:
@@ -388,35 +438,34 @@ implementation, classes where platforms differ; comments explain why;
 messages name the file, unit or key. A feature reads top to bottom:
 
 ```python
-class Locale(Feature):
-    def apply(self, strategy):
-        locale = self.cfg["features"]["locale"]
+class Locale(Feature):  # platforms/linux/features/locale.py: glibc is always there
+    def apply(self):
+        locale = self.settings
         # A list, not any(generator): every line must be ensured, not just up to the first change.
         edits = [
-            ensure_line("/etc/locale.gen", f"^#?{re.escape(l)}$", l) for l in locale["locales"]
+            self.system.files.line("/etc/locale.gen", f"^#?{re.escape(l)}$", l)
+            for l in locale["locales"]
         ]
         if any(edits):
-            with as_root():
-                run("locale-gen")
-
-    class Arch: ...  # glibc is always there: supported, no packages
+            with self.system.shell.as_root():
+                self.system.shell.run("locale-gen")
 ```
 
 ## Testing Strategy
 
-- Shared helpers: called twice on paths the test user owns under
+- `Files` methods: called twice on paths the test user owns under
   `SYSROOT`: `True` then `False`, one `->` line then none.
-- Every external command goes through the machine's `Shell.execute`;
-  tests set it to a Python fake that answers checks from a dict and
-  records every call. No stub scripts, no shell.
-- Platforms: `Linux.ensure_*` as the helpers are tested today; `Arch`
+- Every external command goes through the machine's `Shell.execute`, or
+  `Shell.root` as root; tests set both to a Python fake that answers
+  checks from a dict and records every call. No stub scripts, no shell.
+- Platforms: `LinuxOs.ensure_*` like the `Files` methods; `Pacman`
   against canned `pacman -T` / `pacman -Si` output: missing, one install
   call with every name, the transitive graph. `detect()` against fake
   os-release files: ID, ID_LIKE, none.
-- Features: the strategy is picked through the platform's hierarchy
-  (`Arch`, then `Linux`), has the platform's methods and the nested
-  class's, and is what `apply` receives; none → skipped.
-- Runner (a fake platform, fake features in a temp package): one install
+- Features: a platform's own module of a name wins over its base's, the
+  base's runs where the platform has none; the feature reaches the
+  platform as `system`; a module without the class of its name → an error.
+- Runner (a fake platform whose features are a temp package): one install
   for all packages and silence when none is missing; order from the fake
   graph, ties by name; a requirement runs first; a requirement left off is a
   `ConfigError` from `apply` and `requirements`; a failed feature blocks
@@ -428,14 +477,14 @@ class Locale(Feature):
 
 ## Boundaries
 
-- **Always:** check before mutating; mutate only through `run`, a helper
-  or a platform method; respect dry run and `SYSROOT`; tests in
+- **Always:** check before mutating; mutate only through the machine's
+  `shell.run`, a `files` method or a platform method; respect dry run and `SYSROOT`; tests in
   temp dirs with `SUDO_CMD=false`.
 - **Ask first:** changing the failure policy; a dependency; a helper that
   deletes; a platform besides Arch.
 - **Never:** shell scripts (features, helpers, platforms and tests are
   Python; commands are argv lists, never a shell); sudo in a dry run or a
-  test; keeping sudo alive in the background; writing an order by hand,
+  test; a root process outliving the apply; writing an order by hand,
   or a requirement the package graph already covers.
 
 ## Success Criteria
@@ -443,8 +492,8 @@ class Locale(Feature):
 1. A feature file holds only what it does and, per platform, its
    packages and the features it requires; nothing orders or gates it but
    its name, the package graph and those requirements.
-2. A second platform is one file in `platforms/` plus a nested class in
-   the features it supports; no feature's shared code changes.
+2. A second platform is one directory in `platforms/`, its class and its
+   features; nothing of another platform changes.
 3. On a machine that matches, `dotfiles apply` prints only `nothing to
    change` and runs no sudo; `--dry-run` never runs sudo.
 4. A failed feature blocks only the features whose packages need its
@@ -454,33 +503,35 @@ class Locale(Feature):
 ## Decisions
 
 1. **Order and dependencies come from the package manager**, through
-   `PackageManager.depends`, plus what a strategy `requires()`: what the graph
+   `PackageManager.depends`, plus what a feature `requires()`: what the graph
    cannot see (a config that starts another feature's program, a setup
    part, a provider chosen by another feature) is declared per platform,
    where it holds, and checked against the host's config. Order the graph does
    not cover is fixed by the phases: the package manager is ready before
    any install (`setup`), and the dotfiles are deployed before any
    feature.
-2. **Platforms are classes; a feature gets its platform part as a
-   strategy.** A platform does with its own tools what differs between
-   systems; a feature's nested class per platform holds its packages and
-   whatever else differs there, and `apply` receives it as an object
-   rather than inheriting from it.
+2. **Platforms are directories that do not intersect.** A platform does
+   with its own tools what differs between systems, and its features are
+   its own: a feature is written per platform, not as shared code with a
+   part per platform, so a change for Debian cannot break Arch. What is
+   truly common lives in `linux/`, the one base, as helpers on `LinuxOs`
+   and fallback features.
 3. **Package names are per platform**, never mapped.
 4. **All packages in one transaction**, before any feature runs: one
    check, one sudo, and the package manager orders the installation.
 5. **A failed feature blocks only what builds on it**, in the package
    graph or by requirement; the rest of the apply goes on.
-6. **Helpers return whether they changed something**; the engine only
+6. **`files` and `ensure_*` return whether they changed something**; the engine only
    remembers whether the apply printed a change or a warning, so a run
    that printed neither and failed nothing ends with `nothing to change`
    instead of no output at all. **Notices live in memory**, since one
    process runs the whole apply.
 7. **One object per concern, one machine per apply.** `Report`, `Shell`
    and `Files` in engine, the package manager apart from the platform,
-   what a feature declares (`Strategy`) apart from both, and `apply.Apply`
-   with a method per phase. The module's helpers stay functions of the
-   current `Machine`, so features never pass one around; nothing is a
-   module global a test or `apply` has to reset.
+   the features apart from both, and `apply.Apply`
+   with a method per phase. The machine is passed in, from `apply()` to
+   the platform, its package manager and every feature; only entry
+   points read `current()`, and nothing is a module global a test or
+   `apply` has to reset.
 8. **No helper deletes** a line or a file yet; one comes with the first
    feature that needs it.

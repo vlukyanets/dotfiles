@@ -4,8 +4,8 @@ import sys
 
 import pytest
 
-from dotfiles import config
 from dotfiles.cli import main
+from dotfiles.layout import Layout, local_config
 
 
 def run(monkeypatch, capsys, *argv: str) -> tuple[int, str, str]:
@@ -23,7 +23,7 @@ def test_init_then_every_command_reads_the_machine_config(monkeypatch, capsys):
             "or pass --source <checkout>\n"
         ),
     )
-    local = config.local_path()
+    local = local_config()
     assert run(monkeypatch, capsys, "init", "hyper-lin") == (
         0,
         "-> ~/.config/dotfiles/config.toml (missing)\n",
@@ -36,7 +36,7 @@ def test_init_then_every_command_reads_the_machine_config(monkeypatch, capsys):
     local.write_text(local.read_text().replace('backend = "rbw"', 'backend = "none"'))
     _, mine, _ = run(monkeypatch, capsys, "config")
     assert '[secrets]\nbackend = "none"' in mine
-    assert run(monkeypatch, capsys, "config", "--source", str(config.ROOT))[1] != mine
+    assert run(monkeypatch, capsys, "config", "--source", str(Layout.root))[1] != mine
     assert run(monkeypatch, capsys, "check")[1].endswith("local          ok\n")
 
 

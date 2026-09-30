@@ -7,3 +7,14 @@
 #   features run; a second `apply` prints only `nothing to change` and
 #   asks no password.
 extends = ["vm"]
+
+[git]
+name = "Dotfiles Node Arch"
+email = "no.email.arch@hosting.net"
+
+[features.packaging.pacman]
+parallel_downloads = 2
+
+[features.packaging.makepkg]
+jobs = 1
+packager = "Dotfiles Node Arch <no.email.arch@hosting.net>"

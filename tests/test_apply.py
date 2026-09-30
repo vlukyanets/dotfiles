@@ -9,15 +9,17 @@ import pytest
 
 from dotfiles import apply as runner
 from dotfiles import config, engine
-from dotfiles.apply import Step, apply, cycles, order, steps
-from dotfiles.config import ROOT, ConfigError
-from dotfiles.feature import Feature
+from dotfiles.apply import apply
+from dotfiles.errors import ConfigError
+from dotfiles.feature import classes
+from dotfiles.layout import Layout
+from dotfiles.plan import Step, cycles, order, steps
 from dotfiles.platforms import discovery
-from dotfiles.platforms.arch import Arch
-from dotfiles.platforms.linux import Linux
+from dotfiles.platforms.arch import ArchLinuxOs
+from dotfiles.platforms.linux import LinuxOs
 from dotfiles.platforms.package_manager import PackageManager
 
-HEAD = "from dotfiles.engine import defer, die, notice\nfrom dotfiles.feature import Feature\n\n\n"
+HEAD = "from dotfiles.engine import defer, die\nfrom dotfiles.feature import Feature\n\n\n"
 
 
 class FakeManager(PackageManager):
@@ -40,6 +42,9 @@ class FakeManager(PackageManager):
             raise RuntimeError("mirror down")
         self.installed.update(names)
 
+    def upgrade(self):
+        pass
+
     def depends(self, names):
         return {n: self.graph.get(n, set()) for n in names}
 
@@ -47,11 +52,11 @@ class FakeManager(PackageManager):
         return self.depends(names)
 
 
-class FakeArch(Linux):
+class FakeArch(LinuxOs):
     manager_class = FakeManager
 
 
-FakeArch.__name__ = "Arch"
+FakeArch.__module__ = "fakeplat"  # its features: fakeplat/features/, from make_package
 
 
 @pytest.fixture
@@ -61,7 +66,8 @@ def system(monkeypatch) -> type[FakeManager]:
     monkeypatch.setattr(FakeManager, "installs", [])
     monkeypatch.setattr(FakeManager, "replaced", [])
     monkeypatch.setattr(FakeManager, "broken", False)
-    monkeypatch.setattr(discovery, "detect", lambda cfg, package: FakeArch(cfg))
+    monkeypatch.setattr(discovery, "detect", lambda machine: FakeArch(machine))
+    monkeypatch.setattr(discovery, "every", lambda machine: [FakeArch(machine)])
     return FakeManager
 
 
@@ -69,29 +75,27 @@ def feature(
     cls: str,
     apply: str = "pass",
     packages: list[str] | None = None,
-    on="Linux",
     replaces: list[str] | None = None,
     requires: list[str] | None = None,
 ) -> str:
-    body = f"class {cls}(Feature):\n    def apply(self, strategy):\n        {apply}\n\n"
-    body += f"    class {on}:\n"
-    body += f"        def packages(self):\n            return {packages or []!r}\n"
-    body += f"        def replaces(self):\n            return {replaces or []!r}\n"
-    body += f"        def requires(self):\n            return {requires or []!r}\n"
+    body = f"class {cls}(Feature):\n    def apply(self):\n        {apply}\n\n"
+    body += f"    def packages(self):\n        return {packages or []!r}\n"
+    body += f"    def replaces(self):\n        return {replaces or []!r}\n"
+    body += f"    def requires(self):\n        return {requires or []!r}\n"
     return body
 
 
-def make_package(tmp_path, monkeypatch, modules: dict[str, str]) -> str:
-    """A package of fake features, one module per entry."""
-    pkg = tmp_path / "pkg" / "fakefeatures"
-    pkg.mkdir(parents=True)
+def make_package(tmp_path, monkeypatch, modules: dict[str, str], name: str = "fakeplat") -> None:
+    """Platform package NAME with a module in features/ per entry: FakeArch's by default."""
+    pkg = tmp_path / "pkg" / name
+    (pkg / "features").mkdir(parents=True)
     (pkg / "__init__.py").write_text("")
-    for name, body in modules.items():
-        (pkg / f"{name}.py").write_text(HEAD + body)
+    (pkg / "features/__init__.py").write_text("")
+    for module, body in modules.items():
+        (pkg / f"features/{module}.py").write_text(HEAD + body)
     monkeypatch.syspath_prepend(str(tmp_path / "pkg"))
-    for name in [m for m in sys.modules if m.split(".")[0] == "fakefeatures"]:
-        monkeypatch.delitem(sys.modules, name)  # each test imports its own package
-    return "fakefeatures"
+    for loaded in [m for m in sys.modules if m.split(".")[0] == name]:
+        monkeypatch.delitem(sys.modules, loaded)  # each test imports its own package
 
 
 @pytest.fixture
@@ -107,48 +111,44 @@ def root(tmp_path) -> Path:
 
 
 def test_gates_and_platforms(root, system, tmp_path, monkeypatch, capsys):
-    package = make_package(
+    make_package(
         tmp_path,
         monkeypatch,
         {
             "on": feature("On", 'print("on ran")'),
             "off": feature("Off", 'raise AssertionError("a disabled feature ran")'),
             "always": feature("Always", 'print("always ran")'),  # not in the schema
-            "elsewhere": feature("Elsewhere", "die('ran')", on="Debian"),
-            "archonly": feature(
-                "ArchOnly", 'print("arch ran", type(strategy).__name__)', on="Arch"
-            ),
         },
     )
-    assert apply("h", root, package=package) == 0
+    assert apply("h", root) == 0
     # Fakes print directly, not through changed(): nothing counts as a change.
-    out = "always ran\narch ran ArchOnly.Arch\non ran\nnothing to change\n"
+    out = "always ran\non ran\nnothing to change\n"
     assert capsys.readouterr() == (out, "")
 
 
-def test_the_strategy_is_the_platform_plus_the_nested_class(system):
-    class Tool(Feature):
-        def apply(self, strategy):
-            return strategy.flag(), strategy.manager.missing(["x"])
+def test_a_platform_falls_back_to_its_base_for_what_it_lacks(tmp_path, monkeypatch):
+    base = {"tool": feature("Tool", "return 'base'"), "base": feature("Base")}
+    make_package(tmp_path, monkeypatch, base, name="fakebase")
+    make_package(tmp_path, monkeypatch, {"tool": feature("Tool", "return 'own'")})
 
-        class Linux:
-            def flag(self):
-                return "--linux"
+    class Base(LinuxOs):
+        pass
 
-        class Arch:
-            def flag(self):
-                return "--arch"
+    class Own(Base):
+        manager_class = FakeManager
 
-    tool = Tool({"k": 1})
-    strategy = tool.strategy(FakeArch({"k": 1}))
-    assert type(strategy).__name__ == "Tool.Arch" and strategy.cfg == {"k": 1}
-    assert tool.apply(strategy) == ("--arch", ["x"])
-    del Tool.Arch
-    assert tool.apply(tool.strategy(FakeArch({}))) == ("--linux", ["x"])
+    Base.__module__, Own.__module__ = "fakebase", "fakeplat"
+    found = classes(Own)
+    assert found["tool"].__module__ == "fakeplat.features.tool"
+    assert found["base"].__module__ == "fakebase.features.base"
+    tool = found["tool"]({"k": 1}, Own(engine.current()))
+    assert tool.apply() == "own" and tool.settings == {"k": 1}
+    assert tool.system.manager.missing(["x"]) == ["x"]
+    assert classes(Base)["tool"]({}, None).apply() == "base"
 
 
 def test_one_install_then_silence(root, system, tmp_path, monkeypatch, capsys):
-    package = make_package(
+    make_package(
         tmp_path,
         monkeypatch,
         {
@@ -158,26 +158,42 @@ def test_one_install_then_silence(root, system, tmp_path, monkeypatch, capsys):
         },
     )
     system.installed = {"nginx"}
-    assert apply("h", root, package=package) == 0
+    assert apply("h", root) == 0
     assert system.installs == [["git", "postgres"]]
     assert system.replaced == [["git-git"]]
     assert capsys.readouterr().out == "-> packages: git postgres (missing)\n"
-    assert apply("h", root, package=package) == 0
+    assert apply("h", root) == 0
     assert system.installs == [["git", "postgres"]]
     assert capsys.readouterr() == ("nothing to change\n", "")
 
 
-def test_dry_run_installs_nothing_and_runs_every_feature(
+def test_dry_run_leaves_features_whose_packages_are_missing(
     root, system, tmp_path, monkeypatch, capsys
 ):
-    package = make_package(tmp_path, monkeypatch, {"db": feature("Db", 'print("db")', ["pg"])})
-    assert apply("h", root, dry_run=True, package=package) == 0
+    (root / "dotfiles/defaults.toml").write_text(
+        "[features]\n" + "".join(f"{n}.enabled = true\n" for n in ("db", "app", "shell"))
+    )
+    make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "db": feature("Db", 'die("checked what is not there")', ["pg"]),
+            "app": feature("App", 'die("ran")', requires=["db"]),
+            "shell": feature("Shell", 'print("shell")', ["zsh"]),
+        },
+    )
+    system.installed = {"zsh"}
+    assert apply("h", root, dry_run=True) == 0
     assert system.installs == []
-    assert capsys.readouterr().out == "-> packages: pg (missing)\ndb\n"
+    assert capsys.readouterr() == (
+        "-> packages: pg (missing)\n"
+        + "-> db (after its packages)\n-> app (after its packages)\nshell\n",
+        "",
+    )
 
 
 def step(name, packages=(), requires=()):
-    return Step(name, None, None, frozenset(packages), frozenset(), frozenset(requires))
+    return Step(name, None, frozenset(packages), frozenset(), frozenset(requires))
 
 
 def test_order_follows_the_package_graph():
@@ -206,6 +222,14 @@ def test_order_puts_a_requirement_first():
     assert got == [("b", []), ("a", ["b"]), ("c", [])]  # setup is no step: nothing to wait for
 
 
+def test_order_follows_what_packages_provide():
+    steps_ = [step("app", ["app"]), step("jdk", ["jdk-openjdk"])]
+    graph = {"app": {"java-runtime"}}
+    provides = {"jdk-openjdk": {"java-runtime"}, "app": {"app-bin"}}
+    got = [(s.name, after) for s, after in order(steps_, graph, provides)]
+    assert got == [("jdk", []), ("app", ["jdk"])]
+
+
 def test_order_breaks_a_cycle_by_name():
     graph = {"x": {"y"}, "y": {"x"}}
     got = [(s.name, after) for s, after in order([step("b", ["y"]), step("a", ["x"])], graph)]
@@ -222,7 +246,7 @@ def test_a_requires_cycle_is_a_config_error(root, system, tmp_path, monkeypatch)
     (root / "dotfiles/defaults.toml").write_text(
         "[features]\ngaming.enabled = true\nnvidia.enabled = true\npacman.enabled = true\n"
     )
-    package = make_package(
+    make_package(
         tmp_path,
         monkeypatch,
         {
@@ -233,11 +257,11 @@ def test_a_requires_cycle_is_a_config_error(root, system, tmp_path, monkeypatch)
     )
     msg = "^gaming → nvidia → gaming: each requires the next, so none can run first$"
     with pytest.raises(ConfigError, match=msg):
-        apply("h", root, package=package)
+        apply("h", root)
     assert system.installs == []  # found before any change
     cfg = {"features": {n: {"enabled": True} for n in ("gaming", "nvidia", "pacman")}}
     with pytest.raises(ConfigError, match=msg):
-        runner.requirements(cfg, package, "dotfiles.platforms")
+        runner.requirements(cfg)
 
 
 def test_features_whose_packages_need_each_other_do_not_run(
@@ -247,7 +271,7 @@ def test_features_whose_packages_need_each_other_do_not_run(
         "[features]\n"
         + "".join(f"{n}.enabled = true\n" for n in ("graphics", "glvnd", "game", "shell"))
     )
-    package = make_package(
+    make_package(
         tmp_path,
         monkeypatch,
         {
@@ -259,7 +283,7 @@ def test_features_whose_packages_need_each_other_do_not_run(
     )
     system.installed = {"mesa", "libglvnd", "steam", "zsh"}
     system.graph = {"mesa": {"libglvnd"}, "libglvnd": {"mesa"}, "steam": {"mesa", "libglvnd"}}
-    assert apply("h", root, package=package) == 1
+    assert apply("h", root) == 1
     assert capsys.readouterr() == (
         "shell ran\n",
         (
@@ -270,22 +294,22 @@ def test_features_whose_packages_need_each_other_do_not_run(
 
 
 def test_a_failure_alone_is_not_nothing_to_change(root, system, tmp_path, monkeypatch, capsys):
-    package = make_package(tmp_path, monkeypatch, {"on": feature("On", 'die("broken")')})
-    assert apply("h", root, package=package) == 1
+    make_package(tmp_path, monkeypatch, {"on": feature("On", 'die("broken")')})
+    assert apply("h", root) == 1
     assert capsys.readouterr() == ("", "error: on: broken\n")
 
 
 def test_errors_say_what_went_wrong_and_where(root, system, tmp_path, monkeypatch, capsys):
-    package = make_package(
+    make_package(
         tmp_path,
         monkeypatch,
         {
-            "on": feature("On", 'self.cfg["features"]["on"]["nope"]'),
-            "cmd": feature("Cmd", 'from dotfiles.engine import run; run("false")'),
+            "on": feature("On", 'self.settings["nope"]'),
+            "cmd": feature("Cmd", 'self.system.shell.run("false")'),
             "div": feature("Div", "1 / 0"),
         },
     )
-    assert apply("h", root, package=package) == 1
+    assert apply("h", root) == 1
     err = capsys.readouterr().err.splitlines()
     assert [line.split(", at ")[0] for line in err] == [
         "error: cmd: `false` failed with exit status 1",
@@ -293,15 +317,15 @@ def test_errors_say_what_went_wrong_and_where(root, system, tmp_path, monkeypatc
         "error: on: features.on.nope: no such key in dotfiles/defaults.toml",
     ]
     # The line of the feature, not engine.run's.
-    assert [line.split(", at ")[1].split("fakefeatures/")[1] for line in err] == [
-        'cmd.py:7: from dotfiles.engine import run; run("false")',
+    assert [line.split(", at ")[1].split("fakeplat/features/")[1] for line in err] == [
+        'cmd.py:7: self.system.shell.run("false")',
         "div.py:7: 1 / 0",
-        'on.py:7: self.cfg["features"]["on"]["nope"]',
+        'on.py:7: self.settings["nope"]',
     ]
 
 
 def test_failures_block_what_builds_on_them(root, system, tmp_path, monkeypatch, capsys):
-    package = make_package(
+    make_package(
         tmp_path,
         monkeypatch,
         {
@@ -309,14 +333,14 @@ def test_failures_block_what_builds_on_them(root, system, tmp_path, monkeypatch,
             "web": feature("Web", 'print("web ran")', ["php"]),
             "app": feature("App", 'print("app ran")', ["app"]),
             "net": feature("Net", 'defer("cloning x failed")', ["curl"]),
-            "note": feature("Note", 'notice("reboot")'),
+            "note": feature("Note", 'self.system.report.notice("reboot")'),
             "crash": feature("Crash", "raise RuntimeError('bug')"),
             "z": feature("Z", 'print("z ran")', ["zsh"]),
         },
     )
     system.installed = {"postgres", "php", "app", "curl", "zsh"}
     system.graph = {"php": {"postgres"}, "app": {"php"}, "zsh": {"curl"}}
-    assert apply("h", root, package=package) == 1
+    assert apply("h", root) == 1
     out, err = capsys.readouterr()
     assert out == (
         "z ran\n"
@@ -326,7 +350,7 @@ def test_failures_block_what_builds_on_them(root, system, tmp_path, monkeypatch,
     )
     crash, err = err.split("\n", 1)
     assert crash.startswith("error: crash: unexpected RuntimeError (bug), at ")
-    assert crash.endswith("fakefeatures/crash.py:7: raise RuntimeError('bug')")
+    assert crash.endswith("fakeplat/features/crash.py:7: raise RuntimeError('bug')")
     assert err == (
         "error: db: broken\n"
         "warning: cloning x failed (network?) — the next apply retries\n"
@@ -340,7 +364,7 @@ def test_a_failed_requirement_blocks(root, system, tmp_path, monkeypatch, capsys
     (root / "dotfiles/defaults.toml").write_text(
         "[features]\nshell.enabled = true\nbar.enabled = true\n"
     )
-    package = make_package(
+    make_package(
         tmp_path,
         monkeypatch,
         {
@@ -348,7 +372,7 @@ def test_a_failed_requirement_blocks(root, system, tmp_path, monkeypatch, capsys
             "bar": feature("Bar", 'print("bar ran")', requires=["shell"]),
         },
     )
-    assert apply("h", root, package=package) == 1
+    assert apply("h", root) == 1
     assert capsys.readouterr() == ("", "error: shell: broken\nerror: bar: not run, shell failed\n")
 
 
@@ -356,30 +380,29 @@ def test_a_requirement_left_off_is_a_config_error(root, system, tmp_path, monkey
     (root / "dotfiles/defaults.toml").write_text(
         "[features]\non.enabled = true\noff.enabled = false\nelse.enabled = true\n"
     )
-    package = make_package(
+    make_package(
         tmp_path,
         monkeypatch,
         {
             "on": feature("On", "die('ran')", requires=["off", "nope"]),
             "off": feature("Off"),
-            "else": feature("Else", "die('ran')", on="Debian", requires=["off"]),  # not here
         },
     )
     msg = "^on: requires nope, which is not a feature; on: requires features.off.enabled = true$"
     with pytest.raises(ConfigError, match=msg):
-        apply("h", root, package=package)
+        apply("h", root)
     cfg = {"features": {"on": {"enabled": True}, "off": {"enabled": False}}}
     with pytest.raises(ConfigError, match=msg):
-        runner.requirements(cfg, package, "dotfiles.platforms")
+        runner.requirements(cfg)
     cfg["features"]["off"]["enabled"] = True
     with pytest.raises(ConfigError, match="^on: requires nope, which is not a feature$"):
-        runner.requirements(cfg, package, "dotfiles.platforms")
+        runner.requirements(cfg)
 
 
 def test_packages_that_did_not_install_block_their_features(
     root, system, tmp_path, monkeypatch, capsys
 ):
-    package = make_package(
+    make_package(
         tmp_path,
         monkeypatch,
         {
@@ -390,7 +413,7 @@ def test_packages_that_did_not_install_block_their_features(
     )
     system.installed = {"zsh"}
     system.broken = True
-    assert apply("h", root, package=package) == 1
+    assert apply("h", root) == 1
     out, err = capsys.readouterr()
     assert out == "-> packages: postgres (missing)\nok ran\nplain ran\n"
     assert re.fullmatch(
@@ -405,28 +428,29 @@ def test_notices_survive_ctrl_c(root, system, tmp_path, monkeypatch, capsys):
     def interrupt(*args):
         raise KeyboardInterrupt
 
-    package = make_package(tmp_path, monkeypatch, {"note": feature("Note", 'notice("reboot")')})
-    monkeypatch.setattr(FakeManager, "setup", lambda self: engine.notice("reboot"))
+    make_package(
+        tmp_path, monkeypatch, {"note": feature("Note", 'self.system.report.notice("reboot")')}
+    )
+    monkeypatch.setattr(FakeManager, "setup", lambda self: self.report.notice("reboot"))
     monkeypatch.setattr("dotfiles.apply._deploy", interrupt)
     with pytest.raises(KeyboardInterrupt):
-        apply("h", root, package=package)
+        apply("h", root)
     assert capsys.readouterr().out.endswith("Notices from this apply:\n    reboot\n")
 
 
-def test_a_module_defines_one_feature(root, system, tmp_path, monkeypatch):
-    package = make_package(tmp_path, monkeypatch, {"two": feature("A") + feature("B")})
-    with pytest.raises(ConfigError, match="^fakefeatures.two: defines 2 features, not one$"):
-        steps({"features": {}}, FakeArch({}), package)
+def test_a_module_holds_the_feature_named_after_it(root, system, tmp_path, monkeypatch):
+    make_package(tmp_path, monkeypatch, {"two": feature("A") + feature("B")})
+    with pytest.raises(ConfigError, match="^fakeplat.features.two: no feature class Two$"):
+        steps({"features": {}}, FakeArch(engine.current()))
 
 
 def test_real_features_are_consistent():
-    cfg = tomllib.loads((ROOT / "dotfiles/defaults.toml").read_text())
+    cfg = tomllib.loads(Layout().defaults.read_text())
     for table in cfg["features"].values():
         table["enabled"] = True
-    found = {s.name: s for s in steps(cfg, Arch(cfg))}  # packages() only reads files
-    for name, s in found.items():
-        assert type(s.feature).__name__ == name.title().replace("_", ""), name
-        assert name in cfg["features"], f"{name}: not in the schema"
+    # packages() only reads files
+    found = {s.name: s for s in steps(cfg, ArchLinuxOs(engine.current()))}
+    assert not set(found) - set(cfg["features"]), "features not in the schema"
     missing = set(cfg["features"]) - set(found)
     assert not missing, f"features without a module: {sorted(missing)}"
     assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {}
@@ -449,4 +473,4 @@ def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
     assert "-> /etc/pacman.conf.d/options.conf (missing)\n" in out
     assert "-> ~/.gitconfig (missing)\n" in out
     assert not (Path.home() / ".gitconfig").exists()
-    assert not engine.path("/").exists()
+    assert not engine.current().files.path("/").exists()
