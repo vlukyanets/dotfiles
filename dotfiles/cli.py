@@ -60,8 +60,9 @@ def main() -> int:
     try:
         if args.command == "check":
             results = apply.check(source=args.source)
+            width = max(map(len, results))
             for host, error in results.items():
-                print(f"{host:<14} {'ok' if error is None else 'FAIL'}")
+                print(f"{host:<{width}} {'ok' if error is None else 'FAIL'}")
                 if error is not None:
                     print(f"error: {error}", file=sys.stderr)
             return 1 if any(results.values()) else 0

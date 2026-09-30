@@ -37,7 +37,7 @@ def test_init_then_every_command_reads_the_machine_config(monkeypatch, capsys):
     _, mine, _ = run(monkeypatch, capsys, "config")
     assert '[secrets]\nbackend = "none"' in mine
     assert run(monkeypatch, capsys, "config", "--source", str(Layout.root))[1] != mine
-    assert run(monkeypatch, capsys, "check")[1].endswith("local          ok\n")
+    assert run(monkeypatch, capsys, "check")[1].split()[-2:] == ["local", "ok"]
 
 
 @pytest.mark.parametrize("command", ["init", "config", "render", "deploy", "apply", "check"])

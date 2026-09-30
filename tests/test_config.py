@@ -1,4 +1,5 @@
 import copy
+import re
 import tomllib
 from pathlib import Path
 
@@ -184,7 +185,10 @@ def test_hostname_does_not_pick_up_a_profile(root):
         ),
         ({"hosts/h.toml": 'extends = "p"\n'}, "hosts/h.toml: extends: must be an array of strings"),
         ({"hosts/h.toml": "extends = [1]\n"}, "hosts/h.toml: extends: must be an array of strings"),
-        ({"hosts/h.toml": "", "profiles/h.toml": ""}, "hosts/h.toml: 'h' is also profiles/h.toml"),
+        (
+            {"hosts/h.toml": "", "profiles/h.toml": ""},
+            "ambiguous name 'h': profiles/h.toml, hosts/h.toml; give its path under hosts/",
+        ),
         (
             {"hosts/h.toml": 'extends = ["p"]\n', "profiles/p.toml": "[features]\nc = 1\n"},
             "profiles/p.toml: features.c: unknown key",
@@ -201,6 +205,30 @@ def test_bad_inheritance(root, files, error):
     with pytest.raises(ConfigError) as e:
         resolve("h", root)
     assert str(e.value) == error
+
+
+def test_nested_host_by_name_or_path(root):
+    write(root, "profiles/p.toml", "[features]\na = true\n")
+    write(root, "hosts/vm/node/n.toml", 'extends = ["p"]\n')
+    write(root, "hosts/o.toml", 'extends = ["vm/node/n"]\n[features]\nb = true\n')
+    want = {"features": {"a": True, "b": False}}
+    assert resolve("n", root) == resolve("n.toml", root) == want
+    assert resolve("vm/node/n", root) == resolve("vm/node/n.toml", root) == want
+    assert resolve("o", root) == {"features": {"a": True, "b": True}}
+    assert [w for w, _ in chain("n", root)] == ["profiles/p.toml", "hosts/vm/node/n.toml"]
+
+
+def test_a_name_in_two_folders_is_ambiguous(root):
+    write(root, "hosts/a/n.toml", "")
+    write(root, "hosts/b/n.toml", "")
+    write(root, "hosts/h.toml", 'extends = ["n"]\n')
+    ambiguous = "ambiguous name 'n': hosts/a/n.toml, hosts/b/n.toml; give its path under hosts/"
+    with pytest.raises(ConfigError, match=f"^{re.escape(ambiguous)}$"):
+        resolve("n", root)
+    with pytest.raises(ConfigError, match=f"^{re.escape('hosts/h.toml: extends: ' + ambiguous)}$"):
+        resolve("h", root)
+    assert resolve("a/n", root) == resolve("b/n", root)
+    assert list(check(root)) == ["a/n", "b/n", "h", "unknown-host"]
 
 
 def test_real_profiles():
@@ -274,7 +302,7 @@ def test_init_writes_the_resolved_host_then_nothing(root, tmp_path):
 
 def test_init_needs_a_host_file(root, tmp_path):
     write(root, "profiles/p.toml", "")
-    with pytest.raises(ConfigError, match=r"^no hosts/p\.toml in "):
+    with pytest.raises(ConfigError, match=r"^no host 'p' in "):
         init("p", root, tmp_path / "config.toml")
     assert not (tmp_path / "config.toml").exists()
 

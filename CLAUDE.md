@@ -28,8 +28,10 @@ master and every PR; uv is pinned there by version and sha256.
   `layout.local_config`); the CLI (`dotfiles/cli.py`) picks it or a checkout.
 - Where things are: `dotfiles/layout.py` — `Layout(root)` names a checkout's
   paths (`defaults`, `hosts`, `profiles`, `home`, `home_toml`, `system`),
-  `local_config()` this machine's config, `shown(path)` a path with `~`;
-  code asks it, never joins `root / "hosts"` itself.
+  `named(name)` a host or profile by bare name (ambiguous → error) or by
+  path under `hosts/`, which nests folders; `local_config()` this machine's
+  config, `shown(path)` a path with `~`; code asks it, never joins
+  `root / "hosts"` itself.
 - Resolution, validation, merge, explain, check: `dotfiles/config.py`; it
   imports no feature: the entry points pass `checks=feature.checks()`.
   `ConfigError` lives in `dotfiles/errors.py`, for every layer.

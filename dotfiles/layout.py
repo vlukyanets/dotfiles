@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
+from dotfiles.errors import ConfigError
+
 # The checkout this code runs from.
 _ROOT = Path(__file__).resolve().parent.parent
 
@@ -48,9 +50,28 @@ class Layout:
         """Templates of the files features write outside $HOME, at their path from /."""
         return self.root / "system"
 
-    def host(self, name: str) -> Path:
-        """Host NAME's file."""
-        return self.hosts / f"{name}.toml"
+    def host_names(self) -> list[str]:
+        """Every host by its path under hosts/, without .toml: `vm/dotfiles/node-arch`."""
+        return sorted(
+            p.relative_to(self.hosts).with_suffix("").as_posix() for p in self.hosts.rglob("*.toml")
+        )
+
+    def named(self, name: str) -> Path | None:
+        """NAME's file, .toml optional: a path under hosts/ if it has a `/`, else the one
+        host or profile of that name, in any folder under hosts/; None if there is none.
+        """
+        name = name.removesuffix(".toml")
+        if "/" in name:
+            path = self.hosts / f"{name}.toml"
+            return path if path.is_file() else None
+        # ponytail: rglob on every lookup; index once if hosts/ grows to thousands of files.
+        found = sorted(self.profiles.glob(f"{name}.toml")) + sorted(
+            self.hosts.rglob(f"{name}.toml")
+        )
+        if len(found) > 1:
+            files = ", ".join(str(p.relative_to(self.root)) for p in found)
+            raise ConfigError(f"ambiguous name {name!r}: {files}; give its path under hosts/")
+        return found[0] if found else None
 
 
 def local_config() -> Path:

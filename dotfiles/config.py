@@ -111,45 +111,38 @@ def merge_over(want: dict, base: dict) -> dict:
     return out
 
 
-def _names(root: Path) -> dict[str, Path]:
-    """Every profile and host by name. One namespace, so `extends` needs no prefix."""
-    found: dict[str, Path] = {}
-    layout = Layout(root)
-    paths = sorted(layout.profiles.glob("*.toml")) + sorted(layout.hosts.glob("*.toml"))
-    for path in paths:
-        if path.stem in found:
-            other = found[path.stem].relative_to(root)
-            raise ConfigError(f"{path.relative_to(root)}: {path.stem!r} is also {other}")
-        found[path.stem] = path
-    return found
-
-
 def chain(host: str, root: Path) -> list[tuple[str, dict]]:
     """HOST's files, each (path, data), parents before children; [] for an unknown host."""
-    known = _names(root)
+    layout = Layout(root)
     order: list[tuple[str, dict]] = []
-    done: set[str] = set()
+    done: set[Path] = set()
 
-    def visit(name: str, stack: list[str]) -> None:
-        """NAME's parents, then NAME itself, each once; fail on a cycle."""
-        if name in stack:
-            raise ConfigError(f"extends: cycle {' → '.join(stack[stack.index(name) :] + [name])}")
-        if name in done:
+    def visit(path: Path, stack: list[Path]) -> None:
+        """PATH's parents, then PATH itself, each once; fail on a cycle."""
+        if path in stack:
+            names = [p.stem for p in stack[stack.index(path) :] + [path]]
+            raise ConfigError(f"extends: cycle {' → '.join(names)}")
+        if path in done:
             return
-        where = str(known[name].relative_to(root))
-        data = load(known[name], root)
+        where = str(path.relative_to(root))
+        data = load(path, root)
         parents = data.pop("extends", [])
         if not isinstance(parents, list) or not all(isinstance(p, str) for p in parents):
             raise ConfigError(f"{where}: extends: must be an array of strings")
         for parent in parents:
-            if parent not in known:
+            try:
+                found = layout.named(parent)
+            except ConfigError as e:
+                raise ConfigError(f"{where}: extends: {e}") from None
+            if found is None:
                 raise ConfigError(f"{where}: extends: no profile or host {parent!r}")
-            visit(parent, stack + [name])
-        done.add(name)
+            visit(found, stack + [path])
+        done.add(path)
         order.append((where, data))
 
-    if host in known and known[host].parent == Layout(root).hosts:
-        visit(host, [])
+    path = layout.named(host)
+    if path is not None and path.is_relative_to(layout.hosts):
+        visit(path, [])
     return order
 
 
@@ -221,11 +214,12 @@ def init(
 ) -> str | None:
     """HOST of SOURCE (default this checkout) resolved and written to PATH; the change line, or None."""
     source = source or root
-    if not Layout(source).host(host).is_file():
-        raise ConfigError(f"no hosts/{host}.toml in {source}")
+    found = Layout(source).named(host)
+    if found is None or not found.is_relative_to(Layout(source).hosts):
+        raise ConfigError(f"no host {host!r} in {source}/hosts")
     path = path or local_config()
     text = (
-        f"# This machine's config: hosts/{host}.toml and everything it extends,\n"
+        f"# This machine's config: {found.relative_to(source)} and everything it extends,\n"
         f"# resolved by `dotfiles init` from {source.resolve()}.\n"
         "# apply, deploy, config and render read it; the next init overwrites it.\n\n"
     ) + tomli_w.dumps(resolve(host, root, source=source, checks=checks))
@@ -266,7 +260,7 @@ def check(
     """Resolve every host in hosts/ of SOURCE and one that is not there: host -> error or None."""
     source = source or root
     results: dict[str, str | None] = {}
-    for host in sorted(p.stem for p in Layout(source).hosts.glob("*.toml")) + ["unknown-host"]:
+    for host in Layout(source).host_names() + ["unknown-host"]:
         try:
             resolve(host, root, source=source, checks=checks)
             results[host] = None

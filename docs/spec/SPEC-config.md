@@ -64,8 +64,13 @@ Resolution for host `H`:
    once: `extends = ["a", "b"]` where both extend `base` yields
    `defaults → base → a → b → H`. A shared ancestor is merged once, at its
    first position, so `b` does not reset what `a` set.
-2. **Names.** A name in `extends` is looked up in `hosts/` and `profiles/`;
-   a name present in both is an error. Unknown name → error.
+2. **Names.** `hosts/` may nest folders (`hosts/vm/dotfiles/dotfiles-node-arch.toml`).
+   A name — in `extends`, `--host`, `init` — is either a path under `hosts/`
+   (`vm/dotfiles/dotfiles-node-arch`, `.toml` optional) or a bare name
+   (`dotfiles-node-arch`) looked up in `profiles/` and every folder of
+   `hosts/` (`Layout.named`). A bare name found more than once is an error
+   listing the files: `ambiguous name 'n': hosts/a/n.toml, hosts/b/n.toml`;
+   its path then picks one. Unknown name → error.
    A cycle → error listing the cycle (`a → b → a`).
 3. **Validation, per file, before merging.** Every key must exist in
    `dotfiles/defaults.toml` at the same path, at any depth, with the same
@@ -83,7 +88,7 @@ Resolution for host `H`:
    code that reads the keys; `feature.checks()` gathers them from every platform and
    the entry points pass them in as `checks=` (a `Checks(rules, either)`), so
    `config` imports no feature.
-6. **Unknown host** (no `hosts/<name>.toml`): the defaults alone. Not an
+6. **Unknown host** (no host of that name under `hosts/`): the defaults alone. Not an
    error.
 
 The resolved config does not contain `extends`. It is a tree of
@@ -163,11 +168,11 @@ pyproject.toml           project, [project.scripts] dotfiles = "dotfiles.cli:mai
 dotfiles/cli.py          argparse CLI: init, config, render, deploy, check, apply
 dotfiles/__main__.py     `python -m dotfiles`: calls cli.main
 dotfiles/config.py       load, chain, validate, merge — pure functions over dicts and a root Path
-dotfiles/layout.py       Layout(root): a checkout's paths (this one by default); local_config(), shown()
+dotfiles/layout.py       Layout(root): a checkout's paths (this one by default), named() a host or profile; local_config(), shown()
 dotfiles/defaults.toml   schema
 profiles/                base, server, laptop, vm
 hosts/                   hyper-lin (extends laptop), echo-server (extends server),
-                         dotfiles-node-{arch,debian,voidlinux} (extend vm; test VMs)
+                         vm/dotfiles/dotfiles-node-{arch,debian,voidlinux} (extend vm; test VMs)
 tests/test_config.py     unit tests on tmp_path fixtures + checks on the real data
 tests/test_cli.py        the commands: which config they read, their errors
 docs/spec/               capability map, module specs
@@ -196,8 +201,8 @@ def resolve(
 
 - `pytest`, one file `tests/test_config.py`, fixtures written to `tmp_path`.
 - Cases: single-level extends; multi-parent order; diamond (shared ancestor
-  merged once); host extends host; cycle; unknown parent; name in both
-  directories; unknown key at depth 1 and 2; wrong type incl. `bool` vs
+  merged once); host extends host; cycle; unknown parent; a bare name found twice
+  (ambiguous); a nested host by name and by path; unknown key at depth 1 and 2; wrong type incl. `bool` vs
   `int`; `extends` of wrong type; list replaced not appended; unknown host
   = defaults; every rule of `Packaging.rules`; a key of its `either` with a
   third type; the schema of the code, not of `--source`.
