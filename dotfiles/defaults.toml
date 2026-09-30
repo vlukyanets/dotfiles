@@ -12,10 +12,6 @@
 name  = ""
 email = ""
 
-[secrets]
-# "none" or "rbw": with rbw, ~/.config/rbw/config.json is deployed.
-backend = "none"
-
 # packaging: drop-ins in /etc/pacman.conf.d and /etc/makepkg.conf.d. No
 # `enabled`: pacman itself is always there, so it always runs on Arch.
 # Its keys have no default (their types are Packaging.types): only a key a

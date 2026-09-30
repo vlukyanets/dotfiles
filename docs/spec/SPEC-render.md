@@ -48,9 +48,6 @@ needs a mode or a gate. Paths not listed: files 0644, directories 0755,
 always deployed.
 
 ```toml
-[".config/rbw"]
-when = "secrets.backend == 'rbw'"
-
 [".ssh"]
 mode = "700"
 
@@ -64,7 +61,7 @@ mode = "700"
 ## Template context
 
 ```
-features, git, secrets        the resolved config (config.resolve)
+features, git                 the resolved config (config.resolve)
 host                           the host name
 home, uid                      target home directory and user id
 current                        the target file's current text, "" if absent

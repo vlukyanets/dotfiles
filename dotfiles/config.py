@@ -33,14 +33,7 @@ class Checks(NamedTuple):
     types: dict[str, tuple[type, ...]]
 
 
-# The config's own rule, for the secrets table; the features' come from the entry points.
-_SECRETS_BACKENDS = ("none", "rbw")
-_RULES = {
-    "secrets.backend": (
-        lambda v: v in _SECRETS_BACKENDS,
-        f"one of {', '.join(_SECRETS_BACKENDS)}",
-    ),
-}
+# No rules and no types: the entry points pass the features'.
 _NO_CHECKS = Checks({}, {})
 
 
@@ -187,7 +180,7 @@ def resolve_with_sources(
         config = merge_over(data, config)
         sources.update((key, where) for key, _ in _leaves(data))
     values = dict(_leaves(config))
-    for key, (test, what) in (_RULES | checks.rules).items():
+    for key, (test, what) in checks.rules.items():
         if key in values and not test(values[key]):
             raise ConfigError(f"{host}: {key}: must be {what}, got {_toml_value(values[key])}")
     return Settings(config), sources

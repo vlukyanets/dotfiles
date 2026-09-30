@@ -4,9 +4,6 @@
 # directory covers everything under it. A dotfile follows the feature whose
 # script installs its program.
 
-[".config/rbw"]
-when = "secrets.backend == 'rbw'"
-
 [".ssh"]
 mode = "700"
 

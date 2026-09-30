@@ -138,13 +138,6 @@ def test_rules(key, value, good):
     assert bool(Packaging.rules[key.removeprefix("features.packaging.")][0](value)) is good
 
 
-def test_secrets_backend_is_checked(root):
-    write(root, "dotfiles/defaults.toml", '[secrets]\nbackend = "none"\n')
-    write(root, "hosts/h.toml", '[secrets]\nbackend = "pass"\n')
-    with pytest.raises(ConfigError, match="^h: secrets.backend: must be one of none, rbw"):
-        resolve("h", root)
-
-
 def test_the_schema_comes_from_the_code_not_the_source(root):
     source = root / "old-checkout"
     write(source, "dotfiles/defaults.toml", "[features]\na = false\n")  # older: no b yet

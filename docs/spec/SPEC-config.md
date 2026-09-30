@@ -55,8 +55,8 @@ jobs = "50%"
 ```
 
 Every feature is a table `features.<name>` with `enabled` (default
-`false`) and its settings; `git` and `secrets` are not features and
-stay at the top level.
+`false`) and its settings; `git` is not a feature and stays at the top
+level.
 
 Resolution for host `H`:
 
@@ -85,8 +85,7 @@ Resolution for host `H`:
 4. **Merge.** Tables merge recursively; scalars and lists are replaced by
    the later file, so lists never append.
 5. **Value checks** on the merged result: what a type cannot say, from
-   the config itself for the `secrets` table (`secrets.backend` ∈ {`none`,
-   `rbw`}) and from each feature's `rules` for its own (`Packaging.rules`),
+   each feature's `rules` for its own (`Packaging.rules`),
    as `<host>: <key>: must be <what>, got <value>`. The rules live with the
    code that reads the keys; `feature.checks()` gathers them from every platform and
    the entry points pass them in as `checks=` (a `Checks(rules, types)`), so
@@ -159,7 +158,6 @@ prints one line per leaf, itself valid TOML:
 
 ```
 git.name = "Valentin Lukyanets"  # hosts/hyper-lin.toml
-secrets.backend = "none"  # dotfiles/defaults.toml
 ```
 
 Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
@@ -220,7 +218,7 @@ def resolve(
   ruff before each commit; update the spec when a decision changes.
 - **Ask first:** any runtime dependency beyond `tomli-w`; changing the merge
   rule (e.g. list append).
-- **Never:** push anything; write secrets; prompt
+- **Never:** push anything; prompt
   interactively in this module.
 
 ## Success Criteria

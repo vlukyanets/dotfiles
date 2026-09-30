@@ -33,13 +33,6 @@ def test_ssh_config(homes):
     assert not (homes["unknown-host"] / ".ssh/config.d/.keep").exists()
 
 
-def test_rbw(homes):
-    assert text(homes, "hyper-lin", ".config/rbw/config.json").startswith(
-        '{"email":"valikluks95@gmail.com","sso_id":null,'
-    )
-    assert not (homes["echo-server"] / ".config/rbw").exists()
-
-
 def test_gates_and_modes(homes):
     def files(host):
         return {

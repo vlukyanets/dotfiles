@@ -331,7 +331,7 @@ class Docker(Feature):  # platforms/arch/features/docker.py
   both from every feature of every platform (the schema is one) into a
   `config.Checks`, and the entry points (`cli`, `apply`) pass it to
   `config` as `checks=`: config never imports features. Without it only
-  the types and the config's own `secrets.backend` rule are checked.
+  the types are checked.
 - Every platform has its own package names; nothing maps one onto
   another, and a platform may need packages the others do not.
 - The feature's name is its file name: it runs only when

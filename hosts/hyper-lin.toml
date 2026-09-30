@@ -3,6 +3,3 @@ extends = ["laptop"]
 [git]
 name  = "Valentin Lukyanets"
 email = "valikluks95@gmail.com"
-
-[secrets]
-backend = "rbw"
