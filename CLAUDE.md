@@ -31,9 +31,6 @@ master and every PR; uv is pinned there by version and sha256.
   `home.toml`, rendering in `dotfiles/render.py`.
 - Files features write outside `$HOME`: templates under `system/` at their
   path from `/`, rendered by `render.template` and written with `ensure_file`.
-- Registries: `data/*.toml` (ssh keys), merged into the template
-  context; the names a host takes from them are checked in
-  `render.registries` (`REFERENCES`).
 - Helpers the same on every system: `dotfiles/engine.py` (`Report`,
   `Shell`, `Files` in a `Machine`; the module's functions act on the
   current one). What differs between systems:

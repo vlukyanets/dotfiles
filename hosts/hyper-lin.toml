@@ -4,8 +4,5 @@ extends = ["laptop"]
 name  = "Valentin Lukyanets"
 email = "valikluks95@gmail.com"
 
-[ssh]
-authorized_keys = ["nova-win", "nova-win-work"]
-
 [secrets]
 backend = "rbw"

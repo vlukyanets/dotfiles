@@ -143,7 +143,7 @@ def test_check_renders_every_host(root):
 
 
 def test_check_names_a_value_the_type_allows(tmp_path):
-    for sub in ("hosts", "profiles", "data"):
+    for sub in ("hosts", "profiles"):
         shutil.copytree(ROOT / sub, tmp_path / sub)
     (tmp_path / "dotfiles").mkdir()
     shutil.copy(ROOT / "dotfiles/defaults.toml", tmp_path / "dotfiles")
@@ -152,26 +152,6 @@ def test_check_names_a_value_the_type_allows(tmp_path):
         "solo: features.packaging.makepkg.jobs: must be a number of threads, "
         'or a percent of the cores like "50%", got "fast"'
     )
-
-
-def test_registries_reach_templates_and_names_are_checked(root, tmp_path):
-    write(
-        root,
-        "dotfiles/defaults.toml",
-        '[git]\nname = ""\n[features.zsh]\nenabled = false\n[ssh]\nauthorized_keys = ["a"]\n',
-    )
-    write(root, "hosts/bad.toml", '[ssh]\nauthorized_keys = ["a", "xx"]\n')
-    write(root, "data/ssh-pubkeys-collection.toml", '[ssh_keys.a]\nkey = "ssh-ed25519 A"\n')
-    write(
-        root,
-        "home/keys.j2",
-        '{{ ssh.authorized_keys | map("extract", ssh_keys) | map(attribute="key") | join(",") }}\n',
-    )
-    render("on", tmp_path / "out", root)
-    assert (tmp_path / "out/keys").read_text() == "ssh-ed25519 A\n"
-    with pytest.raises(ConfigError) as e:
-        render("bad", tmp_path / "bad", root)
-    assert str(e.value) == "bad: ssh.authorized_keys: 'xx' is not in data/ (ssh_keys)"
 
 
 def test_system_templates(root):

@@ -56,13 +56,6 @@ def test_gates_and_modes(homes):
     assert oct((homes["hyper-lin"] / ".ssh").stat().st_mode & 0o777) == "0o700"
 
 
-def test_authorized_keys(homes):
-    keys = text(homes, "hyper-lin", ".ssh/authorized_keys").splitlines()[2:]
-    assert [line.split()[-1] for line in keys] == ["nova-win", "nova-win-work"]
-    assert all(line.startswith("ssh-ed25519 AAAA") for line in keys)
-    assert not (homes["echo-server"] / ".ssh/authorized_keys").exists()
-
-
 def test_deploy_hyper_lin_twice_is_silent_the_second_time():
     from dotfiles.render import deploy
 

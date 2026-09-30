@@ -57,7 +57,7 @@ jobs = "50%"
 ```
 
 Every feature is a table `features.<name>` with `enabled` (default
-`false`) and its settings; `git`, `secrets` and `ssh` are not features and
+`false`) and its settings; `git` and `secrets` are not features and
 stay at the top level.
 
 Resolution for host `H`:
@@ -168,9 +168,6 @@ docs/spec/               capability map, module specs
 
 Flat layout (no `src/`), so `python -m dotfiles` runs from a checkout
 without installing the package.
-
-Registries (`ssh-pubkeys-collection.toml`) are not host config; each
-lands in `data/` with the module that first reads it.
 
 ## Code Style
 

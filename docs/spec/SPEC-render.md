@@ -18,8 +18,8 @@ Two commands:
   prints `nothing to change` when `$HOME` already matches.
 
 Out of scope: provisioning (features, packages, root files — `engine`,
-`features`), removing files, the registries only features read
-(`firefox-privacy-config.toml`, `vscode-extensions.toml` come with their features).
+`features`), removing files, lookup tables in `data/` (none today; one
+comes back with the first template that needs it).
 
 ## Tech Stack
 
@@ -37,7 +37,6 @@ Out of scope: provisioning (features, packages, root files — `engine`,
 | an executable | `mode = "755"` in `home.toml` |
 | a file only some hosts get | `when = "<jinja expression>"` in `home.toml` |
 | a file an application also rewrites | an ordinary `.j2` that reads `current` (the file as it is in `$HOME`) |
-| a lookup table | `data/ssh-pubkeys-collection.toml` |
 | the home directory, the user id | `home`, `uid` |
 | a template error | `{{ fail("…") }}` (a global that raises) |
 | TOML in and out, deep merge, regex | filters `from_toml`, `to_toml`, `merge_over`, `regex_search` |
@@ -52,10 +51,6 @@ always deployed.
 [".ssh"]
 mode = "700"
 
-[".ssh/authorized_keys"]
-mode = "600"
-when = "ssh.authorized_keys"
-
 [".config/rbw"]
 when = "secrets.backend == 'rbw'"
 ```
@@ -68,10 +63,9 @@ when = "secrets.backend == 'rbw'"
 ## Template context
 
 ```
-features, git, ssh, secrets    the resolved config (config.resolve)
+features, git, secrets         the resolved config (config.resolve)
 host                           the host name
 home, uid                      target home directory and user id
-ssh_keys                       data/ssh-pubkeys-collection.toml
 current                        the target file's current text, "" if absent
 ```
 
@@ -139,7 +133,6 @@ the dry run and root stay the engine's.
 home/                  the dotfiles, real names, *.j2 for templates
 home.toml              modes and gates
 system/                templates of the files features write outside $HOME
-data/                  ssh-pubkeys-collection.toml
 dotfiles/render.py     context, Jinja2 env and filters, render(), deploy()
 tests/test_render.py   fixture trees in tmp_path; deploy against the tmp HOME
 ```

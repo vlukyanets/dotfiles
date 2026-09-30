@@ -16,11 +16,6 @@ email = ""
 # "none" or "rbw": with rbw, ~/.config/rbw/config.json is deployed.
 backend = "none"
 
-[ssh]
-# Machines that may log in here, by name from the ssh-keys registry.
-# Empty leaves ~/.ssh/authorized_keys unmanaged.
-authorized_keys = []
-
 [features.packaging]
 enabled = false  # drop-ins in /etc/pacman.conf.d and /etc/makepkg.conf.d
 

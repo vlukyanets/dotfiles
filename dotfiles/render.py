@@ -67,8 +67,6 @@ def environment(home: Path) -> jinja2.Environment:
     env.globals["fail"] = fail
     # A double-quoted string that is also valid TOML and JSON.
     env.filters["quote"] = lambda s: json.dumps(str(s), ensure_ascii=False)
-    # Ansible's extract: names | map("extract", registry) looks each name up.
-    env.filters["extract"] = lambda key, container: container[key]
     # For files an application rewrites itself: merge with `current`.
     env.filters["from_toml"] = from_toml
     env.filters["to_toml"] = tomli_w.dumps
@@ -109,25 +107,6 @@ def template(dst: str, root: Path = ROOT, **context) -> str:
         raise _error(e, name, "", SYSTEM) from None
 
 
-# Registry in data/ -> the config key whose names must all be in it.
-REFERENCES = {"ssh_keys": "ssh.authorized_keys"}
-
-
-def registries(host: str, cfg: dict, root: Path) -> dict:
-    """data/*.toml merged, after checking every name CFG takes from them."""
-    merged = {}
-    for path in sorted((root / "data").glob("*.toml")):
-        merged |= config.load(path, root)
-    for registry, dotted in REFERENCES.items():
-        names = cfg
-        for key in dotted.split("."):
-            names = names.get(key, {})
-        for name in names or []:
-            if name not in merged.get(registry, {}):
-                raise ConfigError(f"{host}: {dotted}: {name!r} is not in data/ ({registry})")
-    return merged
-
-
 def _error(e: Exception, template: str, host: str, tree: str = "home") -> ConfigError:
     """The template's name and line, and the host, for any error raised while rendering."""
     line = getattr(e, "lineno", None)
@@ -157,15 +136,7 @@ def render(
     cfg = config.resolve(host, root) if cfg is None else cfg
     # Plain dicts, so Jinja's errors say "dict object".
     plain = cfg.plain() if isinstance(cfg, config.Settings) else cfg
-    context = (
-        plain
-        | registries(host, cfg, root)
-        | {
-            "host": host,
-            "home": str(Path.home()),
-            "uid": os.getuid(),
-        }
-    )
+    context = plain | {"host": host, "home": str(Path.home()), "uid": os.getuid()}
 
     def enabled(rel: Path) -> bool:
         # A gate on a directory covers everything under it.
