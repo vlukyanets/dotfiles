@@ -23,7 +23,7 @@ def _found(cfg: dict, system: OperatingSystem) -> list[Step]:
     """A Step per feature of SYSTEM's platform that CFG does not disable."""
     found = []
     for name, cls in classes(type(system)).items():
-        if name in cfg["features"] and not cfg["features"][name]["enabled"]:
+        if not cfg["features"].get(name, {}).get("enabled", True):  # no `enabled`: always on
             continue
         feature = cls(cfg["features"].get(name, {}), system)
         packages, replaces = frozenset(feature.packages()), frozenset(feature.replaces())
@@ -52,7 +52,7 @@ def _unmet(cfg: dict, requires: dict[str, frozenset[str]]) -> list[str]:
         for name in sorted(names):
             if name not in cfg["features"]:
                 problems.append(f"{feature}: requires {name}, which is not a feature")
-            elif not cfg["features"][name]["enabled"]:
+            elif not cfg["features"][name].get("enabled", True):
                 problems.append(f"{feature}: requires features.{name}.enabled = true")
     return problems
 

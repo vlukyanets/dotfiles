@@ -4,7 +4,7 @@
 # a key that is not here — or has a different type here — fails naming the
 # file and the key. Every feature is a table under [features] whose
 # `enabled` defaults to false, so a host without a file in hosts/ gets
-# dotfiles and nothing else. A feature with no settings is one dotted key,
+# dotfiles and the features without an `enabled`, which always run. A feature with no settings is one dotted key,
 # `docker.enabled = false`; one with settings has its own [features.<name>]
 # table.
 
@@ -16,9 +16,8 @@ email = ""
 # "none" or "rbw": with rbw, ~/.config/rbw/config.json is deployed.
 backend = "none"
 
-[features.packaging]
-enabled = false  # drop-ins in /etc/pacman.conf.d and /etc/makepkg.conf.d
-
+# packaging: drop-ins in /etc/pacman.conf.d and /etc/makepkg.conf.d. No
+# `enabled`: pacman itself is always there, so it always runs on Arch.
 # A setting left at its default writes nothing: pacman.conf and
 # makepkg.conf keep their own value.
 [features.packaging.pacman]

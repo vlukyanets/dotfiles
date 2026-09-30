@@ -43,9 +43,6 @@ what the feature passes, not the whole config.
 ## `packaging` — pacman and makepkg
 
 ```toml
-[features.packaging]
-enabled = true
-
 [features.packaging.pacman]
 parallel_downloads = 5
 multilib           = true
@@ -58,7 +55,8 @@ options  = ["ccache", "!debug"]
 ```
 
 Arch only (`platforms/arch/features/packaging.py`), no packages, no
-requirements: `apply()` does it all.
+requirements: `apply()` does it all. It has no `enabled`: every Arch
+machine has pacman, so it always runs there.
 Only drop-ins are written; the
 main files keep everything the drop-ins do not set. A setting left at its
 default writes nothing, so the main file's own value stays.

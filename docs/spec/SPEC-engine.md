@@ -330,8 +330,10 @@ class Docker(Feature):  # platforms/arch/features/docker.py
 - Every platform has its own package names; nothing maps one onto
   another, and a platform may need packages the others do not.
 - The feature's name is its file name: it runs only when
-  `features.<name>.enabled`. A file whose name is not a feature in the
-  schema runs always and reads its flags itself (services, tools, apps).
+  `features.<name>.enabled`. A feature whose table has no `enabled`
+  (`packaging`) cannot be turned off and runs always; so does a file whose
+  name is not a feature in the schema, and reads its flags itself
+  (services, tools, apps).
 - A feature may declare the features it needs on its platform,
   `requires()` (default `[]`), with the reason next to it:
 

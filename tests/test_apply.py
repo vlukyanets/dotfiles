@@ -126,6 +126,16 @@ def test_gates_and_platforms(root, system, tmp_path, monkeypatch, capsys):
     assert capsys.readouterr() == (out, "")
 
 
+def test_a_feature_without_enabled_always_runs(root, system, tmp_path, monkeypatch, capsys):
+    (root / "dotfiles/defaults.toml").write_text("[features.kept]\nx = 1\n")
+    make_package(tmp_path, monkeypatch, {"kept": feature("Kept", 'print("kept ran")')})
+    assert apply("h", root) == 0
+    assert capsys.readouterr().out == "kept ran\nnothing to change\n"
+    (root / "hosts/h.toml").write_text("[features.kept]\nenabled = false\n")
+    with pytest.raises(ConfigError, match=r"^hosts/h\.toml: features\.kept\.enabled: unknown key$"):
+        config.resolve("h", root)
+
+
 def test_a_platform_falls_back_to_its_base_for_what_it_lacks(tmp_path, monkeypatch):
     base = {"tool": feature("Tool", "return 'base'"), "base": feature("Base")}
     make_package(tmp_path, monkeypatch, base, name="fakebase")

@@ -30,7 +30,8 @@ Build order: `config` → `render`, `engine`, `tooling` → `packages` → `feat
    from the checkout with `uv run dotfiles …`, dependencies from `uv.lock`.
 4. Every apply reconciles live state; a clean apply prints only `nothing to
    change` and asks for no password. A feature is `features.<name>` with `enabled` and its
-   settings; `enabled = false` never uninstalls.
+   settings, or without `enabled` if it always runs (`packaging`);
+   `enabled = false` never uninstalls.
 5. Specs live in `docs/spec/`, one `SPEC-<id>.md` per module.
 6. Commits: imperative plain-language subject, optional one-paragraph body,
    no Conventional Commits prefixes, no AI attribution. Each module lands

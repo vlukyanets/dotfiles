@@ -156,7 +156,7 @@ prints one line per leaf, itself valid TOML:
 
 ```
 git.name = "Valentin Lukyanets"  # hosts/hyper-lin.toml
-features.packaging.enabled = false  # dotfiles/defaults.toml
+features.packaging.pacman.multilib = false  # dotfiles/defaults.toml
 ```
 
 Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.

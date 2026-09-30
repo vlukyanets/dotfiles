@@ -26,9 +26,6 @@ A host or profile sets only what differs and may inherit:
 ```toml
 extends = ["laptop"]   # profiles or other hosts, merged left to right
 
-[features.packaging]
-enabled = true
-
 [features.packaging.pacman]
 flags = ["Color"]
 ```
