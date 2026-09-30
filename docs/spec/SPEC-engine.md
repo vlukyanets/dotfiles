@@ -132,7 +132,12 @@ root. The first such `run` starts one root process,
 once, and every root command of the shell after it goes over that unix
 socket (in a private temp dir) as `(argv, kwargs)` and comes back as the
 `CompletedProcess` or the exception `subprocess.run` raised. The command
-inherits the terminal, so its output shows as before. The process exits
+inherits the terminal's stdout and stderr, so its output shows as before;
+its stdin is a pipe closed at once (EOF). sudo's `use_pty` (default since
+1.9.14) keeps the user's terminal in raw mode for as long as the command
+runs while stdin is that terminal, and every line the apply prints would
+step down the screen; a pipe (not `/dev/null`) makes sudo leave it alone.
+The password is still read from `/dev/tty`. The process exits
 when the shell hangs up (at exit, or when the apply dies); if it cannot
 start (`SUDO_CMD=false`, a wrong password) the `run` raises
 `CalledProcessError`. That is the shell's ROOT; a test's fake gets the

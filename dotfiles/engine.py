@@ -136,7 +136,11 @@ class _Root:
         listener.listen(1)
         listener.settimeout(0.2)
         argv = [*sudo, sys.executable, "-I", str(Path(__file__).with_name("root.py")), address]
-        self._process = subprocess.Popen(argv)
+        # stdin a pipe, closed at once: sudo's use_pty keeps the terminal in raw mode
+        # while stdin is the terminal, and every line we print steps down the screen.
+        # /dev/null would not do: sudo tells a pipe apart, not any non-terminal.
+        self._process = subprocess.Popen(argv, stdin=subprocess.PIPE)
+        self._process.stdin.close()
         while True:  # sudo may be asking for the password
             try:
                 sock, _ = listener.accept()

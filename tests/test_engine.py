@@ -66,6 +66,17 @@ def test_root_commands_share_one_process(monkeypatch):
     assert first.strip() != str(engine.os.getpid())
 
 
+def test_root_process_stdin_is_a_closed_pipe(monkeypatch):
+    # A pipe, not the terminal: sudo's use_pty then leaves the terminal out of raw mode,
+    # where our output would step down the screen. /dev/null would not do.
+    monkeypatch.setenv("SUDO_CMD", "env")
+    probe = (
+        "import os, stat, sys; print(stat.S_ISFIFO(os.fstat(0).st_mode), repr(sys.stdin.read()))"
+    )
+    with shell().as_root():
+        assert shell().run("python3", "-c", probe, capture_output=True).stdout == "True ''\n"
+
+
 def test_mutations_must_succeed(fake):
     fake.answers[("false",)] = (1, "")
     with pytest.raises(subprocess.CalledProcessError):
