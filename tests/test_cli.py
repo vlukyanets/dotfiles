@@ -4,8 +4,8 @@ import sys
 
 import pytest
 
-from dotfiles import config
 from dotfiles.cli import main
+from dotfiles.layout import Layout, local_config
 
 
 def run(monkeypatch, capsys, *argv: str) -> tuple[int, str, str]:
@@ -23,7 +23,7 @@ def test_init_then_every_command_reads_the_machine_config(monkeypatch, capsys):
             "or pass --source <checkout>\n"
         ),
     )
-    local = config.local_path()
+    local = local_config()
     assert run(monkeypatch, capsys, "init", "hyper-lin") == (
         0,
         "-> ~/.config/dotfiles/config.toml (missing)\n",
@@ -33,11 +33,11 @@ def test_init_then_every_command_reads_the_machine_config(monkeypatch, capsys):
     _, repo, _ = run(monkeypatch, capsys, "config", "--host", "hyper-lin")
     assert run(monkeypatch, capsys, "config") == (0, repo, "")
     # The machine config wins until --source or --host points at a checkout.
-    local.write_text(local.read_text().replace("sshd]\nenabled = true", "sshd]\nenabled = false"))
+    local.write_text(local.read_text().replace('"Valentin Lukyanets"', '"Someone Else"'))
     _, mine, _ = run(monkeypatch, capsys, "config")
-    assert "[features.sshd]\nenabled = false" in mine
-    assert run(monkeypatch, capsys, "config", "--source", str(config.ROOT))[1] != mine
-    assert run(monkeypatch, capsys, "check")[1].endswith("local          ok\n")
+    assert 'name = "Someone Else"' in mine
+    assert run(monkeypatch, capsys, "config", "--source", str(Layout.root))[1] != mine
+    assert run(monkeypatch, capsys, "check")[1].split()[-2:] == ["local", "ok"]
 
 
 @pytest.mark.parametrize("command", ["init", "config", "render", "deploy", "apply", "check"])

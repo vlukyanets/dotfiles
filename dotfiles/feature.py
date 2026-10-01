@@ -1,34 +1,87 @@
-"""The base class of every feature and the lookup of its strategy."""
+"""The base class of every feature, and where a platform's features are found."""
 
-from contextlib import AbstractContextManager, nullcontext
+import importlib
+import pkgutil
+from typing import ClassVar
 
-from dotfiles.platforms import Platform
+from dotfiles.config import Checks
+from dotfiles.platforms import discovery
+from dotfiles.platforms.operating_system import OperatingSystem
 
 
 class Feature:
-    """What a feature does everywhere is its apply(); what differs per
-    platform, its packages first of all, is a nested class named after the
-    platform class (Arch, Linux, …), which apply() receives as its strategy."""
+    """A feature on one platform: its settings, what it declares there, what it does.
 
-    def __init__(self, cfg: dict):
-        self.cfg = cfg  # the resolved config
+    Each platform has its own, in `<platform>/features/<name>.py`; a platform
+    without one runs its base's (LinuxOs's). Each default is nothing.
+    """
 
-    def apply(self, strategy: Platform) -> None:
-        """What this feature does, through STRATEGY for what is platform's."""
+    # What the schema's types cannot say, under features.<name>: key -> (test, what it must be).
+    rules: ClassVar[dict[str, tuple]] = {}
+    # Keys and their types where no default says it: several types, the
+    # default's first, or none in the schema, so absent unless a file sets it.
+    types: ClassVar[dict[str, tuple[type, ...]]] = {}
 
-    def session(self, system: Platform) -> AbstractContextManager:
-        """A context around the whole apply of an enabled feature: entered
-        before the platform's setup, left after the last feature, after a
-        failure or Ctrl-C too. Nothing by default."""
-        return nullcontext()
+    def __init__(self, settings: dict, system: OperatingSystem):
+        """The feature with SETTINGS, its features.<name> of the resolved config, on SYSTEM."""
+        self.settings = settings
+        self.system = system
 
-    def strategy(self, system: Platform) -> Platform | None:
-        """The nested class for SYSTEM's platform, walking up its class
-        hierarchy (Arch, then Linux), combined with SYSTEM's class so it has
-        every platform method; None when this feature has none for it."""
-        for base in type(system).__mro__:
-            nested = getattr(type(self), base.__name__, None)
-            if isinstance(nested, type) and not issubclass(nested, Platform):
-                name = f"{type(self).__name__}.{nested.__name__}"
-                return type(name, (nested, type(system)), {})(self.cfg)
-        return None
+    def packages(self) -> list[str]:
+        """The packages it installs on this platform, in its own names."""
+        return []
+
+    def replaces(self) -> list[str]:
+        """Installed packages its packages() replace, removed just before the install."""
+        return []
+
+    def requires(self) -> list[str]:
+        """Features it needs: enabled, or check fails; they run first."""
+        return []
+
+    def apply(self) -> None:
+        """What this feature does, once its packages are installed."""
+
+
+def _package(package: str) -> dict[str, type[Feature]]:
+    """Every feature class of PACKAGE by its module's name: packaging -> Packaging."""
+    try:
+        found = importlib.import_module(package)
+    except ModuleNotFoundError as e:  # a platform without features of its own
+        if e.name is None or not (package == e.name or package.startswith(e.name + ".")):
+            raise
+        return {}
+    return {
+        info.name: discovery.named(
+            importlib.import_module(f"{package}.{info.name}"), info.name, Feature, "feature"
+        )
+        for info in sorted(pkgutil.iter_modules(found.__path__))
+        if not info.name.startswith("_")  # a module its features share
+    }
+
+
+def classes(platform: type[OperatingSystem]) -> dict[str, type[Feature]]:
+    """PLATFORM's features by name: its own, else the nearest base's (ArchLinuxOs, then LinuxOs)."""
+    found: dict[str, type[Feature]] = {}
+    for base in reversed(platform.__mro__):
+        # arch/_os.py holds ArchLinuxOs: arch/features/ holds its features.
+        package = importlib.import_module(base.__module__).__package__
+        if issubclass(base, OperatingSystem) and package:
+            found |= _package(f"{package}.features")
+    return found
+
+
+def every() -> list[tuple[str, type[Feature]]]:
+    """(name, class) of every feature of every platform, for the config's checks."""
+    return [
+        (name, cls) for platform in discovery.platforms() for name, cls in classes(platform).items()
+    ]
+
+
+def checks() -> Checks:
+    """The rules and types of every feature, under features.<name>: what config checks."""
+    rules, types = {}, {}
+    for name, cls in every():  # every platform's: the schema is theirs together
+        rules |= {f"features.{name}.{key}": rule for key, rule in cls.rules.items()}
+        types |= {f"features.{name}.{key}": kinds for key, kinds in cls.types.items()}
+    return Checks(rules, types)

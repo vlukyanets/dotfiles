@@ -1,18 +1,16 @@
 """Host configuration: the defaults, then the host's chain of profiles and hosts."""
 
-import copy
-import os
 import tomllib
 from pathlib import Path
+from typing import NamedTuple
 
 import tomli_w
 
-ROOT = Path(__file__).resolve().parent.parent
-# The schema: every key, its type and its default.
-DEFAULTS = "dotfiles/defaults.toml"
+from dotfiles.errors import ConfigError
+from dotfiles.layout import Layout, local_config, shown
 
 # TOML's names, so an error reads like the file the user is editing.
-KINDS = {
+_KINDS = {
     bool: "boolean",
     int: "integer",
     float: "float",
@@ -20,14 +18,55 @@ KINDS = {
     list: "array",
     dict: "table",
 }
-SECRETS_BACKENDS = ("none", "rbw")
 
 
-class ConfigError(Exception):
-    pass
+class Checks(NamedTuple):
+    """What the schema's types cannot say, from the code that reads the keys.
+
+    RULES: dotted key -> (test, what it must be), checked on the merged config.
+    TYPES: dotted key -> the types it takes, where its default's type does not
+    say: a key of several types, the default's first, or one with no default,
+    in the resolved config only when a file sets it.
+    """
+
+    rules: dict[str, tuple]
+    types: dict[str, tuple[type, ...]]
+
+
+# No rules and no types: the entry points pass the features'.
+_NO_CHECKS = Checks({}, {})
+
+
+class MissingKey(KeyError):
+    """A key the resolved config does not have: a bug in the code reading it."""
+
+    def __str__(self) -> str:
+        """The message alone, without KeyError's quotes."""
+        return self.args[0]
+
+
+class Settings(dict):
+    """A table of the resolved config: a missing key fails naming its dotted path."""
+
+    def __init__(self, data: dict | None = None, dotted: str = ""):
+        """DATA with every table made a Settings that knows its DOTTED path."""
+        super().__init__(
+            (k, Settings(v, f"{dotted}{k}.") if isinstance(v, dict) else v)
+            for k, v in (data or {}).items()
+        )
+        self._dotted = dotted
+
+    def __missing__(self, key):
+        """Fail naming the full dotted key, not just KEY."""
+        raise MissingKey(f"{self._dotted}{key}: no such key in {Layout.DEFAULTS}")
+
+    def plain(self) -> dict:
+        """A copy made of plain dicts, for code that should not see Settings."""
+        return {k: v.plain() if isinstance(v, Settings) else v for k, v in self.items()}
 
 
 def load(path: Path, root: Path) -> dict:
+    """PATH parsed as TOML; a syntax error names the file."""
     try:
         with path.open("rb") as f:
             return tomllib.load(f)
@@ -36,111 +75,100 @@ def load(path: Path, root: Path) -> dict:
         raise ConfigError(f"{where}: {e}") from None
 
 
-def local_path() -> Path:
-    """This machine's config, written by `dotfiles init`."""
-    base = os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
-    return Path(base) / "dotfiles/config.toml"
+def _kind(value) -> str:
+    """VALUE's TOML type, as errors name it."""
+    return _KINDS.get(type(value), type(value).__name__)
 
 
-def shown(path: Path) -> str:
-    """PATH with ~ for the home directory, the way errors and changes name it."""
-    return f"~/{path.relative_to(Path.home())}" if path.is_relative_to(Path.home()) else str(path)
-
-
-def kind(value) -> str:
-    return KINDS.get(type(value), type(value).__name__)
-
-
-def validate(data: dict, schema: dict, where: str, prefix: str = "") -> None:
-    """Every key of DATA exists in SCHEMA at the same path, with the same type."""
+def _validate(data: dict, schema: dict, types: dict, where: str, prefix: str = "") -> None:
+    """Every key of DATA in SCHEMA at the same path or in TYPES, of the type they give it."""
     for key, value in data.items():
         dotted = prefix + key
-        if key not in schema:
+        if key not in schema and dotted not in types:
             raise ConfigError(f"{where}: {dotted}: unknown key")
-        want = schema[key]
+        want = schema.get(key)
+        kinds = types.get(dotted, (type(want),))
         # type() rather than isinstance(): a bool is an int to isinstance.
-        if type(value) is not type(want):
-            raise ConfigError(f"{where}: {dotted}: must be {kind(want)}, got {kind(value)}")
+        if type(value) not in kinds:
+            must = " or ".join(_KINDS[t] for t in kinds)
+            raise ConfigError(f"{where}: {dotted}: must be {must}, got {_kind(value)}")
         if isinstance(want, dict):
-            validate(value, want, where, dotted + ".")
+            _validate(value, want, types, where, dotted + ".")
 
 
-def merge(into: dict, data: dict) -> None:
-    """Tables merge recursively; scalars and arrays are replaced, never appended."""
-    for key, value in data.items():
-        if isinstance(value, dict):
-            merge(into[key], value)
-        else:
-            into[key] = value
-
-
-def names(root: Path) -> dict[str, Path]:
-    """Every profile and host by name. One namespace, so `extends` needs no prefix."""
-    found: dict[str, Path] = {}
-    paths = sorted((root / "profiles").glob("*.toml")) + sorted((root / "hosts").glob("*.toml"))
-    for path in paths:
-        if path.stem in found:
-            other = found[path.stem].relative_to(root)
-            raise ConfigError(f"{path.relative_to(root)}: {path.stem!r} is also {other}")
-        found[path.stem] = path
-    return found
+def merge_over(want: dict, base: dict) -> dict:
+    """BASE with WANT merged over it: tables recursively, scalars and arrays replaced."""
+    out = dict(base)
+    for key, value in want.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            value = merge_over(value, base[key])
+        out[key] = value
+    return out
 
 
 def chain(host: str, root: Path) -> list[tuple[str, dict]]:
-    """(file, data) for HOST and every file it extends, parents first.
-
-    Depth-first, post-order, each file once: a shared ancestor is merged at
-    its first position, so a later parent does not reset what an earlier one
-    set on top of it.
-    """
-    known = names(root)
+    """HOST's files, each (path, data), parents before children; [] for an unknown host."""
+    layout = Layout(root)
     order: list[tuple[str, dict]] = []
-    done: set[str] = set()
+    done: set[Path] = set()
 
-    def visit(name: str, stack: list[str]) -> None:
-        if name in stack:
-            raise ConfigError(f"extends: cycle {' → '.join(stack[stack.index(name) :] + [name])}")
-        if name in done:
+    def visit(path: Path, stack: list[Path]) -> None:
+        """PATH's parents, then PATH itself, each once; fail on a cycle."""
+        if path in stack:
+            names = [p.stem for p in stack[stack.index(path) :] + [path]]
+            raise ConfigError(f"extends: cycle {' → '.join(names)}")
+        if path in done:
             return
-        where = str(known[name].relative_to(root))
-        data = load(known[name], root)
+        where = str(path.relative_to(root))
+        data = load(path, root)
         parents = data.pop("extends", [])
         if not isinstance(parents, list) or not all(isinstance(p, str) for p in parents):
             raise ConfigError(f"{where}: extends: must be an array of strings")
         for parent in parents:
-            if parent not in known:
+            try:
+                found = layout.named(parent)
+            except ConfigError as e:
+                raise ConfigError(f"{where}: extends: {e}") from None
+            if found is None:
                 raise ConfigError(f"{where}: extends: no profile or host {parent!r}")
-            visit(parent, stack + [name])
-        done.add(name)
+            visit(found, stack + [path])
+        done.add(path)
         order.append((where, data))
 
-    # The host itself only comes from hosts/: a machine called "server" does
-    # not pick up the server profile by accident.
-    if host in known and known[host].parent.name == "hosts":
-        visit(host, [])
+    path = layout.named(host)
+    if path is not None and path.is_relative_to(layout.hosts):
+        visit(path, [])
     return order
 
 
-def leaves(data: dict, prefix: str = ""):
+def _leaves(data: dict, prefix: str = ""):
     """(dotted key, value) for every non-table value; arrays are leaves."""
     for key, value in data.items():
         if isinstance(value, dict):
-            yield from leaves(value, prefix + key + ".")
+            yield from _leaves(value, prefix + key + ".")
         else:
             yield prefix + key, value
 
 
 def resolve_with_sources(
-    host: str, root: Path = ROOT, local: Path | None = None
+    host: str,
+    root: Path = Layout.root,
+    local: Path | None = None,
+    source: Path | None = None,
+    *,
+    checks: Checks = _NO_CHECKS,
 ) -> tuple[dict, dict[str, str]]:
-    """Merged config for HOST and, per dotted key, the file its value came
-    from. With LOCAL, the host's files are that one file (the machine
-    config) instead of its chain in hosts/."""
-    schema = load(root / DEFAULTS, root)
-    config = copy.deepcopy(schema)
-    sources = {key: DEFAULTS for key, _ in leaves(schema)}
+    """HOST's merged, validated config and the file each key comes from.
+
+    The schema comes from ROOT, the checkout of the code that reads it; HOST
+    from LOCAL, else from hosts/ of SOURCE (default this checkout). CHECKS
+    come from the caller: entry points pass feature.checks().
+    """
+    schema = load(Layout(root).defaults, root)
+    config = schema
+    sources = {key: Layout.DEFAULTS for key, _ in _leaves(schema)}
     if local is None:
-        files = chain(host, root)
+        files = chain(host, source or root)
     elif local.is_file():
         files = [(shown(local), load(local, root))]
     else:
@@ -148,34 +176,47 @@ def resolve_with_sources(
             f"no {shown(local)} — run dotfiles init <host>, or pass --source <checkout>"
         )
     for where, data in files:
-        validate(data, schema, where)
-        merge(config, data)
-        sources.update((key, where) for key, _ in leaves(data))
-    if config.get("secrets", {}).get("backend", "none") not in SECRETS_BACKENDS:
-        raise ConfigError(
-            f"{host}: secrets.backend: must be one of {', '.join(SECRETS_BACKENDS)},"
-            f" got {config['secrets']['backend']!r}"
-        )
-    return config, sources
+        _validate(data, schema, checks.types, where)
+        config = merge_over(data, config)
+        sources.update((key, where) for key, _ in _leaves(data))
+    values = dict(_leaves(config))
+    for key, (test, what) in checks.rules.items():
+        if key in values and not test(values[key]):
+            raise ConfigError(f"{host}: {key}: must be {what}, got {_toml_value(values[key])}")
+    return Settings(config), sources
 
 
-def resolve(host: str, root: Path = ROOT, local: Path | None = None) -> dict:
+def resolve(
+    host: str,
+    root: Path = Layout.root,
+    local: Path | None = None,
+    source: Path | None = None,
+    *,
+    checks: Checks = _NO_CHECKS,
+) -> dict:
     """Merged config for HOST: the defaults, then every file in its chain."""
-    return resolve_with_sources(host, root, local)[0]
+    return resolve_with_sources(host, root, local, source, checks=checks)[0]
 
 
-def init(host: str, source: Path = ROOT, path: Path | None = None) -> str | None:
-    """HOST's resolved config from the checkout SOURCE written to PATH (the
-    machine config), created or overwritten; the change line, None when
-    PATH already holds it."""
-    if not (source / "hosts" / f"{host}.toml").is_file():
-        raise ConfigError(f"no hosts/{host}.toml in {source}")
-    path = path or local_path()
+def init(
+    host: str,
+    root: Path = Layout.root,
+    path: Path | None = None,
+    source: Path | None = None,
+    *,
+    checks: Checks = _NO_CHECKS,
+) -> str | None:
+    """HOST of SOURCE (default this checkout) resolved and written to PATH; the change line, or None."""
+    source = source or root
+    found = Layout(source).named(host)
+    if found is None or not found.is_relative_to(Layout(source).hosts):
+        raise ConfigError(f"no host {host!r} in {source}/hosts")
+    path = path or local_config()
     text = (
-        f"# This machine's config: hosts/{host}.toml and everything it extends,\n"
+        f"# This machine's config: {found.relative_to(source)} and everything it extends,\n"
         f"# resolved by `dotfiles init` from {source.resolve()}.\n"
         "# apply, deploy, config and render read it; the next init overwrites it.\n\n"
-    ) + tomli_w.dumps(resolve(host, source))
+    ) + tomli_w.dumps(resolve(host, root, source=source, checks=checks))
     if path.is_file() and path.read_text() == text:
         return None
     why = "content differs" if path.exists() else "missing"
@@ -184,27 +225,38 @@ def init(host: str, source: Path = ROOT, path: Path | None = None) -> str | None
     return f"-> {shown(path)} ({why})"
 
 
-def toml_value(value) -> str:
+def _toml_value(value) -> str:
     # Arrays joined by hand: tomli-w breaks long ones over several lines.
+    """VALUE as it is written in TOML, on one line."""
     if isinstance(value, list):
-        return "[" + ", ".join(toml_value(v) for v in value) + "]"
+        return "[" + ", ".join(_toml_value(v) for v in value) + "]"
     return tomli_w.dumps({"v": value}).removeprefix("v = ").removesuffix("\n")
 
 
-def explain(host: str, root: Path = ROOT, local: Path | None = None) -> str:
+def explain(
+    host: str,
+    root: Path = Layout.root,
+    local: Path | None = None,
+    source: Path | None = None,
+    *,
+    checks: Checks = _NO_CHECKS,
+) -> str:
     """One line per leaf, `key = value  # file`: valid TOML, and grep finds any key."""
-    config, sources = resolve_with_sources(host, root, local)
+    config, sources = resolve_with_sources(host, root, local, source, checks=checks)
     return "".join(
-        f"{key} = {toml_value(value)}  # {sources[key]}\n" for key, value in leaves(config)
+        f"{key} = {_toml_value(value)}  # {sources[key]}\n" for key, value in _leaves(config)
     )
 
 
-def check(root: Path = ROOT) -> dict[str, str | None]:
-    """Resolve every host in hosts/ and one that is not there: host -> error or None."""
+def check(
+    root: Path = Layout.root, source: Path | None = None, *, checks: Checks = _NO_CHECKS
+) -> dict[str, str | None]:
+    """Resolve every host in hosts/ of SOURCE and one that is not there: host -> error or None."""
+    source = source or root
     results: dict[str, str | None] = {}
-    for host in sorted(p.stem for p in (root / "hosts").glob("*.toml")) + ["unknown-host"]:
+    for host in Layout(source).host_names() + ["unknown-host"]:
         try:
-            resolve(host, root)
+            resolve(host, root, source=source, checks=checks)
             results[host] = None
         except ConfigError as e:
             results[host] = str(e)

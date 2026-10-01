@@ -8,10 +8,10 @@ stable; specs, plans and commits refer to work by them.
 | Module id | Responsibility | Depends on |
 |---|---|---|
 | `config` | Load `dotfiles/defaults.toml` (schema), `profiles/*.toml`, `hosts/*.toml`; resolve `extends` (host → profiles/hosts); validate every file against the schema; merge; dump the result; `check` every host | — |
-| `render` | Jinja2 templates for dotfiles under `home/`, rendered with the resolved config; feature gates; deploy to `$HOME` with check-before-write (content, mode) | `config` |
-| `engine` | `ensure_file/line/symlink/service/sysctl/...`, `as_root`, `retry`, `defer`, notices, ordered feature runner, a clean apply that only says `nothing to change` | `config` |
-| `packages` | Arch setup (pacman.conf drop-ins, multilib, makepkg, reflector, paru); install from the repositories or the AUR, conflicts left to pacman | `engine` |
-| `features` | One Python module per feature in `dotfiles/defaults.toml` (38), grouped `system`, `shell`, `ssh`, `desktop` | `packages`, `render` |
+| `render` | Jinja2 templates for dotfiles under `home/`, rendered with the resolved config; feature gates; deploy to `$HOME` with check-before-write (content, mode); templates under `system/` for the files features write outside `$HOME` | `config` |
+| `engine` | `files.ensure/line/symlink`, `ensure_service/sysctl/...`, `shell.as_root`, `retry`, `defer`, notices, ordered feature runner, a clean apply that only says `nothing to change` | `config` |
+| `packages` | Install from the repositories, removing what a feature replaces | `engine` |
+| `features` | One Python module per feature and platform (`platforms/<name>/features/`, Linux's the fallback) for each in `dotfiles/defaults.toml`, rebuilt one at a time since 2026-09-28 (`packaging`) | `packages`, `render` |
 | `tooling` | CI: `check` on every host, ruff, pytest; GitHub workflow | `config` |
 | `docs` | README, CLAUDE.md, a page per feature | all |
 
@@ -28,9 +28,10 @@ Build order: `config` → `render`, `engine`, `tooling` → `packages` → `feat
    when a module needs them (`tomli-w` with `config`, Jinja2 with `render`).
    A fresh machine needs git, python and uv, nothing else: the tool runs
    from the checkout with `uv run dotfiles …`, dependencies from `uv.lock`.
-4. Every apply reconciles live state; a clean apply prints nothing and asks
-   for no password. A feature is `features.<name>` with `enabled` and its
-   settings; `enabled = false` never uninstalls.
+4. Every apply reconciles live state; a clean apply prints only `nothing to
+   change` and asks for no password. A feature is `features.<name>` with `enabled` and its
+   settings, or without `enabled` if it always runs (`packaging`);
+   `enabled = false` never uninstalls.
 5. Specs live in `docs/spec/`, one `SPEC-<id>.md` per module.
 6. Commits: imperative plain-language subject, optional one-paragraph body,
    no Conventional Commits prefixes, no AI attribution. Each module lands

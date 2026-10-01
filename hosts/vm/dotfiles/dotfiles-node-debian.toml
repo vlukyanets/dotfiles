@@ -1,0 +1,11 @@
+# A test node: a Debian VM, for what does not depend on Arch.
+#
+# dotfiles has no Debian platform yet (dotfiles/platforms/debian.py), so
+# today `apply` stops before any change with `no platform for debian`.
+# What to try here:
+# - `dotfiles init dotfiles-node-debian`, `config`, `check`: the config
+#   side runs on any Linux with python and uv.
+# - `render --out DIR` and `deploy --dry-run`, then `deploy`: the dotfiles
+#   land in $HOME the same as on Arch; a second deploy changes nothing.
+# - `apply --dry-run`: the error above, with nothing changed.
+extends = ["vm"]

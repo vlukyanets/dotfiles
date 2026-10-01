@@ -1,0 +1,13 @@
+# Managed by dotfiles (features.packaging) — edit
+# system/etc/makepkg.conf.d/dotfiles.conf.j2 in the repo, not this file.
+# Read by makepkg after /etc/makepkg.conf; what is not set here keeps the
+# value makepkg.conf gives it.
+{% if jobs %}
+MAKEFLAGS="-j{{ jobs }}"
+{% endif %}
+{% if makepkg.packager is defined %}
+PACKAGER="{{ makepkg.packager }}"
+{% endif %}
+{% if makepkg.options | default([]) %}
+OPTIONS+=({{ makepkg.options | join(" ") }})
+{% endif %}

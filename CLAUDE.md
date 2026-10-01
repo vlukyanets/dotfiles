@@ -25,30 +25,50 @@ master and every PR; uv is pinned there by version and sha256.
   A feature is `features.<name>.enabled` plus its settings in the same table.
 - Profiles `profiles/`, machines `hosts/`; one namespace for `extends`. A
   machine runs from `~/.config/dotfiles/config.toml` (`config.init`,
-  `config.local_path`); the CLI (`dotfiles/cli.py`) picks it or a checkout.
-- Resolution, validation, merge, explain, check: `dotfiles/config.py`.
+  `layout.local_config`); the CLI (`dotfiles/cli.py`) picks it or a checkout.
+- Where things are: `dotfiles/layout.py` — `Layout(root)` names a checkout's
+  paths (`defaults`, `hosts`, `profiles`, `home`, `home_toml`, `system`),
+  `named(name)` a host or profile by bare name (ambiguous → error) or by
+  path under `hosts/`, which nests folders; `local_config()` this machine's
+  config, `shown(path)` a path with `~`; code asks it, never joins
+  `root / "hosts"` itself.
+- Resolution, validation, merge, explain, check: `dotfiles/config.py`; it
+  imports no feature: the entry points pass `checks=feature.checks()`.
+  `ConfigError` lives in `dotfiles/errors.py`, for every layer.
 - Dotfiles: `home/` (real names, `*.j2` templates), modes and gates in
   `home.toml`, rendering in `dotfiles/render.py`.
-- Registries: `data/*.toml` (ssh keys, languages), merged into the template
-  context; the names a host takes from them are checked in
-  `render.registries` (`REFERENCES`).
-- Helpers the same on every system: `dotfiles/engine.py`. What differs
-  between systems: `dotfiles/platforms/<os-release ID>.py` (`Arch` on
-  `Linux` on `Platform`).
-- Features: `dotfiles/features/<name>.py`, one `Feature` subclass each; its
-  nested classes (`Arch`, `Linux`, …) are the strategies `apply` receives,
-  with the packages for that platform (`packages()`, repository and AUR
-  alike), the ones they replace (`replaces()`) and the features they need
-  there (`requires()`: enabled, or check fails; run first). The name gates
-  it; the order comes from the package graph and those requirements
-  (`dotfiles/apply.py`). Nothing else is declared.
+- Files features write outside `$HOME`: templates under `system/` at their
+  path from `/`, rendered by `render.template` and written with `files.ensure`.
+- Helpers the same on every system: `dotfiles/engine.py` (`Report`,
+  `Shell`, `Files` in a `Machine`, passed from `apply()` to the platform
+  as `self.report`, `self.shell`, `self.files`, and reached by every
+  feature through `self.system`; `current()` only for entry points),
+  retries in `dotfiles/retry.py`, the root process in `dotfiles/root.py`.
+- Platforms: a package each, `dotfiles/platforms/<name>/`, that shares
+  nothing with the others: its `OperatingSystem` subclass (`ArchLinuxOs`
+  in `arch/_os.py`, with the os-release `id` it runs on, `detect` in
+  `platforms/discovery.py` matches ID then ID_LIKE), its package manager
+  (`arch/_pacman.py`: `Pacman`) and its `features/`. The one base is
+  `linux/` (`LinuxOs`: systemd, sysctl, groups, gsettings, and features for
+  every Linux); a platform runs Linux's feature where it has none of that name.
+- Features: `platforms/<name>/features/<feature>.py`, one `Feature`
+  subclass each, named after the module (`packaging` → `Packaging`), built
+  with its table `features.<feature>` as `self.settings` and the platform
+  as `self.system`; checks the types cannot make are its `rules`, the
+  types of keys without a default its `types`. It declares its packages (`packages()`, from the
+  repositories), the ones they replace (`replaces()`) and the features it
+  needs (`requires()`: enabled, or check fails; run first), then does the
+  rest in `apply()`. The name gates it; the order comes from the package
+  graph and those requirements (`dotfiles/plan.py`; `dotfiles/apply.py`
+  runs it). Nothing else is
+  declared. The schema in `defaults.toml` is shared by every platform.
 - Why: `docs/spec/SPEC-<module>.md`, then `docs/spec/CAPABILITY-MAP.md`.
 
 ## Commits and branches
 
 - `master` holds finished modules; each module is built on its own branch.
 - Branch names are short, lowercase, hyphenated and say what changes
-  (`hyper-lin-no-android`); no generated names or `claude/` prefixes.
+  (`nvidia-driver-installation`); no generated names or `claude/` prefixes.
 - Subject: one line, imperative, plain language. Body: optional, one paragraph.
 - No Conventional Commits prefixes, no AI attribution lines in commits or
   pull requests.
@@ -56,16 +76,23 @@ master and every PR; uv is pinned there by version and sha256.
 
 ## Pitfalls
 
+- A name no other module uses starts with `_` (functions, constants,
+  classes, methods), and so does a module nothing outside its package
+  imports (`arch/_os.py`); no `__all__`. Tests may still reach a `_name`.
+- `__init__.py` only imports from its own submodules, never defines a
+  class; ruff's F401 is off there, so no `X as X`.
+- A platform class is `<Name>Os` (`ArchLinuxOs`, `LinuxOs`).
 - `type(v) is type(want)`, not `isinstance`: TOML `true` would pass as an
   integer otherwise.
 - Every test runs with `HOME` and the XDG directories in pytest's temp dir,
-  `engine.SYSROOT` in a temp dir and `SUDO_CMD=false` (`tests/conftest.py`,
-  autouse). Root goes only through `run` inside `with as_root():`, which
+  an active `engine.Machine` whose sysroot is a temp dir, and `SUDO_CMD=false` (`tests/conftest.py`,
+  autouse). Root goes only through `shell.run` inside `with shell.as_root():`, which
   reads `SUDO_CMD`, so a test can never prompt for a password or change
   the machine.
-- A feature mutates only through an `ensure_*` helper, a platform method or
-  `run`: they respect dry run and `SYSROOT`. Commands are argv lists, never a
-  shell; tests fake commands by replacing `engine._run`, not with scripts.
+- A feature mutates only through its system's `files`, `shell.run` or a
+  platform method: they respect dry run and the sysroot. Commands are argv lists, never
+  a shell; tests fake commands with `conftest.Fake.install`, which sets
+  the shell's `execute` and `root`, not with scripts.
 - Templates: a tag alone on its line vanishes with its newline
   (trim_blocks, lstrip_blocks). Booleans print as `True` in Jinja: write
   `{{ x | lower }}` where the file needs `true`.

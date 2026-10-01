@@ -1,12 +1,12 @@
+import copy
+import re
 import tomllib
 from pathlib import Path
 
 import pytest
 
+from dotfiles import feature
 from dotfiles.config import (
-    DEFAULTS,
-    ROOT,
-    ConfigError,
     chain,
     check,
     explain,
@@ -14,6 +14,8 @@ from dotfiles.config import (
     resolve,
     resolve_with_sources,
 )
+from dotfiles.errors import ConfigError
+from dotfiles.layout import Layout
 
 
 def write(root: Path, rel: str, text: str) -> None:
@@ -39,7 +41,7 @@ def test_broken_toml_names_file(root):
 
 
 def test_real_defaults_parse():
-    with (ROOT / "dotfiles/defaults.toml").open("rb") as f:
+    with Layout().defaults.open("rb") as f:
         assert resolve("unknown-host") == tomllib.load(f)
 
 
@@ -71,17 +73,76 @@ def test_int_is_not_bool(root):
         resolve("h", root)
 
 
+def test_a_missing_key_names_its_path(root):
+    cfg = resolve("h", root)
+    assert cfg["features"]["a"] is False
+    with pytest.raises(KeyError) as e:
+        cfg["features"]["nope"]
+    assert str(e.value) == "features.nope: no such key in dotfiles/defaults.toml"
+    assert copy.deepcopy(cfg)["features"] == {"a": False, "b": False}
+
+
 def test_arrays_are_replaced(root):
     write(root, "dotfiles/defaults.toml", '[locale]\nlocales = ["en_US.UTF-8 UTF-8"]\n')
     write(root, "hosts/h.toml", '[locale]\nlocales = ["ru_RU.UTF-8 UTF-8"]\n')
     assert resolve("h", root) == {"locale": {"locales": ["ru_RU.UTF-8 UTF-8"]}}
 
 
-def test_secrets_backend_is_checked(root):
-    write(root, "dotfiles/defaults.toml", '[secrets]\nbackend = "none"\n')
-    write(root, "hosts/h.toml", '[secrets]\nbackend = "pass"\n')
-    with pytest.raises(ConfigError, match="^h: secrets.backend: must be one of none, rbw"):
-        resolve("h", root)
+@pytest.mark.parametrize(
+    ("makepkg", "error"),
+    [
+        ("jobs = 4.0", "hosts/h.toml: features.packaging.makepkg.jobs: must be integer or string, got float"),
+        ('jobs = "0%"', 'h: features.packaging.makepkg.jobs: must be a number of threads, or a percent of the cores like "50%", got "0%"'),
+        ("jobs = -1", 'h: features.packaging.makepkg.jobs: must be a number of threads, or a percent of the cores like "50%", got -1'),
+        ('packager = "Ann"', 'h: features.packaging.makepkg.packager: must be "Name <email>", got "Ann"'),
+    ],
+)  # fmt: skip
+def test_values_the_type_cannot_check(tmp_path, makepkg, error):
+    write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
+    write(tmp_path, "hosts/h.toml", f"[features.packaging.makepkg]\n{makepkg}\n")
+    with pytest.raises(ConfigError) as e:
+        resolve("h", tmp_path, checks=feature.checks())
+    assert str(e.value) == error
+
+
+def test_a_key_without_default_is_there_only_when_set(tmp_path):
+    write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
+    write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = true\n")
+    cfg = resolve("h", tmp_path, checks=feature.checks())
+    assert cfg["features"]["packaging"] == {"pacman": {"multilib": True}, "makepkg": {}}
+    write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = 1\n")
+    with pytest.raises(ConfigError, match=r"multilib: must be boolean, got integer$"):
+        resolve("h", tmp_path, checks=feature.checks())
+    write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nnope = 1\n")
+    with pytest.raises(ConfigError, match=r"pacman\.nope: unknown key$"):
+        resolve("h", tmp_path, checks=feature.checks())
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "good"),
+    [
+        ("features.packaging.makepkg.jobs", 0, False),
+        ("features.packaging.makepkg.jobs", 8, True),
+        ("features.packaging.makepkg.jobs", "150%", True),
+        ("features.packaging.makepkg.packager", "", False),
+        ("features.packaging.makepkg.packager", "Ann Lee <ann@lee.org>", True),
+        ("features.packaging.pacman.flags", ["Color", "VerbosePkgLists"], True),
+        ("features.packaging.pacman.flags", ["Colour"], False),
+        ("features.packaging.pacman.parallel_downloads", 0, False),
+        ("features.packaging.pacman.parallel_downloads", 1, True),
+    ],
+)
+def test_rules(key, value, good):
+    from dotfiles.platforms.arch.features.packaging import Packaging
+
+    assert bool(Packaging.rules[key.removeprefix("features.packaging.")][0](value)) is good
+
+
+def test_the_schema_comes_from_the_code_not_the_source(root):
+    source = root / "old-checkout"
+    write(source, "dotfiles/defaults.toml", "[features]\na = false\n")  # older: no b yet
+    write(source, "hosts/h.toml", "[features]\na = true\n")
+    assert resolve("h", root, source=source) == {"features": {"a": True, "b": False}}
 
 
 def test_host_extends_profile_and_overrides_it(root):
@@ -131,7 +192,10 @@ def test_hostname_does_not_pick_up_a_profile(root):
         ),
         ({"hosts/h.toml": 'extends = "p"\n'}, "hosts/h.toml: extends: must be an array of strings"),
         ({"hosts/h.toml": "extends = [1]\n"}, "hosts/h.toml: extends: must be an array of strings"),
-        ({"hosts/h.toml": "", "profiles/h.toml": ""}, "hosts/h.toml: 'h' is also profiles/h.toml"),
+        (
+            {"hosts/h.toml": "", "profiles/h.toml": ""},
+            "ambiguous name 'h': profiles/h.toml, hosts/h.toml; give its path under hosts/",
+        ),
         (
             {"hosts/h.toml": 'extends = ["p"]\n', "profiles/p.toml": "[features]\nc = 1\n"},
             "profiles/p.toml: features.c: unknown key",
@@ -150,20 +214,42 @@ def test_bad_inheritance(root, files, error):
     assert str(e.value) == error
 
 
+def test_nested_host_by_name_or_path(root):
+    write(root, "profiles/p.toml", "[features]\na = true\n")
+    write(root, "hosts/vm/node/n.toml", 'extends = ["p"]\n')
+    write(root, "hosts/o.toml", 'extends = ["vm/node/n"]\n[features]\nb = true\n')
+    want = {"features": {"a": True, "b": False}}
+    assert resolve("n", root) == resolve("n.toml", root) == want
+    assert resolve("vm/node/n", root) == resolve("vm/node/n.toml", root) == want
+    assert resolve("o", root) == {"features": {"a": True, "b": True}}
+    assert [w for w, _ in chain("n", root)] == ["profiles/p.toml", "hosts/vm/node/n.toml"]
+
+
+def test_a_name_in_two_folders_is_ambiguous(root):
+    write(root, "hosts/a/n.toml", "")
+    write(root, "hosts/b/n.toml", "")
+    write(root, "hosts/h.toml", 'extends = ["n"]\n')
+    ambiguous = "ambiguous name 'n': hosts/a/n.toml, hosts/b/n.toml; give its path under hosts/"
+    with pytest.raises(ConfigError, match=f"^{re.escape(ambiguous)}$"):
+        resolve("n", root)
+    with pytest.raises(ConfigError, match=f"^{re.escape('hosts/h.toml: extends: ' + ambiguous)}$"):
+        resolve("h", root)
+    assert resolve("a/n", root) == resolve("b/n", root)
+    assert list(check(root)) == ["a/n", "b/n", "h", "unknown-host"]
+
+
 def test_real_profiles():
-    assert [w for w, _ in chain("hyper-lin", ROOT)] == [
+    assert [w for w, _ in chain("hyper-lin", Layout.root)] == [
         "profiles/base.toml",
         "profiles/laptop.toml",
         "hosts/hyper-lin.toml",
     ]
-    assert [w for w, _ in chain("echo-server", ROOT)] == [
+    assert [w for w, _ in chain("echo-server", Layout.root)] == [
         "profiles/base.toml",
         "profiles/server.toml",
         "hosts/echo-server.toml",
     ]
-    echo = resolve("echo-server")
-    assert echo["features"]["sshd"]["enabled"] and echo["features"]["zsh"]["enabled"]
-    assert not echo["features"]["niri"]["enabled"]
+    assert resolve("echo-server")["git"]["name"] == "Valentin Lukyanets"
 
 
 def test_check_reports_every_broken_host(root):
@@ -179,7 +265,7 @@ def test_check_reports_every_broken_host(root):
 
 
 def test_check_real_data():
-    assert not any(check().values())
+    assert not any(check(checks=feature.checks()).values())
 
 
 def test_explain_names_the_file_of_each_value(root):
@@ -223,7 +309,7 @@ def test_init_writes_the_resolved_host_then_nothing(root, tmp_path):
 
 def test_init_needs_a_host_file(root, tmp_path):
     write(root, "profiles/p.toml", "")
-    with pytest.raises(ConfigError, match=r"^no hosts/p\.toml in "):
+    with pytest.raises(ConfigError, match=r"^no host 'p' in "):
         init("p", root, tmp_path / "config.toml")
     assert not (tmp_path / "config.toml").exists()
 
@@ -234,7 +320,7 @@ def test_local_config_replaces_the_hosts_chain(root, tmp_path):
     # hosts/h.toml is not read; the key the file lacks gets its default.
     got, sources = resolve_with_sources("h", root, tmp_path / "config.toml")
     assert got == {"features": {"a": True, "b": False}}
-    assert sources == {"features.a": str(tmp_path / "config.toml"), "features.b": DEFAULTS}
+    assert sources == {"features.a": str(tmp_path / "config.toml"), "features.b": Layout.DEFAULTS}
 
 
 @pytest.mark.parametrize(

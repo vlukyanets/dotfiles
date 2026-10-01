@@ -5,10 +5,11 @@ machine is a short TOML file that inherits from profiles; dotfiles are
 Jinja2 templates rendered with that configuration; features are Python
 classes that check the live system and change only what differs. Work in
 progress: today it resolves host configuration, renders and deploys the
-dotfiles in `home/`, and runs `dotfiles apply` on Arch: pacman, makepkg
-and reflector set up, packages from the repositories and the AUR, and
-every feature of `dotfiles/defaults.toml`, one module each in
-`dotfiles/features/` (see the [capability map](docs/spec/CAPABILITY-MAP.md)).
+dotfiles in `home/`, and runs `dotfiles apply` on Arch: packages from the
+repositories and every feature of `dotfiles/defaults.toml`, one module
+each per platform in `dotfiles/platforms/<name>/features/`. The features are being rebuilt one at a
+time; today there is `packaging` (pacman and makepkg drop-ins). See the
+[capability map](docs/spec/CAPABILITY-MAP.md).
 
 ## How a host is described
 
@@ -25,12 +26,8 @@ A host or profile sets only what differs and may inherit:
 ```toml
 extends = ["laptop"]   # profiles or other hosts, merged left to right
 
-[features]
-docker.enabled = true
-
-[features.swap]
-enabled = true
-size    = "20g"
+[features.packaging.pacman]
+flags = ["Color"]
 ```
 
 Tables merge; values and arrays are replaced. A shared ancestor is merged
