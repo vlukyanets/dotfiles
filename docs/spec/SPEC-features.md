@@ -9,7 +9,7 @@ Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. The list starts from scratch:
 features come back one at a time, each with its settings, its
-dependencies and its tests. Today there is one, `packaging`.
+dependencies and its tests. Today there are `packaging` and `reflector`.
 
 ## Structure
 
@@ -97,6 +97,43 @@ names the key: `parallel_downloads` and an integer `jobs` at least 1, a
 string `jobs` a positive percent, `packager` `Name <email>`,
 `flags` from pacman's list of valueless options.
 
+## `reflector` — the mirrorlist
+
+```toml
+[features.reflector]
+enabled            = true
+country            = ["Germany", "PL"]  # empty: every country
+protocol           = "https"
+latest             = 20
+sort               = "rate"
+age                = 12                 # hours
+completion_percent = 100
+download_timeout   = 5                  # seconds
+on_calendar        = "weekly"
+on_boot_sec        = "15min"
+```
+
+Arch only (`platforms/arch/features/reflector.py`), off by default, on in
+`profiles/base.toml`. Its package is `reflector`; then `apply()`:
+
+- `/etc/xdg/reflector/reflector.conf` (`root:root` 644), the arguments
+  `reflector.service` reads, one per line: `--save /etc/pacman.d/mirrorlist`,
+  `--country "A,B"` only when `country` is not empty (quoted: the file is
+  split like a shell line, and names have spaces), then `--protocol`,
+  `--latest`, `--sort`, `--age`, `--completion-percent`, `--download-timeout`.
+  Every key has a default, since the file is ours whole.
+- `/etc/systemd/system/reflector.timer.d/override.conf` (`root:root` 644):
+  `OnCalendar` and `OnBootSec`, each emptied first, since a timer adds up
+  every one it is given; `systemctl daemon-reload` when it changed.
+- `ensure_service("reflector.timer")`.
+- Any of these changed: `systemctl start reflector.service` as root, so the
+  next install downloads from the new mirrors. Its failure is a notice, not
+  an error: the old mirrorlist stays and the timer tries again.
+
+`Reflector.rules`: `protocol` and `sort` from reflector's names, `latest`,
+`age` and `download_timeout` at least 1, `completion_percent` 0 to 100,
+`on_calendar` and `on_boot_sec` not empty.
+
 ## Project Structure
 
 ```
@@ -104,7 +141,10 @@ dotfiles/platforms/arch/features/packaging.py  Packaging: rules, types, drop-ins
 system/etc/pacman.conf.d/options.conf.j2       its templates
 system/etc/pacman.conf.d/multilib.conf.j2
 system/etc/makepkg.conf.d/dotfiles.conf.j2
-dotfiles/defaults.toml                         features.packaging and its settings
+dotfiles/platforms/arch/features/reflector.py Reflector: rules, config, timer, refresh
+system/etc/xdg/reflector/reflector.conf.j2    its templates
+system/etc/systemd/system/reflector.timer.d/override.conf.j2
+dotfiles/defaults.toml                         every feature and its settings
 tests/test_features.py                         each feature against a fake machine
 ```
 
@@ -121,6 +161,10 @@ tests/test_features.py                         each feature against a fake machi
   once `multilib.db` exists; off again, the drop-in back to its header; an active `[multilib]` of `pacman.conf` fails
   before any change, a commented-out one does not, and neither matters
   with multilib off.
+- reflector: every argument in order, the country quoted; `daemon-reload`,
+  the timer enabled and one refresh on the first apply, nothing on the
+  second; a changed setting refreshes without a reload; a failed refresh
+  is a notice.
 - `test_real_features_are_consistent`: every schema feature has a module
   and every module a schema table.
 

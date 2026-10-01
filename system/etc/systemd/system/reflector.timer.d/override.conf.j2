@@ -1,0 +1,8 @@
+# Managed by dotfiles (features.reflector) — edit
+# system/etc/systemd/system/reflector.timer.d/override.conf.j2 in the repo, not this file.
+# Each emptied first: a timer adds every OnCalendar it is given.
+[Timer]
+OnCalendar=
+OnCalendar={{ reflector.on_calendar }}
+OnBootSec=
+OnBootSec={{ reflector.on_boot_sec }}

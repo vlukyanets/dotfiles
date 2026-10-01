@@ -140,3 +140,65 @@ def test_packaging_multilib_commented_out_or_off(machine):
     # Off: a [multilib] of pacman.conf is its own business.
     write("/etc/pacman.conf", PACMAN_CONF + "\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n")
     apply("packaging")
+
+
+TIMER_ON = {
+    ("systemctl", "is-enabled", "reflector.timer"): (0, "enabled"),
+    ("systemctl", "is-active", "reflector.timer"): (0, "active"),
+}
+REFRESH = ["systemctl", "start", "reflector.service"]
+
+
+def test_reflector_writes_its_config_and_refreshes_once(machine, capsys):
+    apply("reflector", defaults(reflector={"country": ["Germany", "United States"]}))
+    assert settings("/etc/xdg/reflector/reflector.conf") == [
+        "--save /etc/pacman.d/mirrorlist",
+        '--country "Germany,United States"',
+        "--protocol https",
+        "--latest 20",
+        "--sort rate",
+        "--age 12",
+        "--completion-percent 100",
+        "--download-timeout 5",
+    ]
+    assert settings("/etc/systemd/system/reflector.timer.d/override.conf") == [
+        "[Timer]",
+        "OnCalendar=",
+        "OnCalendar=weekly",
+        "OnBootSec=",
+        "OnBootSec=15min",
+    ]
+    calls = [
+        c for c in machine.calls if c[0] == "systemctl" and c[1] not in ("is-enabled", "is-active")
+    ]
+    assert calls == [
+        ["systemctl", "daemon-reload"],
+        ["systemctl", "enable", "--now", "reflector.timer"],
+        REFRESH,
+    ]
+    assert capsys.readouterr().out.endswith("-> mirrorlist refreshed\n")
+    machine.answers.update(TIMER_ON)
+    machine.calls.clear()
+    apply("reflector", defaults(reflector={"country": ["Germany", "United States"]}))
+    assert capsys.readouterr().out == ""
+    assert REFRESH not in machine.calls
+
+
+def test_reflector_changed_setting_refreshes_without_reload(machine):
+    machine.answers.update(TIMER_ON)
+    apply("reflector")
+    machine.calls.clear()
+    apply("reflector", defaults(reflector={"latest": 5}))
+    assert "--latest 5" in settings("/etc/xdg/reflector/reflector.conf")
+    assert ["systemctl", "daemon-reload"] not in machine.calls
+    assert REFRESH in machine.calls
+    assert "--country" not in "".join(settings("/etc/xdg/reflector/reflector.conf"))
+
+
+def test_reflector_failed_refresh_is_a_notice(machine, capsys):
+    machine.answers[tuple(REFRESH)] = (1, "")
+    apply("reflector")
+    out, err = capsys.readouterr()
+    assert "mirrorlist refreshed" not in out
+    assert "refreshing the mirrorlist failed (network?)" in err
+    assert engine.current().report.notices

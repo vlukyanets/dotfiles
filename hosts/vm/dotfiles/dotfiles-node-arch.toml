@@ -18,3 +18,15 @@ parallel_downloads = 2
 [features.packaging.makepkg]
 jobs = 1
 packager = "Dotfiles Node Arch <no.email.arch@hosting.net>"
+
+[features.reflector]
+enabled = true
+country = ["Ukraine", "Poland"]
+protocol = "https"
+latest = 20
+sort = "rate"
+age = 12
+completion_percent = 100
+download_timeout = 10
+on_calendar = "weekly"
+on_boot_sec = "15min"

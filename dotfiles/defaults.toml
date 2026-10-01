@@ -26,3 +26,17 @@ email = ""
 # jobs = 8                    MAKEFLAGS=-jN: threads, or "50%" of the cores (at least 1)
 # packager = "Name <email>"   PACKAGER
 # options = ["ccache"]        OPTIONS+=(...), e.g. ["ccache", "!debug"]
+
+# reflector: /etc/pacman.d/mirrorlist refreshed by reflector.timer, and at
+# once when a setting changes.
+[features.reflector]
+enabled            = false
+country            = []        # names or codes, e.g. ["Germany", "PL"]; empty: every country
+protocol           = "https"   # https, http, rsync or ftp
+latest             = 20        # the N mirrors synced most recently
+sort               = "rate"    # age, rate, country, score or delay
+age                = 12        # hours since a mirror last synced, at most
+completion_percent = 100       # how complete a mirror must be, 0-100
+download_timeout   = 5         # seconds
+on_calendar        = "weekly"  # reflector.timer's OnCalendar
+on_boot_sec        = "15min"   # and OnBootSec

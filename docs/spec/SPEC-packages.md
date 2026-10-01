@@ -99,5 +99,5 @@ tests/test_apply.py                    replaces reach install, only when somethi
    replacement (`replaces()`) and removed with `pacman -Rdd` just before the
    install, rather than left to pacman's undocumented `--ask` answers.
 3. **No setup in the platform** (2026-09-28): pacman and makepkg are the
-   `packaging` feature; reflector, the AUR, paru and rustup went with the
+   `packaging` feature, the mirrorlist the `reflector` one; the AUR, paru and rustup went with the
    features that used them.

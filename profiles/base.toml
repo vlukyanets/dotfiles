@@ -1,2 +1,5 @@
 # What every host gets. Values that depend on where or what the machine is
 # belong to the host.
+
+[features.reflector]
+enabled = true
