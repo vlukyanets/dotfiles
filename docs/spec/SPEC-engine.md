@@ -347,7 +347,7 @@ class Docker(Feature):  # platforms/arch/features/docker.py
           return ["pacman"]  # its multilib: steam and the lib32 packages
   ```
 
-  Each must be enabled: otherwise `steps()` raises `ConfigError`, one
+  Each must run, enabled or without an `enabled`: otherwise `steps()` raises `ConfigError`, one
   `gaming: requires features.pacman.enabled = true` per requirement
   (`gaming: requires x, which is not a feature` for a name the schema
   lacks), so `apply` stops before setup. A cycle of requirements is the
