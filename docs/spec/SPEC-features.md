@@ -137,14 +137,20 @@ Arch only (`platforms/arch/features/reflector.py`), off by default, on in
 
 ```toml
 [features.rustup]
-enabled = true
+enabled   = true
+toolchain = "stable"  # beta, nightly, "1.85.0", "nightly-2026-09-01"
 ```
 
 Arch only (`platforms/arch/features/rustup.py`), off by default, on in
-`profiles/base.toml`. No settings. Its package is `rustup`, replacing
-`rust`, which conflicts with it; then `rustup default stable`, retried,
-while `rustup default` prints nothing: cargo runs only with a default
-toolchain. A toolchain already the default, stable or not, is left alone.
+`profiles/base.toml`. Its package is `rustup`, replacing `rust`, which
+conflicts with it; then `rustup default TOOLCHAIN`, retried, which
+downloads it when missing: cargo runs only with a default toolchain. Not
+while it is the default already: `rustup default` prints it with the host
+(`stable-x86_64-unknown-linux-gnu`), taken from `Default host:` of
+`rustup show`, so a dated nightly does not pass for `nightly`. An installed
+toolchain is never updated (`rustup update` is the user's), and the one it
+replaces stays installed. `Rustup.rules`: `toolchain` letters, digits,
+`.`, `_` and `-`.
 
 ## `paru` — the AUR helper
 
@@ -183,7 +189,7 @@ system/etc/makepkg.conf.d/dotfiles.conf.j2
 dotfiles/platforms/arch/features/reflector.py Reflector: rules, config, timer, refresh
 system/etc/xdg/reflector/reflector.conf.j2    its templates
 system/etc/systemd/system/reflector.timer.d/override.conf.j2
-dotfiles/platforms/arch/features/rustup.py    Rustup: rustup for rust, the default toolchain
+dotfiles/platforms/arch/features/rustup.py    Rustup: rustup for rust, its default toolchain
 dotfiles/platforms/arch/features/paru.py      Paru: build, install
 dotfiles/defaults.toml                         every feature and its settings
 tests/test_features.py                         each feature against a fake machine
@@ -206,7 +212,8 @@ tests/test_features.py                         each feature against a fake machi
   the timer enabled and one refresh on the first apply, nothing on the
   second; a changed setting refreshes without a reload; a failed refresh
   is a notice.
-- rustup: `default stable` once, nothing while a default is set.
+- rustup: `default stable` once, nothing while it is the default; another
+  toolchain switched to, a dated nightly not taken for `nightly`.
 - paru: clone and `makepkg` without sudo, then `sudo pacman
   -U` of the built file only; nothing when `paru --version` runs; a dry run
   only checks; as root it fails.

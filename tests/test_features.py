@@ -254,12 +254,31 @@ def test_paru_refuses_to_build_as_root(machine, monkeypatch):
         apply("paru")
 
 
-def test_rustup_sets_a_default_toolchain_once(machine, capsys):
+RUSTUP_SHOW = (0, "Default host: x86_64-unknown-linux-gnu\nrustup home:  /home/u/.rustup")
+
+
+def test_rustup_sets_the_toolchain_once(machine, capsys):
+    machine.answers[("rustup", "show")] = RUSTUP_SHOW
     apply("rustup")
-    assert machine.calls == [["rustup", "default"], ["rustup", "default", "stable"]]
-    assert capsys.readouterr().out == "-> rustup default stable\n"
+    assert machine.calls[-1] == ["rustup", "default", "stable"]
+    assert capsys.readouterr().out == "-> rustup default stable (was none)\n"
     machine.answers[("rustup", "default")] = (0, "stable-x86_64-unknown-linux-gnu (default)")
     machine.calls.clear()
     apply("rustup")
-    assert machine.calls == [["rustup", "default"]]
+    assert machine.calls == [["rustup", "default"], ["rustup", "show"]]
     assert capsys.readouterr().out == ""
+
+
+def test_rustup_switches_to_another_toolchain(machine, capsys):
+    machine.answers[("rustup", "show")] = RUSTUP_SHOW
+    machine.answers[("rustup", "default")] = (0, "stable-x86_64-unknown-linux-gnu (default)")
+    apply("rustup", defaults(rustup={"toolchain": "nightly-2026-09-01"}))
+    assert machine.calls[-1] == ["rustup", "default", "nightly-2026-09-01"]
+    assert capsys.readouterr().out == (
+        "-> rustup default nightly-2026-09-01 (was stable-x86_64-unknown-linux-gnu)\n"
+    )
+    # A dated nightly is not "nightly": the host alone may follow the name.
+    machine.answers[("rustup", "default")] = (0, "nightly-2026-09-01-x86_64-unknown-linux-gnu")
+    machine.calls.clear()
+    apply("rustup", defaults(rustup={"toolchain": "nightly"}))
+    assert machine.calls[-1] == ["rustup", "default", "nightly"]
