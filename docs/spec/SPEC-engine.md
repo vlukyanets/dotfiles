@@ -28,9 +28,8 @@ depend on each other; the order of the features follows from that.
    packages depend on.
 5. Print the notices collected along the way.
 
-Out of scope: mirrors and reflector, the AUR and paru (all `packages`),
-and every feature but `packaging`, which writes pacman's and makepkg's
-drop-ins (the rest go to `features`).
+Out of scope: the AUR and paru (`packages`), and every feature, `packaging`
+and `reflector` included (`features`).
 
 ## Tech Stack
 

@@ -3,3 +3,6 @@ extends = ["laptop"]
 [git]
 name  = "Valentin Lukyanets"
 email = "valikluks95@gmail.com"
+
+[features.reflector]
+country = ["Ukraine", "Poland", "Slovakia", "Germany", "Hungary", "Czechia"]

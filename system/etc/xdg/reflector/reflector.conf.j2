@@ -1,0 +1,13 @@
+# Managed by dotfiles (features.reflector) — edit
+# system/etc/xdg/reflector/reflector.conf.j2 in the repo, not this file.
+# reflector.service reads one argument per line, split like a shell would.
+--save /etc/pacman.d/mirrorlist
+{% if reflector.country %}
+--country "{{ reflector.country | join(",") }}"
+{% endif %}
+--protocol {{ reflector.protocol }}
+--latest {{ reflector.latest }}
+--sort {{ reflector.sort }}
+--age {{ reflector.age }}
+--completion-percent {{ reflector.completion_percent }}
+--download-timeout {{ reflector.download_timeout }}

@@ -238,9 +238,8 @@ def resolve(
 1. Output is TOML (`tomli-w`), not JSON.
 2. `echo-server` extends `server`, so it has every server feature.
 3. `config --explain` is in this iteration.
-4. Profiles: `base`; `server`, `laptop` and `vm` extend it. Since the
-   features restarted (2026-09-28) they set nothing yet; each feature that
-   comes back lands in the profile of the machines that want it.
+4. Profiles: `base`; `server`, `laptop` and `vm` extend it. A feature is
+   enabled in the profile of the machines that want it.
 5. Every feature is a table under `features` with `enabled` and its own
    settings, so a feature's switch and its settings sit in one place.
 6. **The machine keeps its own resolved config** in
