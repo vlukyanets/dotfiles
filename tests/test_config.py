@@ -239,10 +239,10 @@ def test_a_name_in_two_folders_is_ambiguous(root):
 
 
 def test_real_profiles():
-    assert [w for w, _ in chain("hyper-lin", Layout.root)] == [
+    assert [w for w, _ in chain("hyper", Layout.root)] == [
         "profiles/base.toml",
         "profiles/laptop.toml",
-        "hosts/hyper-lin.toml",
+        "hosts/hyper.toml",
     ]
     assert [w for w, _ in chain("echo-server", Layout.root)] == [
         "profiles/base.toml",

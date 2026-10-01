@@ -24,13 +24,13 @@ def test_init_then_every_command_reads_the_machine_config(monkeypatch, capsys):
         ),
     )
     local = local_config()
-    assert run(monkeypatch, capsys, "init", "hyper-lin") == (
+    assert run(monkeypatch, capsys, "init", "hyper") == (
         0,
         "-> ~/.config/dotfiles/config.toml (missing)\n",
         "",
     )
-    assert run(monkeypatch, capsys, "init", "hyper-lin")[1] == "nothing to change\n"
-    _, repo, _ = run(monkeypatch, capsys, "config", "--host", "hyper-lin")
+    assert run(monkeypatch, capsys, "init", "hyper")[1] == "nothing to change\n"
+    _, repo, _ = run(monkeypatch, capsys, "config", "--host", "hyper")
     assert run(monkeypatch, capsys, "config") == (0, repo, "")
     # The machine config wins until --source or --host points at a checkout.
     local.write_text(local.read_text().replace('"Valentin Lukyanets"', '"Someone Else"'))

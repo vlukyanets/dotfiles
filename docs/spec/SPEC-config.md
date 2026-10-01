@@ -14,7 +14,7 @@ User stories:
 
 - A new laptop is `hosts/<name>.toml` with `extends = ["laptop"]`, git
   identity and a handful of overrides, not 70 feature flags copied by hand.
-- A second machine like an existing one is `extends = ["hyper-lin"]` plus
+- A second machine like an existing one is `extends = ["hyper"]` plus
   what differs.
 - A typo (`features.nvidai`), a wrong type (`features.swap.size = 20`), an unknown
   parent or an inheritance cycle fails with the file and the key path
@@ -81,7 +81,7 @@ Resolution for host `H`:
    `Packaging.types`), which is in the resolved config only when a file
    sets it. `extends` is the only key not in the schema and must be a list
    of strings. Errors name the file and the dotted key path:
-   `hosts/hyper-lin.toml: features.nvidai: unknown key`.
+   `hosts/hyper.toml: features.nvidai: unknown key`.
 4. **Merge.** Tables merge recursively; scalars and lists are replaced by
    the later file, so lists never append.
 5. **Value checks** on the merged result: what a type cannot say, from
@@ -145,8 +145,8 @@ uv run --exact dotfiles init                      # ~/.config/dotfiles/config.to
 uv run --exact dotfiles init echo-server          # ... from hosts/echo-server.toml; overwrites the file
 uv run --exact dotfiles config                    # this machine, from ~/.config/dotfiles/config.toml
 uv run --exact dotfiles config --source .         # this machine, from hosts/<hostname>.toml of the checkout at .
-uv run --exact dotfiles config --host hyper-lin   # any host of this checkout, TOML on stdout
-uv run --exact dotfiles config --host hyper-lin --explain # every leaf as a dotted key, with the file it came from
+uv run --exact dotfiles config --host hyper   # any host of this checkout, TOML on stdout
+uv run --exact dotfiles config --host hyper --explain # every leaf as a dotted key, with the file it came from
 uv run --isolated dotfiles check                  # every host in hosts/ + one unknown host (+ local); exit 1 on any error, all errors listed
 uv run --isolated --group dev pytest              # verification: a throwaway environment, .venv/ untouched
 uv run --isolated --group dev ruff check . && uv run --isolated --group dev ruff format --check .
@@ -157,7 +157,7 @@ Output of `config` is TOML, the same shape as the input files. `--explain`
 prints one line per leaf, itself valid TOML:
 
 ```
-git.name = "Valentin Lukyanets"  # hosts/hyper-lin.toml
+git.name = "Valentin Lukyanets"  # hosts/hyper.toml
 ```
 
 Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
@@ -172,7 +172,7 @@ dotfiles/config.py       load, chain, validate, merge — pure functions over di
 dotfiles/layout.py       Layout(root): a checkout's paths (this one by default), named() a host or profile; local_config(), shown()
 dotfiles/defaults.toml   schema
 profiles/                base, server, laptop, vm
-hosts/                   hyper-lin (extends laptop), echo-server (extends server),
+hosts/                   hyper (extends laptop), echo-server (extends server),
                          vm/dotfiles/dotfiles-node-{arch,debian,voidlinux} (extend vm; test VMs)
 tests/test_config.py     unit tests on tmp_path fixtures + checks on the real data
 tests/test_cli.py        the commands: which config they read, their errors
@@ -223,9 +223,9 @@ def resolve(
 
 ## Success Criteria
 
-1. `uv run --exact dotfiles config --host hyper-lin` prints that machine's whole
+1. `uv run --exact dotfiles config --host hyper` prints that machine's whole
    configuration as TOML: every key of the schema, with its resolved value.
-2. `hosts/hyper-lin.toml` extends `laptop` and holds only what differs from
+2. `hosts/hyper.toml` extends `laptop` and holds only what differs from
    it; `echo-server` extends `server`; `laptop` and `server` extend `base`.
 3. `uv run --isolated dotfiles check` exits 0 on the repo data and 1 on each broken
    fixture from the test list, naming file and key.

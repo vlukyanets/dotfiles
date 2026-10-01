@@ -477,11 +477,11 @@ def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
         return subprocess.CompletedProcess(argv, 1, "", "")
 
     monkeypatch.setattr(engine.current().shell, "execute", checks_only)
-    cfg = config.resolve("hyper-lin")
+    cfg = config.resolve("hyper")
     for table in cfg["features"].values():
         table["enabled"] = True
     cfg["features"]["packaging"]["pacman"]["flags"] = ["Color"]  # it writes only what is set
-    assert apply("hyper-lin", dry_run=True, cfg=cfg) == 0
+    assert apply("hyper", dry_run=True, cfg=cfg) == 0
     out = capsys.readouterr().out
     assert "-> /etc/pacman.conf.d/options.conf (missing)\n" in out
     assert "-> ~/.gitconfig (missing)\n" in out

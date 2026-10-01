@@ -1,11 +1,3 @@
-# A test node: an Arch VM to run the whole tool on before a real machine.
-#
-# What to try here:
-# - `dotfiles init dotfiles-node-arch`, then `config`, `config --explain`:
-#   the chain vm → base and the values each file sets.
-# - `apply --dry-run`, then `apply`: the dotfiles deployed and the enabled
-#   features run; a second `apply` prints only `nothing to change` and
-#   asks no password.
 extends = ["vm"]
 
 [git]
@@ -30,3 +22,10 @@ completion_percent = 100
 download_timeout = 10
 on_calendar = "weekly"
 on_boot_sec = "15min"
+
+[features.rustup]
+enabled = true
+toolchain = "stable"
+
+[features.paru]
+enabled = true

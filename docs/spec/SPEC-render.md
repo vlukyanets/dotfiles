@@ -103,8 +103,8 @@ For each rendered path, in order:
 ## Commands
 
 ```
-uv run --exact dotfiles render --host hyper-lin --out /tmp/home-hyper-lin
-uv run --exact dotfiles render --host hyper-lin --out DIR --current ~   # with merges from the real files
+uv run --exact dotfiles render --host hyper --out /tmp/home-hyper
+uv run --exact dotfiles render --host hyper --out DIR --current ~   # with merges from the real files
 uv run --exact dotfiles deploy --dry-run
 uv run --exact dotfiles deploy
 uv run --isolated dotfiles check        # apply.check: also renders every host into a temp dir
@@ -159,7 +159,7 @@ the message, comments on why.
 - Deploy (tmp `HOME` from `conftest.py`): first run writes and reports,
   second run changes nothing; mode drift fixed; `--dry-run` writes nothing; symlink
   escaping `$HOME` refused.
-- Real data: `check` renders hyper-lin, echo-server and an unknown host;
+- Real data: `check` renders hyper, echo-server and an unknown host;
   tests pin what the templates with logic (loops, gates)
   produce for the real hosts.
 
@@ -175,7 +175,7 @@ the message, comments on why.
 
 1. Every file under `home/` renders for every host (`check`), with the
    mode and gate `home.toml` gives it.
-2. On hyper-lin, after one `dotfiles deploy`, `deploy --dry-run` prints
+2. On hyper, after one `dotfiles deploy`, `deploy --dry-run` prints
    nothing.
 3. `check`, pytest, ruff green locally and in CI.
 

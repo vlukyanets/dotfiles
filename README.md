@@ -71,8 +71,8 @@ of updating it.
     uv run --exact dotfiles init [HOST]                       # hosts/HOST.toml resolved into ~/.config/dotfiles/config.toml
     uv run --exact dotfiles config                            # this machine's config, as TOML
     uv run --exact dotfiles config --source .                 # the same from hosts/<hostname>.toml of the checkout at .
-    uv run --exact dotfiles config --host hyper-lin --explain # each key with the file it came from
-    uv run --exact dotfiles render --host hyper-lin --out DIR # a host's home tree, into an empty DIR
+    uv run --exact dotfiles config --host hyper --explain # each key with the file it came from
+    uv run --exact dotfiles render --host hyper --out DIR # a host's home tree, into an empty DIR
     uv run --exact dotfiles deploy --dry-run                  # what would change in $HOME
     uv run --exact dotfiles deploy                            # write it
     uv run --exact dotfiles apply --dry-run                   # features + dotfiles: what would change, no sudo

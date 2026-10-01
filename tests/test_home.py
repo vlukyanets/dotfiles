@@ -4,7 +4,7 @@ import pytest
 
 from dotfiles.render import render
 
-HOSTS = ("hyper-lin", "echo-server", "unknown-host")
+HOSTS = ("hyper", "echo-server", "unknown-host")
 
 
 @pytest.fixture(scope="module")
@@ -20,7 +20,7 @@ def text(homes, host, rel):
 
 
 def test_gitconfig(homes):
-    on = text(homes, "hyper-lin", ".gitconfig")
+    on = text(homes, "hyper", ".gitconfig")
     assert "    name  = Valentin Lukyanets\n    email = valikluks95@gmail.com\n" in on
     assert on.endswith("[color]\n    ui = auto\n")
     off = text(homes, "unknown-host", ".gitconfig")
@@ -28,7 +28,7 @@ def test_gitconfig(homes):
 
 
 def test_ssh_config(homes):
-    assert text(homes, "hyper-lin", ".ssh/config").endswith("Include config.d/*\n")
+    assert text(homes, "hyper", ".ssh/config").endswith("Include config.d/*\n")
     assert (homes["unknown-host"] / ".ssh/config.d").is_dir()
     assert not (homes["unknown-host"] / ".ssh/config.d/.keep").exists()
 
@@ -46,12 +46,12 @@ def test_gates_and_modes(homes):
         ".ssh/config": "644",
         ".config/environment.d/path.conf": "644",
     }
-    assert oct((homes["hyper-lin"] / ".ssh").stat().st_mode & 0o777) == "0o700"
+    assert oct((homes["hyper"] / ".ssh").stat().st_mode & 0o777) == "0o700"
 
 
 def test_deploy_hyper_lin_twice_is_silent_the_second_time():
     from dotfiles.render import deploy
 
-    first = deploy("hyper-lin")
+    first = deploy("hyper")
     assert "-> ~/.gitconfig (missing)" in first and "-> ~/.ssh (missing)" in first
-    assert deploy("hyper-lin") == []
+    assert deploy("hyper") == []
