@@ -463,7 +463,9 @@ def test_real_features_are_consistent():
     assert not set(found) - set(cfg["features"]), "features not in the schema"
     missing = set(cfg["features"]) - set(found)
     assert not missing, f"features without a module: {sorted(missing)}"
-    assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {}
+    assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {
+        "paru": ["packaging"]
+    }
 
 
 def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):

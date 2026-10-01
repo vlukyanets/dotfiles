@@ -3,3 +3,6 @@
 
 [features.reflector]
 enabled = true
+
+[features.paru]
+enabled = true

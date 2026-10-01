@@ -40,3 +40,8 @@ completion_percent = 100       # how complete a mirror must be, 0-100
 download_timeout   = 5         # seconds
 on_calendar        = "weekly"  # reflector.timer's OnCalendar
 on_boot_sec        = "15min"   # and OnBootSec
+
+# paru: the AUR helper, built from the AUR by makepkg as the user and
+# installed by pacman as root, whenever `paru --version` does not run.
+[features.paru]
+enabled = false

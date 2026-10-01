@@ -8,7 +8,7 @@ depends on `packages` and `render`.
 Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
-`packaging` and `reflector`.
+`packaging`, `reflector` and `paru`.
 
 ## Structure
 
@@ -133,6 +133,36 @@ Arch only (`platforms/arch/features/reflector.py`), off by default, on in
 `age` and `download_timeout` at least 1, `completion_percent` 0 to 100,
 `on_calendar` and `on_boot_sec` not empty.
 
+## `paru` — the AUR helper
+
+```toml
+[features.paru]
+enabled = true
+```
+
+Arch only (`platforms/arch/features/paru.py`), off by default, on in
+`profiles/base.toml`. No settings. It builds paru from the AUR and installs
+it, two steps apart: makepkg builds as the user (it refuses root), pacman
+installs as root; makepkg never calls sudo itself.
+
+- Packages: `base-devel`, `git`, and `rustup` for cargo, replacing `rust`,
+  which conflicts with it. Requires `packaging`, so makepkg builds with its
+  `MAKEFLAGS` and `OPTIONS`.
+- `rustup default stable`, retried, while rustup has no default toolchain:
+  cargo runs only with one.
+- `paru --version` runs: nothing more. That is the check, not the
+  package: a paru left behind by a libalpm bump is installed and does not
+  run, so it is built again.
+- The build, as the user, in a temp dir under `~/.cache/dotfiles` (not
+  `/tmp`, where a tmpfs may be too small for cargo): `git clone --depth 1`
+  of `https://aur.archlinux.org/paru.git`, then `makepkg --noconfirm
+  --cleanbuild`, each retried; no `-s`, since `packages()` brought the
+  dependencies. The files are those of `makepkg --packagelist` that exist
+  (paru-debug only with the debug option); none fails the feature.
+- The install, as root: `pacman -U --needed --noconfirm` of those files.
+- As root itself the feature fails at once: makepkg would refuse.
+- Dry run: the checks only, and `paru built and installed` reported.
+
 ## Project Structure
 
 ```
@@ -143,6 +173,7 @@ system/etc/makepkg.conf.d/dotfiles.conf.j2
 dotfiles/platforms/arch/features/reflector.py Reflector: rules, config, timer, refresh
 system/etc/xdg/reflector/reflector.conf.j2    its templates
 system/etc/systemd/system/reflector.timer.d/override.conf.j2
+dotfiles/platforms/arch/features/paru.py      Paru: rustup's toolchain, build, install
 dotfiles/defaults.toml                         every feature and its settings
 tests/test_features.py                         each feature against a fake machine
 ```
@@ -164,8 +195,11 @@ tests/test_features.py                         each feature against a fake machi
   the timer enabled and one refresh on the first apply, nothing on the
   second; a changed setting refreshes without a reload; a failed refresh
   is a notice.
+- paru: the toolchain, clone and `makepkg` without sudo, then `sudo pacman
+  -U` of the built file only; nothing when `paru --version` runs; a dry run
+  only checks; as root it fails.
 - `test_real_features_are_consistent`: every schema feature has a module
-  and every module a schema table.
+  and every module a schema table; paru alone requires another (packaging).
 
 ## Boundaries
 

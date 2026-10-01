@@ -8,8 +8,8 @@ progress: today it resolves host configuration, renders and deploys the
 dotfiles in `home/`, and runs `dotfiles apply` on Arch: packages from the
 repositories and every feature of `dotfiles/defaults.toml`, one module
 each per platform in `dotfiles/platforms/<name>/features/`. Today there
-are `packaging` (pacman and makepkg drop-ins) and `reflector` (the
-mirrorlist on a timer). See the [capability map](docs/spec/CAPABILITY-MAP.md).
+are `packaging` (pacman and makepkg drop-ins), `reflector` (the
+mirrorlist on a timer) and `paru` (the AUR helper). See the [capability map](docs/spec/CAPABILITY-MAP.md).
 
 ## How a host is described
 
