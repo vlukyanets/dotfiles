@@ -11,7 +11,7 @@ stable; specs, plans and commits refer to work by them.
 | `render` | Jinja2 templates for dotfiles under `home/`, rendered with the resolved config; feature gates; deploy to `$HOME` with check-before-write (content, mode); templates under `system/` for the files features write outside `$HOME` | `config` |
 | `engine` | `files.ensure/line/symlink`, `ensure_service/sysctl/...`, `shell.as_root`, `retry`, `defer`, notices, ordered feature runner, a clean apply that only says `nothing to change` | `config` |
 | `packages` | Install from the repositories, removing what a feature replaces | `engine` |
-| `features` | One Python module per feature and platform (`platforms/<name>/features/`, Linux's the fallback) for each in `dotfiles/defaults.toml`, rebuilt one at a time since 2026-09-28 (`packaging`, `reflector`) | `packages`, `render` |
+| `features` | One Python module per feature and platform (`platforms/<name>/features/`, Linux's the fallback) for each in `dotfiles/defaults.toml` | `packages`, `render` |
 | `tooling` | CI: `check` on every host, ruff, pytest; GitHub workflow | `config` |
 | `docs` | README, CLAUDE.md, a page per feature | all |
 

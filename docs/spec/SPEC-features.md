@@ -1,15 +1,14 @@
 # Spec: `features` — the features of the schema
 
-Status: restarted 2026-09-28. Module of the [capability map](CAPABILITY-MAP.md);
+Module of the [capability map](CAPABILITY-MAP.md);
 depends on `packages` and `render`.
 
 ## Objective
 
 Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
-check fails, root only through `shell.as_root`. The list starts from scratch:
-features come back one at a time, each with its settings, its
-dependencies and its tests. Today there are `packaging` and `reflector`.
+check fails, root only through `shell.as_root`. Today there are
+`packaging` and `reflector`.
 
 ## Structure
 
