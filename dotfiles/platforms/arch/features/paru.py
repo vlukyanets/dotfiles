@@ -13,23 +13,18 @@ _PARU = "https://aur.archlinux.org/paru.git"
 
 
 class Paru(Feature):
-    """base-devel, git and rustup for the build; paru built once, while it does not run."""
+    """base-devel and git for the build, cargo from rustup; paru built while it does not run."""
 
     def packages(self) -> list[str]:
-        """What makepkg and paru's PKGBUILD need: cargo comes from rustup."""
-        return ["base-devel", "git", "rustup"]
-
-    def replaces(self) -> list[str]:
-        """rust conflicts with rustup, which provides cargo and rustc too."""
-        return ["rust"]
+        """What makepkg and paru's PKGBUILD need, but cargo."""
+        return ["base-devel", "git"]
 
     def requires(self) -> list[str]:
-        """packaging first: makepkg builds with its MAKEFLAGS and OPTIONS."""
-        return ["packaging"]
+        """packaging: makepkg builds with its MAKEFLAGS and OPTIONS; rustup: cargo."""
+        return ["packaging", "rustup"]
 
     def apply(self) -> None:
-        """A stable toolchain for cargo, then paru built and installed unless it runs."""
-        self._toolchain()
+        """paru built and installed unless it runs."""
         # --version, not the package: a paru left behind by a libalpm bump does not run.
         if (self.system.shell.output("paru", "--version") or "").startswith("paru "):
             return
@@ -45,15 +40,6 @@ class Paru(Feature):
             built = self._build(Path(tmp) / "paru")
             self._install(built)
         self.system.report.changed("paru built and installed")
-
-    def _toolchain(self) -> None:
-        """rustup's default toolchain stable, if it has none: cargo runs only with one."""
-        if self.system.shell.output("rustup", "default"):
-            return
-        for attempt in retrying(self.system.report):
-            with attempt:
-                self.system.shell.run("rustup", "default", "stable")
-        self.system.report.changed("rustup default stable")
 
     def _build(self, src: Path) -> list[str]:
         """paru cloned into SRC and built by makepkg as this user; the package files."""

@@ -8,7 +8,7 @@ depends on `packages` and `render`.
 Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
-`packaging`, `reflector` and `paru`.
+`packaging`, `reflector`, `rustup` and `paru`.
 
 ## Structure
 
@@ -133,6 +133,19 @@ Arch only (`platforms/arch/features/reflector.py`), off by default, on in
 `age` and `download_timeout` at least 1, `completion_percent` 0 to 100,
 `on_calendar` and `on_boot_sec` not empty.
 
+## `rustup` — cargo and rustc
+
+```toml
+[features.rustup]
+enabled = true
+```
+
+Arch only (`platforms/arch/features/rustup.py`), off by default, on in
+`profiles/base.toml`. No settings. Its package is `rustup`, replacing
+`rust`, which conflicts with it; then `rustup default stable`, retried,
+while `rustup default` prints nothing: cargo runs only with a default
+toolchain. A toolchain already the default, stable or not, is left alone.
+
 ## `paru` — the AUR helper
 
 ```toml
@@ -145,11 +158,8 @@ Arch only (`platforms/arch/features/paru.py`), off by default, on in
 it, two steps apart: makepkg builds as the user (it refuses root), pacman
 installs as root; makepkg never calls sudo itself.
 
-- Packages: `base-devel`, `git`, and `rustup` for cargo, replacing `rust`,
-  which conflicts with it. Requires `packaging`, so makepkg builds with its
-  `MAKEFLAGS` and `OPTIONS`.
-- `rustup default stable`, retried, while rustup has no default toolchain:
-  cargo runs only with one.
+- Packages: `base-devel` and `git`. Requires `packaging`, so makepkg
+  builds with its `MAKEFLAGS` and `OPTIONS`, and `rustup`, for cargo.
 - `paru --version` runs: nothing more. That is the check, not the
   package: a paru left behind by a libalpm bump is installed and does not
   run, so it is built again.
@@ -173,7 +183,8 @@ system/etc/makepkg.conf.d/dotfiles.conf.j2
 dotfiles/platforms/arch/features/reflector.py Reflector: rules, config, timer, refresh
 system/etc/xdg/reflector/reflector.conf.j2    its templates
 system/etc/systemd/system/reflector.timer.d/override.conf.j2
-dotfiles/platforms/arch/features/paru.py      Paru: rustup's toolchain, build, install
+dotfiles/platforms/arch/features/rustup.py    Rustup: rustup for rust, the default toolchain
+dotfiles/platforms/arch/features/paru.py      Paru: build, install
 dotfiles/defaults.toml                         every feature and its settings
 tests/test_features.py                         each feature against a fake machine
 ```
@@ -195,11 +206,12 @@ tests/test_features.py                         each feature against a fake machi
   the timer enabled and one refresh on the first apply, nothing on the
   second; a changed setting refreshes without a reload; a failed refresh
   is a notice.
-- paru: the toolchain, clone and `makepkg` without sudo, then `sudo pacman
+- rustup: `default stable` once, nothing while a default is set.
+- paru: clone and `makepkg` without sudo, then `sudo pacman
   -U` of the built file only; nothing when `paru --version` runs; a dry run
   only checks; as root it fails.
 - `test_real_features_are_consistent`: every schema feature has a module
-  and every module a schema table; paru alone requires another (packaging).
+  and every module a schema table; paru alone requires others (packaging, rustup).
 
 ## Boundaries
 

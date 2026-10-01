@@ -223,36 +223,43 @@ def test_paru_is_built_as_the_user_and_installed_as_root(machine, monkeypatch, c
 
     monkeypatch.setattr(engine.current().shell, "execute", makepkg)
     apply("paru")
-    checks = (["paru", "--version"], ["rustup", "default"])
-    mutations = [c for c in machine.calls if c not in checks]
+    mutations = [c for c in machine.calls if c != ["paru", "--version"]]
     assert [c[:3] for c in mutations] == [
-        ["rustup", "default", "stable"],
         ["git", "clone", "--quiet"],
         ["makepkg", "--noconfirm", "--cleanbuild"],  # as the user: no sudo
         ["makepkg", "--packagelist"],
         ["sudo", "pacman", "-U"],
     ]
     assert mutations[-1] == ["sudo", "pacman", "-U", "--needed", "--noconfirm", *built]
-    assert capsys.readouterr().out == "-> rustup default stable\n-> paru built and installed\n"
+    assert capsys.readouterr().out == "-> paru built and installed\n"
 
 
 def test_paru_that_runs_is_left_alone(machine, capsys):
     machine.answers.update(PARU_RUNS)
-    machine.answers[("rustup", "default")] = (0, "stable-x86_64-unknown-linux-gnu (default)")
     apply("paru")
     assert capsys.readouterr().out == ""
-    assert machine.calls == [["rustup", "default"], ["paru", "--version"]]
+    assert machine.calls == [["paru", "--version"]]
 
 
 def test_paru_dry_run_builds_nothing(machine, capsys):
     engine.current().dry_run = True
     apply("paru")
-    assert capsys.readouterr().out == "-> rustup default stable\n-> paru built and installed\n"
-    assert [c[0] for c in machine.calls] == ["rustup", "paru"]  # checks only
+    assert capsys.readouterr().out == "-> paru built and installed\n"
+    assert machine.calls == [["paru", "--version"]]  # the check only
 
 
 def test_paru_refuses_to_build_as_root(machine, monkeypatch):
     monkeypatch.setattr(os, "geteuid", lambda: 0)
-    machine.answers[("rustup", "default")] = (0, "stable")
     with pytest.raises(engine.Failed, match="makepkg refuses root"):
         apply("paru")
+
+
+def test_rustup_sets_a_default_toolchain_once(machine, capsys):
+    apply("rustup")
+    assert machine.calls == [["rustup", "default"], ["rustup", "default", "stable"]]
+    assert capsys.readouterr().out == "-> rustup default stable\n"
+    machine.answers[("rustup", "default")] = (0, "stable-x86_64-unknown-linux-gnu (default)")
+    machine.calls.clear()
+    apply("rustup")
+    assert machine.calls == [["rustup", "default"]]
+    assert capsys.readouterr().out == ""

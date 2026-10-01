@@ -41,7 +41,13 @@ download_timeout   = 5         # seconds
 on_calendar        = "weekly"  # reflector.timer's OnCalendar
 on_boot_sec        = "15min"   # and OnBootSec
 
+# rustup: cargo and rustc from rustup in place of rust, the stable toolchain
+# the default while there is none.
+[features.rustup]
+enabled = false
+
 # paru: the AUR helper, built from the AUR by makepkg as the user and
 # installed by pacman as root, whenever `paru --version` does not run.
+# Requires rustup, for cargo.
 [features.paru]
 enabled = false

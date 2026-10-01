@@ -4,5 +4,8 @@
 [features.reflector]
 enabled = true
 
+[features.rustup]
+enabled = true
+
 [features.paru]
 enabled = true
