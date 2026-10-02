@@ -6,6 +6,7 @@ import subprocess
 from collections.abc import Sequence
 
 from dotfiles.engine import die
+from dotfiles.platforms.arch._aur import Aur
 from dotfiles.platforms.package_manager import PackageManager
 from dotfiles.retry import retrying
 
@@ -25,17 +26,22 @@ class Pacman(PackageManager):
         found = self.shell.output("pacman", "-T", *names)  # prints exactly the ones not installed
         return list(names) if found is None else found.split()
 
-    def install(self, names: list[str], replaces: Sequence[str] = ()) -> None:
-        """REPLACES removed, then NAMES installed in one transaction; fails first on unknown names."""
+    def install(self, names: list[str], replaces: Sequence[str] = ()) -> list[str]:
+        """REPLACES removed, then NAMES of the repositories installed in one transaction;
+        the others, left for build(): the AUR.
+        """
         self._remove(replaces)
         known = (
             self._parse(self.shell.output("pacman", "-Si", *names, env=_c_env()) or "")
             if names
             else {}
         )
-        if unknown := [n for n in names if n not in known]:
-            die(f"not in the repositories: {' '.join(unknown)}")
-        self._sync(names)
+        self.sync([n for n in names if n in known])
+        return [n for n in names if n not in known]
+
+    def build(self, names: list[str]) -> None:
+        """NAMES built from the AUR as this user and installed as root, AUR dependencies first."""
+        Aur(self).install(names)
 
     def upgrade(self) -> None:
         """pacman -Syu as root: the sync and the downloads retried, the install once.
@@ -75,8 +81,8 @@ class Pacman(PackageManager):
                     self.shell.run("pacman", "-Rdd", "--noconfirm", name)
                 self.report.changed(f"removed {name}, its replacement follows")
 
-    def _sync(self, names: list[str]) -> None:
-        """NAMES from the repositories, as root: downloaded with retries, installed once."""
+    def sync(self, names: list[str], *flags: str) -> None:
+        """NAMES from the repositories with FLAGS, as root: downloaded with retries, installed once."""
         if not names:
             return
         try:
@@ -89,7 +95,7 @@ class Pacman(PackageManager):
                 " run pacman -Syu and apply again"
             )
         with self.shell.as_root():
-            self.shell.run("pacman", "-S", "--needed", "--noconfirm", *names)
+            self.shell.run("pacman", "-S", "--needed", "--noconfirm", *flags, *names)
 
     @staticmethod
     def _parse(info: str, field: str = "Depends On") -> dict[str, set[str]]:

@@ -1,6 +1,5 @@
 import os
 import tomllib
-from pathlib import Path
 
 import pytest
 
@@ -8,6 +7,7 @@ from dotfiles import engine
 from dotfiles.feature import classes
 from dotfiles.layout import Layout
 from dotfiles.platforms.arch import ArchLinuxOs
+from dotfiles.platforms.arch._pacman import Pacman
 from dotfiles.platforms.arch.features.packaging import _jobs
 
 
@@ -208,50 +208,22 @@ def test_reflector_failed_refresh_is_a_notice(machine, capsys):
 PARU_RUNS = {("paru", "--version"): (0, "paru v2.0.4 - libalpm v15.0.0")}
 
 
-def test_paru_is_built_as_the_user_and_installed_as_root(machine, monkeypatch, capsys):
-    monkeypatch.setenv("SUDO_CMD", "sudo")
+def test_paru_is_built_from_the_aur_while_it_does_not_run(machine, monkeypatch):
     built = []
-
-    def makepkg(argv, check=False, **kwargs):
-        if argv == ["makepkg", "--packagelist"]:  # paru-debug listed, never built
-            names = ["paru-2.0.4-1-x86_64.pkg.tar.zst", "paru-debug-2.0.4-1-x86_64.pkg.tar.zst"]
-            listed = [str(kwargs["cwd"] / name) for name in names]
-            Path(listed[0]).touch()
-            built.append(listed[0])
-            machine.answers[tuple(argv)] = (0, "\n".join(listed))
-        return machine(argv, check, **kwargs)
-
-    monkeypatch.setattr(engine.current().shell, "execute", makepkg)
+    monkeypatch.setattr(Pacman, "build", lambda self, names: built.append(names))
     apply("paru")
-    mutations = [c for c in machine.calls if c != ["paru", "--version"]]
-    assert [c[:3] for c in mutations] == [
-        ["git", "clone", "--quiet"],
-        ["makepkg", "--noconfirm", "--cleanbuild"],  # as the user: no sudo
-        ["makepkg", "--packagelist"],
-        ["sudo", "pacman", "-U"],
-    ]
-    assert mutations[-1] == ["sudo", "pacman", "-U", "--needed", "--noconfirm", *built]
-    assert capsys.readouterr().out == "-> paru built and installed\n"
-
-
-def test_paru_that_runs_is_left_alone(machine, capsys):
+    assert built == [["paru"]]  # installed but not running (a libalpm bump) counts too
     machine.answers.update(PARU_RUNS)
     apply("paru")
-    assert capsys.readouterr().out == ""
-    assert machine.calls == [["paru", "--version"]]
+    assert built == [["paru"]]
+    assert machine.calls == [["paru", "--version"]] * 2
 
 
 def test_paru_dry_run_builds_nothing(machine, capsys):
     engine.current().dry_run = True
     apply("paru")
-    assert capsys.readouterr().out == "-> paru built and installed\n"
+    assert capsys.readouterr().out == "-> paru built from the AUR\n"
     assert machine.calls == [["paru", "--version"]]  # the check only
-
-
-def test_paru_refuses_to_build_as_root(machine, monkeypatch):
-    monkeypatch.setattr(os, "geteuid", lambda: 0)
-    with pytest.raises(engine.Failed, match="makepkg refuses root"):
-        apply("paru")
 
 
 RUSTUP_SHOW = (0, "Default host: x86_64-unknown-linux-gnu\nrustup home:  /home/u/.rustup")

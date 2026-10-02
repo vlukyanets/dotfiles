@@ -30,6 +30,8 @@ class FakeManager(PackageManager):
     graph: ClassVar[dict[str, set[str]]] = {}  # package -> everything it needs
     installs: ClassVar[list[list[str]]] = []
     replaced: ClassVar[list[list[str]]] = []  # REPLACES of each install
+    aur: ClassVar[set[str]] = set()  # not in its repositories: left for build()
+    builds: ClassVar[list[list[str]]] = []
     broken = False  # install fails
 
     def missing(self, names):
@@ -40,6 +42,11 @@ class FakeManager(PackageManager):
         self.replaced.append(list(replaces))
         if self.broken:
             raise RuntimeError("mirror down")
+        self.installed.update(set(names) - self.aur)
+        return [n for n in names if n in self.aur]
+
+    def build(self, names):
+        self.builds.append(names)
         self.installed.update(names)
 
     def upgrade(self):
@@ -65,6 +72,8 @@ def system(monkeypatch) -> type[FakeManager]:
     monkeypatch.setattr(FakeManager, "graph", {})
     monkeypatch.setattr(FakeManager, "installs", [])
     monkeypatch.setattr(FakeManager, "replaced", [])
+    monkeypatch.setattr(FakeManager, "aur", set())
+    monkeypatch.setattr(FakeManager, "builds", [])
     monkeypatch.setattr(FakeManager, "broken", False)
     monkeypatch.setattr(discovery, "detect", lambda machine: FakeArch(machine))
     monkeypatch.setattr(discovery, "every", lambda machine: [FakeArch(machine)])
@@ -175,6 +184,30 @@ def test_one_install_then_silence(root, system, tmp_path, monkeypatch, capsys):
     assert apply("h", root) == 0
     assert system.installs == [["git", "postgres"]]
     assert capsys.readouterr() == ("nothing to change\n", "")
+
+
+def test_an_aur_package_is_built_at_its_feature_s_turn(root, system, tmp_path, monkeypatch, capsys):
+    (root / "dotfiles/defaults.toml").write_text(
+        "[features]\n" + "".join(f"{n}.enabled = true\n" for n in ("base", "app"))
+    )
+    make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "base": feature(
+                "Base", "self.system.report.changed(str(self.system.manager.installed))"
+            ),
+            "app": feature("App", packages=["git", "app-bin"], requires=["base"]),
+        },
+    )
+    system.aur = {"app-bin"}
+    assert apply("h", root) == 0
+    assert system.installs == [["app-bin", "git"]]
+    assert system.builds == [["app-bin"]]
+    # base ran before app's AUR package was built
+    assert capsys.readouterr().out == "-> packages: app-bin git (missing)\n-> {'git'}\n"
+    assert apply("h", root) == 0
+    assert system.builds == [["app-bin"]]
 
 
 def test_dry_run_leaves_features_whose_packages_are_missing(

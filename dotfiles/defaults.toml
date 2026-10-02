@@ -49,6 +49,6 @@ toolchain = "stable"  # stable, beta, nightly, a version ("1.85.0") or a dated n
 
 # paru: the AUR helper, built from the AUR by makepkg as the user and
 # installed by pacman as root, whenever `paru --version` does not run.
-# Requires rustup, for cargo.
+# Requires packaging, for makepkg's flags, and rustup, for cargo.
 [features.paru]
 enabled = false

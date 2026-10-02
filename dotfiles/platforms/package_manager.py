@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from dotfiles.engine import Machine
+from dotfiles.engine import Machine, die
 
 
 class PackageManager(ABC):
@@ -22,8 +22,14 @@ class PackageManager(ABC):
         """NAMES that are not installed. A check: no root, no change."""
 
     @abstractmethod
-    def install(self, names: list[str], replaces: Sequence[str] = ()) -> None:
-        """NAMES installed, in one transaction, REPLACES removed first."""
+    def install(self, names: list[str], replaces: Sequence[str] = ()) -> list[str]:
+        """NAMES installed, in one transaction, REPLACES removed first; those it has not
+        in its repositories, left for build().
+        """
+
+    def build(self, names: list[str]) -> None:
+        """NAMES, which install() left, built and installed; none can be by default."""
+        die(f"not in the repositories: {' '.join(names)}")
 
     @abstractmethod
     def upgrade(self) -> None:

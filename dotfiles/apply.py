@@ -63,6 +63,8 @@ class Apply:
         self.wanted = sorted(set().union(*(step.packages for step in found)))
         self.unavailable: set[str] = set()  # wanted, and still missing after the install
         self.pending: set[str] = set()  # missing, left so by a dry run
+        # Not in the repositories: each built at its feature's turn, after what it requires.
+        self.later: set[str] = set()
         self.waiting: set[str] = set()  # features a dry run cannot check before their packages
 
     def run(self) -> int:
@@ -107,8 +109,8 @@ class Apply:
         if ready:
             replaced = sorted(set().union(*(step.replaces for step in self.steps)))
             with self._guard("packages"):
-                manager.install(missing, replaced)
-        self.unavailable = set(manager.missing(self.wanted))
+                self.later = set(manager.install(missing, replaced))
+        self.unavailable = set(manager.missing(self.wanted)) - self.later
 
     def _features(self) -> None:
         """Each feature in order, unless what it builds on failed."""
@@ -130,6 +132,9 @@ class Apply:
                 self.report.changed(f"{step.name} (after its packages)")
                 continue
             with self._guard(step.name):
+                if later := sorted(step.packages & self.later):
+                    self.system.manager.build(later)
+                    self.later -= set(later)
                 try:
                     step.feature.apply()
                 except engine.Deferred as e:

@@ -1,6 +1,10 @@
 import grp
+import json
+import os
 import pwd
 import subprocess
+from pathlib import Path
+from urllib.parse import urlencode
 
 import pytest
 from conftest import Fake
@@ -147,11 +151,132 @@ def test_arch_install_removes_what_it_replaces(system, arch, capsys):
     assert capsys.readouterr().out == "-> removed jack2, its replacement follows\n"
 
 
-def test_arch_install_outside_the_repositories_fails_before_any_change(system, arch):
+def test_arch_install_leaves_what_is_not_in_the_repositories_for_build(system, arch):
     system.answers[("pacman", "-Si", "tmux", "clock-rs-git")] = (0, si("tmux"))
-    with pytest.raises(Failed, match="^not in the repositories: clock-rs-git$"):
-        arch.manager.install(["tmux", "clock-rs-git"])
-    assert [c[1] for c in system.calls] == ["-Si"]
+    assert arch.manager.install(["tmux", "clock-rs-git"]) == ["clock-rs-git"]
+    assert system.calls[1:] == [
+        ["pacman", "-Sw", "--needed", "--noconfirm", "tmux"],
+        ["pacman", "-S", "--needed", "--noconfirm", "tmux"],
+    ]
+
+
+def aur_info(*infos: dict) -> tuple[int, str]:
+    """curl's answer: the AUR RPC's results for INFOS."""
+    return 0, json.dumps({"results": [{"PackageBase": i["Name"], **i} for i in infos]})
+
+
+def rpc(*names: str) -> tuple[str, ...]:
+    return (
+        "curl",
+        "-fsSL",
+        f"https://aur.archlinux.org/rpc/v5/info?{urlencode([('arg[]', n) for n in names])}",
+    )
+
+
+@pytest.fixture
+def aur(system, monkeypatch) -> Fake:
+    """makepkg that builds NAME-1-1-x86_64.pkg.tar.zst in its directory, pacman -Qqp that reads it."""
+    system.programs |= {"curl", "git", "makepkg"}
+
+    def execute(argv, check=False, **kwargs):
+        if argv[:2] == ["git", "clone"]:
+            Path(argv[-1]).mkdir(parents=True)
+        if argv[0] == "makepkg":
+            pkg = kwargs["cwd"] / f"{kwargs['cwd'].name}-1-1-x86_64.pkg.tar.zst"
+            if argv[1] == "--noconfirm":
+                pkg.touch()
+            else:  # --packagelist
+                system.answers[tuple(argv)] = (0, str(pkg))
+                system.answers[("pacman", "-Qqp", str(pkg))] = (0, kwargs["cwd"].name)
+        return system(argv, check, **kwargs)
+
+    monkeypatch.setattr(engine.current().shell, "execute", execute)
+    monkeypatch.setenv("SUDO_CMD", "sudo")
+    system.programs.add("sudo")
+    return system
+
+
+def test_aur_builds_as_the_user_and_installs_as_root_dependencies_first(aur, arch, capsys):
+    app = {"Name": "app", "Depends": ["libfoo>=1", "glibc"], "MakeDepends": ["cargo"]}
+    aur.answers[rpc("app")] = aur_info(app)
+    aur.answers[rpc("libfoo")] = aur_info({"Name": "libfoo"})
+    aur.answers[("pacman", "-T", "libfoo>=1", "glibc", "cargo")] = (127, "libfoo>=1\ncargo\n")
+    aur.answers[("pacman", "-Sp", "--print-format", "%n", "libfoo")] = (1, "")
+    aur.answers[("pacman", "-Sp", "--print-format", "%n", "cargo")] = (0, "rustup")
+    arch.manager.build(["app"])
+    cache = Path(os.environ["XDG_CACHE_HOME"]) / "dotfiles/aur"
+    mutations = [
+        c for c in aur.calls if c[0] in ("git", "sudo") or c[:2] == ["makepkg", "--noconfirm"]
+    ]
+    assert mutations == [
+        ["sudo", "pacman", "-Sw", "--needed", "--noconfirm", "cargo"],
+        ["sudo", "pacman", "-S", "--needed", "--noconfirm", "--asdeps", "cargo"],
+        [
+            "git",
+            "clone",
+            "--quiet",
+            "--depth",
+            "1",
+            "https://aur.archlinux.org/libfoo.git",
+            str(cache / "libfoo"),
+        ],
+        # As the user: no sudo, and no -s, which would call it.
+        ["makepkg", "--noconfirm", "--force", "--cleanbuild", "--clean", "--nocheck"],
+        [
+            "sudo",
+            "pacman",
+            "-U",
+            "--noconfirm",
+            "--asdeps",
+            str(cache / "libfoo/libfoo-1-1-x86_64.pkg.tar.zst"),
+        ],
+        [
+            "git",
+            "clone",
+            "--quiet",
+            "--depth",
+            "1",
+            "https://aur.archlinux.org/app.git",
+            str(cache / "app"),
+        ],
+        ["makepkg", "--noconfirm", "--force", "--cleanbuild", "--clean", "--nocheck"],
+        [
+            "sudo",
+            "pacman",
+            "-U",
+            "--noconfirm",
+            str(cache / "app/app-1-1-x86_64.pkg.tar.zst"),
+        ],
+    ]
+    assert capsys.readouterr().out == "-> libfoo built from the AUR\n-> app built from the AUR\n"
+
+
+def test_aur_builds_again_from_what_it_has(aur, arch):
+    src = Path(os.environ["XDG_CACHE_HOME"]) / "dotfiles/aur/app"
+    (src / ".git").mkdir(parents=True)
+    (src / "app-0.9.tar.gz").touch()  # a source makepkg already has
+    (src / "app-0.9-1-x86_64.pkg.tar.zst").touch()  # an earlier build
+    aur.answers[rpc("app")] = aur_info({"Name": "app"})
+    arch.manager.build(["app"])
+    assert [c[:2] for c in aur.calls if c[0] == "git"] == [["git", "fetch"], ["git", "reset"]]
+    assert sorted(p.name for p in src.iterdir()) == [
+        ".git",
+        "app-0.9.tar.gz",
+        "app-1-1-x86_64.pkg.tar.zst",
+    ]
+
+
+def test_aur_fails_on_what_it_does_not_have(aur, arch):
+    aur.answers[rpc("nope")] = aur_info()
+    with pytest.raises(Failed, match="^not in the repositories nor the AUR: nope$"):
+        arch.manager.build(["nope"])
+
+
+def test_aur_refuses_to_build_as_root(aur, arch, monkeypatch):
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    with pytest.raises(Failed, match="makepkg refuses root"):
+        arch.manager.build(["app"])
+    assert aur.calls == []
 
 
 def test_arch_install_failure_names_the_stale_database(system, arch, monkeypatch):
