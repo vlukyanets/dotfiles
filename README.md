@@ -1,11 +1,10 @@
 # dotfiles
 
 Takes an Arch Linux machine from a fresh install to a configured one. A
-machine is a short TOML file that inherits from profiles; dotfiles are
-Jinja2 templates rendered with that configuration; features are Python
-classes that check the live system and change only what differs. Work in
-progress: today it resolves host configuration, renders and deploys the
-dotfiles in `home/`, and runs `dotfiles apply` on Arch: packages from the
+machine is a short TOML file that inherits from profiles; features are
+Python classes that check the live system and change only what differs,
+writing files from Jinja2 templates. Work in progress: today it resolves
+host configuration and runs `dotfiles apply` on Arch: packages from the
 repositories and every feature of `dotfiles/defaults.toml`, one module
 each per platform in `dotfiles/platforms/<name>/features/`. Today there
 are `packaging` (pacman and makepkg drop-ins), `reflector` (the
@@ -15,7 +14,7 @@ helper). See the [capability map](docs/spec/CAPABILITY-MAP.md).
 ## How a host is described
 
 ```
-dotfiles/defaults.toml  every key, its type and its default; every feature off
+dotfiles/defaults.toml  every key, its type and its default
 profiles/<name>.toml    base, server, laptop, vm
 hosts/<hostname>.toml   one file per machine
 ~/.config/dotfiles/config.toml
@@ -39,9 +38,9 @@ rules in full: [SPEC-config](docs/spec/SPEC-config.md).
 A machine runs from its own copy of the config: `dotfiles init [HOST]`
 writes the resolved `hosts/HOST.toml` (default: this machine's hostname),
 every key with its effective value, to `~/.config/dotfiles/config.toml`,
-and overwrites it on the next init. `apply`, `deploy`, `config` and
-`render` read that file; `--source PATH` reads `hosts/<hostname>.toml` of
-the checkout at PATH instead, and `--host NAME` a host of this checkout.
+and overwrites it on the next init. `apply` and `config` read that
+file; `--source PATH` reads `hosts/<hostname>.toml` of the checkout at
+PATH instead, and `config --host NAME` a host of this checkout.
 
 ## Running it
 
@@ -71,12 +70,9 @@ of updating it.
     uv run --exact dotfiles init [HOST]                       # hosts/HOST.toml resolved into ~/.config/dotfiles/config.toml
     uv run --exact dotfiles config                            # this machine's config, as TOML
     uv run --exact dotfiles config --source .                 # the same from hosts/<hostname>.toml of the checkout at .
-    uv run --exact dotfiles config --host hyper --explain # each key with the file it came from
-    uv run --exact dotfiles render --host hyper --out DIR # a host's home tree, into an empty DIR
-    uv run --exact dotfiles deploy --dry-run                  # what would change in $HOME
-    uv run --exact dotfiles deploy                            # write it
-    uv run --exact dotfiles apply --dry-run                   # features + dotfiles: what would change, no sudo
+    uv run --exact dotfiles config --host hyper --explain     # each key with the file it came from
+    uv run --exact dotfiles apply --dry-run                   # packages and features: what would change, no sudo
     uv run --exact dotfiles apply                             # this machine; "nothing to change" when it already matches
-    uv run --isolated dotfiles check                          # every host and the machine config resolve and render
+    uv run --isolated dotfiles check                          # every host and the machine config resolve
     uv run --isolated --group dev pytest
     uv run --isolated --group dev ruff check . && uv run --isolated --group dev ruff format --check .

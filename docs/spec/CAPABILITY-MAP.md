@@ -1,14 +1,14 @@
 # Capability Map: dotfiles
 
-Approved 2026-09-23. A Python tool that describes each machine in TOML,
-renders its dotfiles from Jinja2 templates and brings the live system in
-line with that description, checking before every change. Module ids are
-stable; specs, plans and commits refer to work by them.
+Approved 2026-09-23. A Python tool that describes each machine in TOML
+and brings the live system in line with that description, checking
+before every change. Module ids are stable; specs, plans and commits
+refer to work by them.
 
 | Module id | Responsibility | Depends on |
 |---|---|---|
-| `config` | Load `dotfiles/defaults.toml` (schema), `profiles/*.toml`, `hosts/*.toml`; resolve `extends` (host → profiles/hosts); validate every file against the schema; merge; dump the result; `check` every host | — |
-| `render` | Jinja2 templates for dotfiles under `home/`, rendered with the resolved config; feature gates; deploy to `$HOME` with check-before-write (content, mode); templates under `system/` for the files features write outside `$HOME` | `config` |
+| `config` | Load `dotfiles/defaults.toml` (schema), `profiles/*.toml`, `hosts/**/*.toml`; resolve `extends` (host → profiles/hosts); validate every file against the schema; merge; dump the result; `check` every host | — |
+| `render` | Jinja2 templates under `system/` for the files features write, rendered with the context a feature passes | `config` |
 | `engine` | `files.ensure/line/symlink`, `ensure_service/sysctl/...`, `shell.as_root`, `retry`, `defer`, notices, ordered feature runner, a clean apply that only says `nothing to change` | `config` |
 | `packages` | Install from the repositories, removing what a feature replaces | `engine` |
 | `features` | One Python module per feature and platform (`platforms/<name>/features/`, Linux's the fallback) for each in `dotfiles/defaults.toml` | `packages`, `render` |

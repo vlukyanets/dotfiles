@@ -33,7 +33,7 @@ The schema is one for every platform: `features.<name>` in
 `rules` and `types` of that name's classes, gathered from every platform
 by `feature.checks()` and passed to `config` by the entry points.
 
-A file a feature writes outside `$HOME` is a Jinja2 template under
+A file a feature writes is a Jinja2 template under
 `system/`, at its path from `/`: `system/etc/pacman.conf.d/options.conf.j2`
 for `/etc/pacman.conf.d/options.conf`. `render.template(dst, **context)`
 renders it; the feature writes the text with `files.ensure`. The context is
@@ -43,6 +43,7 @@ what the feature passes, not the whole config.
 
 ```toml
 [features.packaging.pacman]
+contrib            = true
 parallel_downloads = 5
 multilib           = true
 flags              = ["Color", "VerbosePkgLists"]
@@ -53,10 +54,12 @@ packager = "Ann Lee <ann@lee.org>"
 options  = ["ccache", "!debug"]
 ```
 
-Arch only (`platforms/arch/features/packaging.py`), no packages, no
-requirements: `apply()` does it all. It has no `enabled`: every Arch
-machine has pacman, so it always runs there. Its keys have no default:
-the schema holds only the empty `pacman` and `makepkg` tables, and
+Arch only (`platforms/arch/features/packaging.py`), no requirements. It
+has no `enabled`: every Arch machine has pacman, so it always runs there.
+Its one package is `pacman-contrib` (paccache, checkupdates, pactree…),
+while `pacman.contrib`, false by default, is true; false never removes
+it. The other keys of `pacman` and `makepkg` have no default: the schema
+holds only `contrib` in those tables, and
 `Packaging.types` gives each key its type, so a key is in the resolved
 config only when a host or profile sets it. Only drop-ins are written, and
 only for what is set: with nothing set the feature touches nothing, and
@@ -74,20 +77,21 @@ the main files keep everything the drop-ins do not set.
 - `multilib` not set: its drop-in, its `Include` and `pacman.conf`'s own
   `[multilib]` are left as they are. Set, `/etc/pacman.conf.d/multilib.conf`
   (`root:root` 644) and its `Include` line appended to `pacman.conf` are
-  written either way, so the setting follows `multilib` both ways: `true` puts `[multilib]` (`Include =
-  /etc/pacman.d/mirrorlist`) in it, whatever `pacman.conf` says; `false`
-  leaves it only its header, which takes the repository out again after a
-  `true`. While multilib is on and `/var/lib/pacman/sync/multilib.db` does not exist:
-  `Pacman.upgrade()` (`pacman -Syuw` as root, retried, then `-Su`); a full upgrade, not `-Sy`,
-  which followed by `-S` is a partial upgrade. An active `[multilib]` in
-  `pacman.conf` itself fails the feature before any change (`comment that
-  section out`): pacman refuses a second section of the same repository
-  (`could not register 'multilib' database`). With `multilib = false`
-  that section is `pacman.conf`'s own business.
-- `/etc/makepkg.conf.d/dotfiles.conf` (`root:root` 644), when any `makepkg`
-  key is set; makepkg reads it after `makepkg.conf`: `MAKEFLAGS="-jN"` when `jobs` is set,
-  `PACKAGER="…"` when `packager` is, `OPTIONS+=(…)` when `options` is not
-  empty.
+  written either way, so the setting follows `multilib` both ways: `true`
+  puts `[multilib]` (`Include = /etc/pacman.d/mirrorlist`) in it, whatever
+  `pacman.conf` says; `false` leaves it only its header, which takes the
+  repository out again after a `true`. While multilib is on and
+  `/var/lib/pacman/sync/multilib.db` does not exist: `Pacman.upgrade()`
+  (`pacman -Syuw` as root, retried, then `-Su`); a full upgrade, not
+  `-Sy`, which followed by `-S` is a partial upgrade. An active
+  `[multilib]` in `pacman.conf` itself fails the feature before any change
+  (`comment that section out`): pacman refuses a second section of the
+  same repository (`could not register 'multilib' database`). With
+  `multilib = false` that section is `pacman.conf`'s own business.
+- `/etc/makepkg.conf.d/dotfiles.conf` (`root:root` 644), when any
+  `makepkg` key is set; makepkg reads it after `makepkg.conf`:
+  `MAKEFLAGS="-jN"` when `jobs` is set, `PACKAGER="…"` when `packager` is,
+  `OPTIONS+=(…)` when `options` is not empty.
 - `jobs` is an integer, the threads, or a string `"NN%"`, that share of
   `os.cpu_count()` at the apply, at least 1; not set leaves `makepkg.conf`'s.
 
@@ -160,24 +164,17 @@ enabled = true
 ```
 
 Arch only (`platforms/arch/features/paru.py`), off by default, on in
-`profiles/base.toml`. No settings. It builds paru from the AUR and installs
-it, two steps apart: makepkg builds as the user (it refuses root), pacman
-installs as root; makepkg never calls sudo itself.
+`profiles/base.toml`. No settings, no packages: requires `packaging`, so
+makepkg builds with its `MAKEFLAGS` and `OPTIONS`, and `rustup`, for
+cargo.
 
-- Packages: `base-devel` and `git`. Requires `packaging`, so makepkg
-  builds with its `MAKEFLAGS` and `OPTIONS`, and `rustup`, for cargo.
 - `paru --version` runs: nothing more. That is the check, not the
-  package: a paru left behind by a libalpm bump is installed and does not
-  run, so it is built again.
-- The build, as the user, in a temp dir under `~/.cache/dotfiles` (not
-  `/tmp`, where a tmpfs may be too small for cargo): `git clone --depth 1`
-  of `https://aur.archlinux.org/paru.git`, then `makepkg --noconfirm
-  --cleanbuild`, each retried; no `-s`, since `packages()` brought the
-  dependencies. The files are those of `makepkg --packagelist` that exist
-  (paru-debug only with the debug option); none fails the feature.
-- The install, as root: `pacman -U --needed --noconfirm` of those files.
-- As root itself the feature fails at once: makepkg would refuse.
-- Dry run: the checks only, and `paru built and installed` reported.
+  package, which is why paru is not in `packages()`: a paru left behind
+  by a libalpm bump is installed and does not run, so it is built again.
+- Otherwise `manager.build(["paru"])`: built as the user, installed as
+  root, like any AUR package (`SPEC-packages`), the build in
+  `~/.cache/dotfiles/aur/paru`.
+- Dry run: the check only, and `paru built from the AUR` reported.
 
 ## Project Structure
 
@@ -186,39 +183,42 @@ dotfiles/platforms/arch/features/packaging.py  Packaging: rules, types, drop-ins
 system/etc/pacman.conf.d/options.conf.j2       its templates
 system/etc/pacman.conf.d/multilib.conf.j2
 system/etc/makepkg.conf.d/dotfiles.conf.j2
-dotfiles/platforms/arch/features/reflector.py Reflector: rules, config, timer, refresh
-system/etc/xdg/reflector/reflector.conf.j2    its templates
+dotfiles/platforms/arch/features/reflector.py  Reflector: rules, config, timer, refresh
+system/etc/xdg/reflector/reflector.conf.j2     its templates
 system/etc/systemd/system/reflector.timer.d/override.conf.j2
-dotfiles/platforms/arch/features/rustup.py    Rustup: rustup for rust, its default toolchain
-dotfiles/platforms/arch/features/paru.py      Paru: build, install
+dotfiles/platforms/arch/features/rustup.py     Rustup: rustup for rust, its default toolchain
+dotfiles/platforms/arch/features/paru.py       Paru: built from the AUR while it does not run
 dotfiles/defaults.toml                         every feature and its settings
 tests/test_features.py                         each feature against a fake machine
+tests/test_apply.py                            test_real_features_are_consistent
 ```
 
 ## Testing Strategy
 
 - Every command faked, root's files written under a temp sysroot
   (`conftest.machine`).
-- Defaults: every drop-in holds only its header, the options `Include`
-  lands before `[core]`, multilib's at the end, no pacman command; a
-  second apply prints nothing.
+- Nothing set: no drop-in, `pacman.conf` untouched, no command, nothing
+  printed. Only `flags` set: the options drop-in alone, its `Include`
+  before `[core]`; only `jobs`: `MAKEFLAGS` alone.
+- `pacman.contrib`: `pacman-contrib` among the packages only when true.
 - Every setting set: the lines in order; `"50%"` of a patched
   `cpu_count`; a percent never below one thread.
-- multilib: the drop-in, its `Include` at the end, `-Syuw` and `-Su` once, nothing
-  once `multilib.db` exists; off again, the drop-in back to its header; an active `[multilib]` of `pacman.conf` fails
-  before any change, a commented-out one does not, and neither matters
-  with multilib off.
+- multilib: the drop-in, its `Include` at the end, `-Syuw` and `-Su`,
+  nothing once `multilib.db` exists or when not set; off again, the
+  drop-in back to its header; an active `[multilib]` of `pacman.conf`
+  fails before any change, a commented-out one does not, and neither
+  matters with multilib not set.
 - reflector: every argument in order, the country quoted; `daemon-reload`,
   the timer enabled and one refresh on the first apply, nothing on the
   second; a changed setting refreshes without a reload; a failed refresh
   is a notice.
 - rustup: `default stable` once, nothing while it is the default; another
   toolchain switched to, a dated nightly not taken for `nightly`.
-- paru: clone and `makepkg` without sudo, then `sudo pacman
-  -U` of the built file only; nothing when `paru --version` runs; a dry run
-  only checks; as root it fails.
+- paru: built from the AUR while `paru --version` fails, not once it runs;
+  a dry run only checks.
 - `test_real_features_are_consistent`: every schema feature has a module
-  and every module a schema table; paru alone requires others (packaging, rustup).
+  and every module a schema table; paru alone requires others
+  (packaging, rustup).
 
 ## Boundaries
 
@@ -231,12 +231,12 @@ tests/test_features.py                         each feature against a fake machi
 ## Decisions
 
 1. **`packaging` is an ordinary feature**, not the platform's setup. A
-   feature that needs it (multilib for lib32 packages) will say so in
-   `requires()` once the dependency rework lands.
-2. **A default writes nothing**: `0`, `""`, `[]` and `false` leave the
-   main file's value, so a host sets only what it wants to change. multilib
-   is the exception: `false` empties its drop-in, since the repository
-   there is ours.
+   feature that needs it says so in `requires()`, as `paru` does for its
+   `MAKEFLAGS` and `OPTIONS`.
+2. **What is not set writes nothing**: a key no host or profile sets
+   leaves the main file's value, so a host sets only what it wants to
+   change. multilib is the exception: `false` empties its drop-in, since
+   the repository there is ours.
 3. **Valueless options are a list** (`flags`), since TOML has no key
    without a value and `false` could not turn one off anyway.
 4. **`jobs` has no shell expressions** (`"$(nproc)"`): a number or a
