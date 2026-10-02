@@ -53,8 +53,9 @@ enabled = false
 # the rest of ~/.zshrc stays the user's.
 [features.zsh]
 enabled = false
-plugins = []  # oh-my-zsh's own plugins
-extras  = []  # from the repositories
+shell   = "/usr/bin/zsh"  # made the login shell by chsh; listed in /etc/shells
+plugins = []              # oh-my-zsh's own plugins
+extras  = []              # from the repositories
 
 # The theme: one of oh-my-zsh's own, without a repo; or <dir>/<name>, the
 # theme <name> of `repo` cloned into ~/.oh-my-zsh/custom/themes/<dir>, again

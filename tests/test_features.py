@@ -335,6 +335,12 @@ def test_zsh_clones_writes_sources_and_switches_once(machine, monkeypatch, capsy
     assert machine.calls == []
 
 
+def test_zsh_login_shell_is_the_one_set(machine, monkeypatch):
+    login_shell(monkeypatch, "/usr/bin/zsh")
+    apply("zsh", defaults(zsh={"shell": "/usr/local/bin/zsh"}))
+    assert ["chsh", "-s", "/usr/local/bin/zsh", "u"] in machine.calls
+
+
 def test_zsh_creates_zshrc_with_the_source_line(machine, monkeypatch):
     login_shell(monkeypatch, "/usr/bin/zsh")
     apply("zsh")

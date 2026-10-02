@@ -15,7 +15,6 @@ from dotfiles.retry import retrying
 _OMZ = "https://github.com/ohmyzsh/ohmyzsh.git"
 _SNIPPET = "~/.config/zsh/dotfiles.zsh"
 _SOURCE = f"source {_SNIPPET}"
-_ZSH = "/usr/bin/zsh"
 # zsh-completions is only its package: its functions are in zsh's fpath already.
 _EXTRAS = ("zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions")
 _NAME = r"[A-Za-z0-9._-]+"
@@ -31,6 +30,7 @@ class Zsh(Feature):
         ),
         "theme.repo": (lambda v: v == "" or re.fullmatch(r"https://\S+", v), "an https git URL"),
         "theme.branch": (lambda v: re.fullmatch(r"[A-Za-z0-9._/-]*", v), "a branch name"),
+        "shell": (lambda v: re.fullmatch(r"/\S+", v), "an absolute path, e.g. /usr/bin/zsh"),
         "plugins": (
             lambda v: all(re.fullmatch(_NAME, p) for p in v),
             "names of oh-my-zsh's plugins",
@@ -58,18 +58,18 @@ class Zsh(Feature):
         if theme["repo"]:
             if not slash:
                 die(f"zsh: theme {theme['name']} of a repo must be <dir>/<name>")
-            dst = omz / "custom/themes" / clone
+            dst = omz / "custom" / "themes" / clone
             if not self._cloned(dst, theme["repo"], theme["branch"]):
                 self._clone(theme["repo"], dst, f"theme {clone}", theme["branch"])
         text = template(_SNIPPET, zsh=settings)
         system.files.ensure(home / _SNIPPET.removeprefix("~/"), text)
         # At the top: the rest of ~/.zshrc stays the user's, and overrides ours.
         system.files.line(home / ".zshrc", f"^{re.escape(_SOURCE)}$", _SOURCE, before=".")
-        me = pwd.getpwuid(os.geteuid())
-        if Path(me.pw_shell).name != "zsh":  # /bin/zsh is /usr/bin/zsh too
+        shell, me = settings["shell"], pwd.getpwuid(os.geteuid())
+        if os.path.realpath(me.pw_shell) != os.path.realpath(shell):  # /bin is /usr/bin
             with system.shell.as_root():
-                system.shell.run("chsh", "-s", _ZSH, me.pw_name)
-            system.report.changed(f"login shell of {me.pw_name}: {_ZSH} (was {me.pw_shell})")
+                system.shell.run("chsh", "-s", shell, me.pw_name)
+            system.report.changed(f"login shell of {me.pw_name}: {shell} (was {me.pw_shell})")
             system.report.notice("zsh is the login shell — log out and back in for it")
 
     def _cloned(self, dst: Path, url: str, branch: str) -> bool:

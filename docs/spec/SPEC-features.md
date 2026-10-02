@@ -197,12 +197,14 @@ Every Linux (`platforms/linux/features/no_beep.py`), off by default, on in
 
 ## `zsh` — zsh and oh-my-zsh
 
-An example; by default `plugins` and `extras` are empty, `theme.name` is
-`robbyrussell`, `theme.repo` and `theme.branch` are empty.
+An example; by default `shell` is `/usr/bin/zsh`, `plugins` and `extras`
+are empty, `theme.name` is `robbyrussell`, `theme.repo` and `theme.branch`
+are empty.
 
 ```toml
 [features.zsh]
 enabled = true
+shell   = "/usr/bin/zsh"
 plugins = ["git"]
 extras  = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions"]
 
@@ -238,10 +240,11 @@ files included, the user sets up in `~/.zshrc`. Its packages are `zsh`,
 - `source ~/.config/zsh/dotfiles.zsh` in `~/.zshrc`, at the top, so the
   rest of the file stays the user's and overrides ours; a missing
   `~/.zshrc` is created with that line alone.
-- A login shell other than zsh: `chsh -s /usr/bin/zsh` as root, and a
-  notice to log out and back in.
+- A login shell other than `shell`: `chsh -s <shell>` as root, and a
+  notice to log out and back in. Both paths are compared resolved, so
+  `/bin/zsh` is `/usr/bin/zsh` where `/bin` links to `/usr/bin`.
 
-`Zsh.rules`: `theme.name` one such name or two joined by `/`, each of
+`Zsh.rules`: `shell` an absolute path; `theme.name` one such name or two joined by `/`, each of
 `plugins` letters, digits, `.`, `_` and `-`; `theme.repo` empty or an
 `https://` URL; `theme.branch` empty or a branch name; `extras` names
 from the three above.
@@ -298,7 +301,8 @@ tests/test_apply.py                            test_real_features_are_consistent
   half clone alone. A theme's repo cloned into `custom/themes/<dir>`, and
   nothing written but the snippet and `~/.zshrc`'s line. Another branch or
   origin cloned again, `--branch` passed; a built-in theme clones nothing;
-  a repo's theme without `<dir>/` fails.
+  a repo's theme without `<dir>/` fails. Another `shell` set: `chsh -s`
+  with it.
 - `test_real_features_are_consistent`: every schema feature has a module
   and every module a schema table; paru alone requires others
   (packaging, rustup).
