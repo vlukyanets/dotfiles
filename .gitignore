@@ -1,8 +1,9 @@
 .venv/
+.venv-dev/
 __pycache__/
 .claude/settings.local.json
 tasks/
-# Editor project state, at the root only: home/ holds real dotfiles.
+# Editor project state.
 /.idea/
 /.vscode/
 /.zed/
