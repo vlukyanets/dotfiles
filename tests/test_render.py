@@ -6,7 +6,7 @@ import pytest
 from dotfiles.apply import check
 from dotfiles.errors import ConfigError
 from dotfiles.layout import Layout
-from dotfiles.render import source, template
+from dotfiles.render import template
 
 
 def write(root: Path, rel: str, text: str) -> None:
@@ -45,8 +45,6 @@ def test_home_templates(tmp_path):
     write(tmp_path, "home/.y.j2", "{{ nope }}")
     with pytest.raises(ConfigError, match="^home/.y.j2:1: 'nope' is undefined$"):
         template("~/.y", tmp_path)
-    write(tmp_path, "home/.raw", "${#x} {{ y }}\n")
-    assert source("~/.raw", tmp_path) == "${#x} {{ y }}\n"  # no Jinja
 
 
 def test_merge_over():

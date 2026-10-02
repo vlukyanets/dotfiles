@@ -58,8 +58,9 @@ extras  = []  # from the repositories
 
 # The theme: one of oh-my-zsh's own, without a repo; or <dir>/<name>, the
 # theme <name> of `repo` cloned into ~/.oh-my-zsh/custom/themes/<dir>, again
-# whenever its URL or branch differs. powerlevel10k also gets ~/.p10k.zsh
-# from home/.p10k.zsh.
+# whenever its URL or branch differs. Of the user's files zsh writes only
+# ~/.config/zsh/dotfiles.zsh and its line in ~/.zshrc: a theme's own
+# settings (~/.p10k.zsh) are the user's, set up in ~/.zshrc.
 [features.zsh.theme]
 name   = "robbyrussell"
 repo   = ""  # an https git URL; empty: built in

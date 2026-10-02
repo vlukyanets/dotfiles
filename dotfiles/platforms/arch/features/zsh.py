@@ -9,13 +9,12 @@ from typing import ClassVar
 
 from dotfiles.engine import die
 from dotfiles.feature import Feature
-from dotfiles.render import source, template
+from dotfiles.render import template
 from dotfiles.retry import retrying
 
 _OMZ = "https://github.com/ohmyzsh/ohmyzsh.git"
 _SNIPPET = "~/.config/zsh/dotfiles.zsh"
 _SOURCE = f"source {_SNIPPET}"
-_P10K = "~/.p10k.zsh"  # powerlevel10k's settings, made by `p10k configure`
 _ZSH = "/usr/bin/zsh"
 # zsh-completions is only its package: its functions are in zsh's fpath already.
 _EXTRAS = ("zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions")
@@ -61,10 +60,7 @@ class Zsh(Feature):
             dst = omz / "custom/themes" / clone
             if not self._cloned(dst, theme["repo"], theme["branch"]):
                 self._clone(theme["repo"], dst, f"theme {clone}", theme["branch"])
-        p10k = clone == "powerlevel10k"
-        if p10k:
-            system.files.ensure(home / _P10K.removeprefix("~/"), source(_P10K))
-        text = template(_SNIPPET, zsh=settings, p10k=p10k)
+        text = template(_SNIPPET, zsh=settings)
         system.files.ensure(home / _SNIPPET.removeprefix("~/"), text)
         # At the top: the rest of ~/.zshrc stays the user's, and overrides ours.
         system.files.line(home / ".zshrc", f"^{re.escape(_SOURCE)}$", _SOURCE, before=".")

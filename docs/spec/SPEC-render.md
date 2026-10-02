@@ -50,10 +50,6 @@ under `home/`: `template("~/.config/zsh/dotfiles.zsh", zsh=...)` renders
 `Path.home() / ...` with `files.ensure`, as the user. Nothing reads
 `home/` but the features that name a template there.
 
-`render.source(dst)` gives a file of `system/` or `home/` as it is, no
-`.j2` and no Jinja: a generated file like `home/.p10k.zsh`, whose
-`${#...}` Jinja would read as its own.
-
 ## Project Structure
 
 ```
@@ -67,8 +63,7 @@ tests/test_render.py   templates in tmp_path; check on a copy of the real data
 
 - A template rendered with its context, a tag alone on its line gone; `fail()`
   and an undefined variable each an error naming the template and line.
-- `~/PATH` rendered from `home/PATH.j2`, its errors naming `home/`;
-  `source` returns a file as it is.
+- `~/PATH` rendered from `home/PATH.j2`, its errors naming `home/`.
 - `check` on a copy of the real hosts names a value its rule refuses.
 
 ## Boundaries

@@ -342,8 +342,6 @@ def test_zsh_creates_zshrc_with_the_source_line(machine, monkeypatch):
     text = home(".config/zsh/dotfiles.zsh").read_text()
     # By default no plugin of oh-my-zsh's and no extra.
     assert "plugins=()\n" in text and "/usr/share/zsh/plugins" not in text
-    assert "p10k" not in text
-    assert not home(".p10k.zsh").exists()
 
 
 P10K_REPO = "https://github.com/romkatv/powerlevel10k.git"
@@ -365,7 +363,7 @@ def theme_clone(machine, url: str, branch: str) -> list[str]:
     return [*CLONE, url, str(theme)]
 
 
-def test_zsh_theme_from_its_repo_with_p10k_settings(machine, monkeypatch, capsys):
+def test_zsh_theme_from_its_repo(machine, monkeypatch, capsys):
     login_shell(monkeypatch, "/usr/bin/zsh")
     omz_cloned()
     apply("zsh", defaults(zsh=P10K))
@@ -373,11 +371,10 @@ def test_zsh_theme_from_its_repo_with_p10k_settings(machine, monkeypatch, capsys
     assert [c for c in machine.calls if c[:2] == ["git", "clone"]] == [
         [*CLONE, P10K_REPO, str(theme)]
     ]
-    assert home(".p10k.zsh").read_text() == (Layout().home / ".p10k.zsh").read_text()
     text = home(".config/zsh/dotfiles.zsh").read_text()
-    # Instant prompt before oh-my-zsh, the settings after it.
-    assert text.index("p10k-instant-prompt") < text.index('ZSH_THEME="powerlevel10k/powerlevel10k"')
-    assert text.index('source "$ZSH/oh-my-zsh.sh"') < text.index("source ~/.p10k.zsh")
+    assert 'ZSH_THEME="powerlevel10k/powerlevel10k"' in text
+    assert "p10k" not in text  # its own files are the user's
+    assert not home(".p10k.zsh").exists()
     theme_clone(machine, P10K_REPO, "master")
     capsys.readouterr()
     machine.calls.clear()

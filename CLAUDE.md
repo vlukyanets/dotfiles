@@ -35,8 +35,7 @@ master and every PR; uv is pinned there by version and sha256.
   imports no feature: the entry points pass `checks=feature.checks()`.
   `ConfigError` lives in `dotfiles/errors.py`, for every layer.
 - Files features write: templates under `system/` at their path from `/`,
-  dotfiles under `home/` at their path from `~` (`template("~/.x")`;
-  `render.source` for a generated file Jinja must not read),
+  dotfiles under `home/` at their path from `~` (`template("~/.x")`),
   rendered by `render.template` (`dotfiles/render.py`) and written with
   `files.ensure`. No file is deployed outside a feature.
 - Helpers the same on every system: `dotfiles/engine.py` (`Report`,

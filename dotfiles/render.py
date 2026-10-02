@@ -34,24 +34,11 @@ def _environment(directory: Path) -> jinja2.Environment:
     return env
 
 
-def _where(dst: str, root: Path) -> tuple[Path, str]:
-    """The directory of DST's file and its name there: home/ for ~/PATH, else system/."""
-    layout = Layout(root)
-    if dst.startswith("~/"):
-        return layout.home, dst[2:]
-    return layout.system, dst.lstrip("/")
-
-
-def source(dst: str, root: Path = Layout.root) -> str:
-    """system/DST, or home/PATH for ~/PATH, as it is: a file no template holds, a generated one."""
-    directory, name = _where(dst, root)
-    return (directory / name).read_text()
-
-
 def template(dst: str, root: Path = Layout.root, **context) -> str:
     """system/DST.j2, or home/PATH.j2 for ~/PATH, rendered with CONTEXT: what a feature writes."""
-    directory, name = _where(dst, root)
-    name += _SUFFIX
+    layout = Layout(root)
+    directory, name = (layout.home, dst[2:]) if dst.startswith("~/") else (layout.system, dst)
+    name = name.lstrip("/") + _SUFFIX
     try:
         return _environment(directory).get_template(name).render(context)
     except (jinja2.TemplateError, _TemplateFail) as e:
