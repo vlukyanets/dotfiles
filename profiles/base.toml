@@ -15,7 +15,3 @@ enabled = true
 
 [features.zsh]
 enabled = true
-
-[features.zsh.theme]
-name = "powerlevel10k/powerlevel10k"
-repo = "https://github.com/romkatv/powerlevel10k.git"
