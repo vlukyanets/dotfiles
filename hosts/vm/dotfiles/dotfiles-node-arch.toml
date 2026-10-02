@@ -31,3 +31,10 @@ toolchain = "stable"
 
 [features.paru]
 enabled = true
+
+[features.zsh]
+enabled = true
+plugins = ["git"]
+
+[features.zsh.theme]
+name = "agnoster"
