@@ -8,7 +8,7 @@ depends on `packages` and `render`.
 Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
-`packaging`, `reflector`, `rustup` and `paru`.
+`packaging`, `reflector`, `rustup`, `paru` and `no_beep`.
 
 ## Structure
 
@@ -176,6 +176,23 @@ cargo.
   `~/.cache/dotfiles/aur/paru`.
 - Dry run: the check only, and `paru built from the AUR` reported.
 
+## `no_beep` — no PC speaker
+
+```toml
+[features.no_beep]
+enabled = true
+```
+
+Every Linux (`platforms/linux/features/no_beep.py`), off by default, on in
+`profiles/base.toml`. No settings, no packages.
+
+- `/etc/modprobe.d/nobeep.conf` (`root:root` 644): `blacklist pcspkr` and
+  `blacklist snd_pcsp`, the console's beeper and ALSA's driver of the same
+  speaker, so neither loads at boot.
+- Those of them loaded now (`/sys/module/<name>`): `modprobe -r` as root.
+  It fails while a sound server holds `snd_pcsp`: a notice that the
+  speaker is silent after a reboot.
+
 ## Project Structure
 
 ```
@@ -188,6 +205,8 @@ system/etc/xdg/reflector/reflector.conf.j2     its templates
 system/etc/systemd/system/reflector.timer.d/override.conf.j2
 dotfiles/platforms/arch/features/rustup.py     Rustup: rustup for rust, its default toolchain
 dotfiles/platforms/arch/features/paru.py       Paru: built from the AUR while it does not run
+dotfiles/platforms/linux/features/no_beep.py   NoBeep: blacklist, unload
+system/etc/modprobe.d/nobeep.conf.j2           its template
 dotfiles/defaults.toml                         every feature and its settings
 tests/test_features.py                         each feature against a fake machine
 tests/test_apply.py                            test_real_features_are_consistent
@@ -216,6 +235,8 @@ tests/test_apply.py                            test_real_features_are_consistent
   toolchain switched to, a dated nightly not taken for `nightly`.
 - paru: built from the AUR while `paru --version` fails, not once it runs;
   a dry run only checks.
+- no_beep: the blacklist, a loaded driver unloaded once, nothing the
+  second time; a driver in use is a notice.
 - `test_real_features_are_consistent`: every schema feature has a module
   and every module a schema table; paru alone requires others
   (packaging, rustup).

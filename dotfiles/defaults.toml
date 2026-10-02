@@ -4,7 +4,7 @@
 # a key that is not here — or has a different type here — fails naming the
 # file and the key. Every feature is a table under [features] whose
 # `enabled` defaults to false, so a host without a file in hosts/ gets
-# dotfiles and the features without an `enabled`, which always run. A feature with no settings is one dotted key,
+# only the features without an `enabled`, which always run. A feature with no settings is one dotted key,
 # `docker.enabled = false`; one with settings has its own [features.<name>]
 # table.
 
@@ -42,6 +42,11 @@ completion_percent = 100       # how complete a mirror must be, 0-100
 download_timeout   = 5         # seconds
 on_calendar        = "weekly"  # reflector.timer's OnCalendar
 on_boot_sec        = "15min"   # and OnBootSec
+
+# no_beep: the PC speaker's drivers (pcspkr, snd_pcsp) blacklisted in
+# /etc/modprobe.d/nobeep.conf, and unloaded when loaded.
+[features.no_beep]
+enabled = false
 
 # rustup: cargo and rustc from rustup in place of rust, with `toolchain`
 # installed and the default.

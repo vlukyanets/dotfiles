@@ -263,3 +263,29 @@ def test_rustup_switches_to_another_toolchain(machine, capsys):
     machine.calls.clear()
     apply("rustup", defaults(rustup={"toolchain": "nightly"}))
     assert machine.calls[-1] == ["rustup", "default", "nightly"]
+
+
+UNLOAD = ["modprobe", "-r", "pcspkr"]
+
+
+def test_no_beep_blacklists_and_unloads_once(machine, capsys):
+    engine.current().files.path("/sys/module/pcspkr").mkdir(parents=True)
+    apply("no_beep")
+    assert settings("/etc/modprobe.d/nobeep.conf") == ["blacklist pcspkr", "blacklist snd_pcsp"]
+    assert machine.calls[-1] == UNLOAD
+    assert capsys.readouterr().out.endswith("-> pcspkr unloaded\n")
+    engine.current().files.path("/sys/module/pcspkr").rmdir()
+    machine.calls.clear()
+    apply("no_beep")
+    assert capsys.readouterr().out == ""
+    assert machine.calls == []
+
+
+def test_no_beep_driver_in_use_is_a_notice(machine, capsys):
+    for module in ("pcspkr", "snd_pcsp"):
+        engine.current().files.path(f"/sys/module/{module}").mkdir(parents=True)
+    machine.answers[("modprobe", "-r", "pcspkr", "snd_pcsp")] = (1, "")
+    apply("no_beep")
+    out, err = capsys.readouterr()
+    assert "unloaded" not in out
+    assert "pcspkr snd_pcsp in use: the PC speaker is silent after a reboot" in err
