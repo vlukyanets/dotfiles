@@ -40,6 +40,11 @@ class Layout:
         """Templates of the files features write, at their path from /."""
         return self.root / "system"
 
+    @property
+    def home(self) -> Path:
+        """Templates of the files features write in $HOME, at their path from it."""
+        return self.root / "home"
+
     def host_names(self) -> list[str]:
         """Every host by its path under hosts/, without .toml: `vm/dotfiles/node-arch`."""
         return sorted(

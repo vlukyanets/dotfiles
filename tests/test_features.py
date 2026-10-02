@@ -1,5 +1,8 @@
 import os
+import pwd
 import tomllib
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -289,3 +292,63 @@ def test_no_beep_driver_in_use_is_a_notice(machine, capsys):
     out, err = capsys.readouterr()
     assert "unloaded" not in out
     assert "pcspkr snd_pcsp in use: the PC speaker is silent after a reboot" in err
+
+
+def login_shell(monkeypatch, shell: str) -> None:
+    me = SimpleNamespace(pw_name="u", pw_shell=shell)
+    monkeypatch.setattr(pwd, "getpwuid", lambda uid: me)
+
+
+def home(name: str) -> Path:
+    return engine.current().files.path(Path.home() / name)
+
+
+CLONE = ["git", "clone", "--quiet", "--depth", "1"]
+
+
+def test_zsh_clones_writes_sources_and_switches_once(machine, monkeypatch, capsys):
+    login_shell(monkeypatch, "/bin/bash")
+    zshrc = home(".zshrc")
+    zshrc.parent.mkdir(parents=True)
+    zshrc.write_text("# mine\nalias ll='ls -l'\n")
+    apply("zsh", defaults(zsh={"plugins": ["git", "sudo"], "extras": ["zsh-syntax-highlighting"]}))
+    assert [c[:5] for c in machine.calls if c[0] == "git"] == [CLONE]
+    assert home(".config/zsh/dotfiles.zsh").read_text().splitlines()[3:] == [
+        'export ZSH="$HOME/.oh-my-zsh"',
+        'ZSH_THEME="robbyrussell"',
+        "plugins=(git sudo)",
+        'source "$ZSH/oh-my-zsh.sh"',
+        "# Last: it wraps the widgets defined before it.",
+        "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh",
+    ]
+    # At the top: what is there already comes after, and overrides it.
+    assert zshrc.read_text() == "source ~/.config/zsh/dotfiles.zsh\n# mine\nalias ll='ls -l'\n"
+    assert ["chsh", "-s", "/usr/bin/zsh", "u"] in machine.calls
+    out, err = capsys.readouterr()
+    assert "-> login shell of u: /usr/bin/zsh (was /bin/bash)\n" in out
+    assert "log out and back in" in err
+    (home(".oh-my-zsh") / "oh-my-zsh.sh").touch()
+    login_shell(monkeypatch, "/bin/zsh")
+    machine.calls.clear()
+    apply("zsh", defaults(zsh={"plugins": ["git", "sudo"], "extras": ["zsh-syntax-highlighting"]}))
+    assert capsys.readouterr().out == ""
+    assert machine.calls == []
+
+
+def test_zsh_creates_zshrc_with_the_source_line(machine, monkeypatch):
+    login_shell(monkeypatch, "/usr/bin/zsh")
+    apply("zsh")
+    assert home(".zshrc").read_text() == "source ~/.config/zsh/dotfiles.zsh\n"
+    text = home(".config/zsh/dotfiles.zsh").read_text()
+    assert "zsh-autosuggestions.zsh" in text and "zsh-syntax-highlighting.zsh" in text
+
+
+def test_zsh_dry_run_clones_nothing(machine, monkeypatch, capsys):
+    login_shell(monkeypatch, "/usr/bin/zsh")
+    leftover = home(".oh-my-zsh/half")
+    leftover.mkdir(parents=True)
+    engine.current().dry_run = True
+    apply("zsh")
+    assert machine.calls == []
+    assert leftover.exists()
+    assert "-> oh-my-zsh cloned into " in capsys.readouterr().out

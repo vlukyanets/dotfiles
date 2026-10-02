@@ -9,8 +9,8 @@ repositories and every feature of `dotfiles/defaults.toml`, one module
 each per platform in `dotfiles/platforms/<name>/features/`. Today there
 are `packaging` (pacman and makepkg drop-ins), `reflector` (the
 mirrorlist on a timer), `rustup` (cargo and rustc), `paru` (the AUR
-helper) and `no_beep` (no PC speaker). See the
-[capability map](docs/spec/CAPABILITY-MAP.md).
+helper), `no_beep` (no PC speaker) and `zsh` (zsh with oh-my-zsh, the
+login shell). See the [capability map](docs/spec/CAPABILITY-MAP.md).
 
 ## How a host is described
 

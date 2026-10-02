@@ -1,4 +1,4 @@
-"""Templates of the files features write: system/<path from />.j2, rendered with Jinja2."""
+"""Templates of the files features write: system/<path from />.j2 and home/<path from ~>.j2."""
 
 import traceback
 from pathlib import Path
@@ -35,12 +35,14 @@ def _environment(directory: Path) -> jinja2.Environment:
 
 
 def template(dst: str, root: Path = Layout.root, **context) -> str:
-    """system/DST.j2 rendered with CONTEXT: the content a feature writes to DST."""
-    name = dst.lstrip("/") + _SUFFIX
+    """system/DST.j2, or home/PATH.j2 for ~/PATH, rendered with CONTEXT: what a feature writes."""
+    layout = Layout(root)
+    directory, name = (layout.home, dst[2:]) if dst.startswith("~/") else (layout.system, dst)
+    name = name.lstrip("/") + _SUFFIX
     try:
-        return _environment(Layout(root).system).get_template(name).render(context)
+        return _environment(directory).get_template(name).render(context)
     except (jinja2.TemplateError, _TemplateFail) as e:
-        raise _error(e, f"system/{name}") from None
+        raise _error(e, f"{directory.name}/{name}") from None
 
 
 def _error(e: Exception, name: str) -> ConfigError:

@@ -12,3 +12,6 @@ enabled = true
 
 [features.no_beep]
 enabled = true
+
+[features.zsh]
+enabled = true

@@ -48,6 +48,15 @@ on_boot_sec        = "15min"   # and OnBootSec
 [features.no_beep]
 enabled = false
 
+# zsh: zsh the login shell (chsh), oh-my-zsh cloned into ~/.oh-my-zsh and
+# loaded by ~/.config/zsh/dotfiles.zsh, sourced from the top of ~/.zshrc;
+# the rest of ~/.zshrc stays the user's.
+[features.zsh]
+enabled = false
+theme   = "robbyrussell"  # one of oh-my-zsh's themes
+plugins = ["git"]         # oh-my-zsh's own plugins
+extras  = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions"]  # from the repositories
+
 # rustup: cargo and rustc from rustup in place of rust, with `toolchain`
 # installed and the default.
 [features.rustup]

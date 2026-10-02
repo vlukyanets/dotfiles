@@ -1,0 +1,14 @@
+# Managed by dotfiles (features.zsh) — edit
+# home/.config/zsh/dotfiles.zsh.j2 in the repo, not this file.
+# Sourced from the top of ~/.zshrc: what follows it there overrides this.
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="{{ zsh.theme }}"
+plugins=({{ zsh.plugins | join(" ") }})
+source "$ZSH/oh-my-zsh.sh"
+{% if "zsh-autosuggestions" in zsh.extras %}
+source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+{% endif %}
+{% if "zsh-syntax-highlighting" in zsh.extras %}
+# Last: it wraps the widgets defined before it.
+source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+{% endif %}

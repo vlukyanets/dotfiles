@@ -39,6 +39,14 @@ def test_system_templates(tmp_path):
         template("/etc/z.conf", root)
 
 
+def test_home_templates(tmp_path):
+    write(tmp_path, "home/.config/x.j2", "a = {{ a }}\n")
+    assert template("~/.config/x", tmp_path, a=1) == "a = 1\n"
+    write(tmp_path, "home/.y.j2", "{{ nope }}")
+    with pytest.raises(ConfigError, match="^home/.y.j2:1: 'nope' is undefined$"):
+        template("~/.y", tmp_path)
+
+
 def test_merge_over():
     from dotfiles.config import merge_over
 
