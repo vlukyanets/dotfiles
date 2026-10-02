@@ -344,8 +344,8 @@ def test_zsh_creates_zshrc_with_the_source_line(machine, monkeypatch):
     assert "plugins=()\n" in text and "/usr/share/zsh/plugins" not in text
 
 
-P10K_REPO = "https://github.com/romkatv/powerlevel10k.git"
-P10K = {"theme": {"name": "powerlevel10k/powerlevel10k", "repo": P10K_REPO}}
+THEME_REPO = "https://example.org/someone/mytheme.git"
+THEMED = {"theme": {"name": "mytheme/mytheme", "repo": THEME_REPO}}
 
 
 def omz_cloned() -> None:
@@ -354,8 +354,8 @@ def omz_cloned() -> None:
 
 
 def theme_clone(machine, url: str, branch: str) -> list[str]:
-    """powerlevel10k's clone made, as git reports it: URL, on BRANCH."""
-    theme = home(".oh-my-zsh/custom/themes/powerlevel10k")
+    """The theme's clone made, as git reports it: URL, on BRANCH."""
+    theme = home(".oh-my-zsh/custom/themes/mytheme")
     (theme / ".git").mkdir(parents=True, exist_ok=True)
     git = ("git", "-C", str(theme))
     machine.answers[(*git, "remote", "get-url", "origin")] = (0, url)
@@ -366,19 +366,17 @@ def theme_clone(machine, url: str, branch: str) -> list[str]:
 def test_zsh_theme_from_its_repo(machine, monkeypatch, capsys):
     login_shell(monkeypatch, "/usr/bin/zsh")
     omz_cloned()
-    apply("zsh", defaults(zsh=P10K))
-    theme = home(".oh-my-zsh/custom/themes/powerlevel10k")
+    apply("zsh", defaults(zsh=THEMED))
+    theme = home(".oh-my-zsh/custom/themes/mytheme")
     assert [c for c in machine.calls if c[:2] == ["git", "clone"]] == [
-        [*CLONE, P10K_REPO, str(theme)]
+        [*CLONE, THEME_REPO, str(theme)]
     ]
     text = home(".config/zsh/dotfiles.zsh").read_text()
-    assert 'ZSH_THEME="powerlevel10k/powerlevel10k"' in text
-    assert "p10k" not in text  # its own files are the user's
-    assert not home(".p10k.zsh").exists()
-    theme_clone(machine, P10K_REPO, "master")
+    assert 'ZSH_THEME="mytheme/mytheme"' in text
+    theme_clone(machine, THEME_REPO, "master")
     capsys.readouterr()
     machine.calls.clear()
-    apply("zsh", defaults(zsh=P10K))
+    apply("zsh", defaults(zsh=THEMED))
     assert capsys.readouterr().out == ""
     assert not [c for c in machine.calls if c[:2] == ["git", "clone"]]
 
@@ -386,14 +384,14 @@ def test_zsh_theme_from_its_repo(machine, monkeypatch, capsys):
 def test_zsh_theme_on_another_branch_or_repo_is_cloned_again(machine, monkeypatch, capsys):
     login_shell(monkeypatch, "/usr/bin/zsh")
     omz_cloned()
-    clone = theme_clone(machine, P10K_REPO, "master")
-    on_dev = defaults(zsh={"theme": {**P10K["theme"], "branch": "dev"}})
+    clone = theme_clone(machine, THEME_REPO, "master")
+    on_dev = defaults(zsh={"theme": {**THEMED["theme"], "branch": "dev"}})
     apply("zsh", on_dev)
     assert [c for c in machine.calls if c[:2] == ["git", "clone"]] == [
         [*clone[:-2], "--branch", "dev", *clone[-2:]]
     ]
-    assert "-> theme powerlevel10k cloned into " in capsys.readouterr().out
-    theme_clone(machine, P10K_REPO, "dev")
+    assert "-> theme mytheme cloned into " in capsys.readouterr().out
+    theme_clone(machine, THEME_REPO, "dev")
     machine.calls.clear()
     apply("zsh", on_dev)
     assert not [c for c in machine.calls if c[:2] == ["git", "clone"]]
@@ -414,7 +412,7 @@ def test_zsh_theme_of_a_repo_needs_its_dir(machine, monkeypatch):
     login_shell(monkeypatch, "/usr/bin/zsh")
     omz_cloned()
     with pytest.raises(engine.Failed, match="must be <dir>/<name>"):
-        apply("zsh", defaults(zsh={"theme": {"name": "p10k", "repo": P10K_REPO}}))
+        apply("zsh", defaults(zsh={"theme": {"name": "mytheme", "repo": THEME_REPO}}))
 
 
 def test_zsh_dry_run_clones_nothing(machine, monkeypatch, capsys):

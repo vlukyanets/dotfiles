@@ -52,7 +52,8 @@ class Zsh(Feature):
         if not (omz / "oh-my-zsh.sh").is_file():
             self._clone(_OMZ, omz, "oh-my-zsh")
         theme = settings["theme"]
-        # powerlevel10k/powerlevel10k: the theme powerlevel10k of the clone powerlevel10k.
+        # oh-my-zsh's way for a theme of its own directory: ZSH_THEME=<dir>/<name> loads
+        # custom/themes/<dir>/<name>.zsh-theme.
         clone, slash, _ = theme["name"].partition("/")
         if theme["repo"]:
             if not slash:
