@@ -1,7 +1,8 @@
 # Spec: `render` — templates of the files features write
 
-Status: approved 2026-09-23; the `home/` tree, `render` and `deploy` went
-on 2026-10-02. Module of the [capability map](CAPABILITY-MAP.md); depends
+Status: approved 2026-09-23; the unconditional `home/` deploy, `render`
+and `deploy` went on 2026-10-02, and `home/` came back the same day for
+the dotfile templates features name. Module of the [capability map](CAPABILITY-MAP.md); depends
 on `config`.
 
 ## Objective
@@ -38,12 +39,26 @@ files.ensure(_PACMAN_OPTIONS_CONF, text, owner="root:root")
   its newline. Booleans print as `True`: `{{ x | lower }}` where the file
   needs `true`.
 - `fail("why")` in a template stops it with that message.
-- Every error is a `ConfigError` naming `system/<path>:<line>`.
+- Every error is a `ConfigError` naming the template and its line,
+  `system/<path>:<line>` or `home/<path>:<line>`.
+
+## Dotfile templates: `home/`
+
+A file a feature writes in `$HOME` is a template at its path from `~`
+under `home/`: `template("~/.config/zsh/dotfiles.zsh", zsh=...)` renders
+`home/.config/zsh/dotfiles.zsh.j2`. The feature writes it to
+`Path.home() / ...` with `files.ensure`, as the user. Nothing reads
+`home/` but the features that name a template there.
+
+`render.source(dst)` gives a file of `system/` or `home/` as it is, no
+`.j2` and no Jinja: a generated file like `home/.p10k.zsh`, whose
+`${#...}` Jinja would read as its own.
 
 ## Project Structure
 
 ```
 system/                templates of the files features write, at their path from /
+home/                  templates of the dotfiles features write, at their path from ~
 dotfiles/render.py     the Jinja2 environment and template()
 tests/test_render.py   templates in tmp_path; check on a copy of the real data
 ```
@@ -52,6 +67,8 @@ tests/test_render.py   templates in tmp_path; check on a copy of the real data
 
 - A template rendered with its context, a tag alone on its line gone; `fail()`
   and an undefined variable each an error naming the template and line.
+- `~/PATH` rendered from `home/PATH.j2`, its errors naming `home/`;
+  `source` returns a file as it is.
 - `check` on a copy of the real hosts names a value its rule refuses.
 
 ## Boundaries
@@ -68,4 +85,5 @@ tests/test_render.py   templates in tmp_path; check on a copy of the real data
    host before any feature ran, with its own manifest of modes and gates
    (`home.toml`) and its own commands (`render`, `deploy`). A dotfile is a
    feature's like any other file: the feature gates it, and the engine
-   writes it.
+   writes it. Its template is under `home/` again, but only as a template
+   a feature names (`zsh`, 2026-10-02).

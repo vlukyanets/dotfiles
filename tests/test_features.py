@@ -1,5 +1,8 @@
 import os
+import pwd
 import tomllib
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -289,3 +292,140 @@ def test_no_beep_driver_in_use_is_a_notice(machine, capsys):
     out, err = capsys.readouterr()
     assert "unloaded" not in out
     assert "pcspkr snd_pcsp in use: the PC speaker is silent after a reboot" in err
+
+
+def login_shell(monkeypatch, shell: str) -> None:
+    me = SimpleNamespace(pw_name="u", pw_shell=shell)
+    monkeypatch.setattr(pwd, "getpwuid", lambda uid: me)
+
+
+def home(name: str) -> Path:
+    return engine.current().files.path(Path.home() / name)
+
+
+CLONE = ["git", "clone", "--quiet", "--depth", "1"]
+
+
+def test_zsh_clones_writes_sources_and_switches_once(machine, monkeypatch, capsys):
+    login_shell(monkeypatch, "/bin/bash")
+    zshrc = home(".zshrc")
+    zshrc.parent.mkdir(parents=True)
+    zshrc.write_text("# mine\nalias ll='ls -l'\n")
+    apply("zsh", defaults(zsh={"plugins": ["git", "sudo"], "extras": ["zsh-syntax-highlighting"]}))
+    assert [c[:5] for c in machine.calls if c[0] == "git"] == [CLONE]
+    assert home(".config/zsh/dotfiles.zsh").read_text().splitlines()[3:] == [
+        'export ZSH="$HOME/.oh-my-zsh"',
+        'ZSH_THEME="robbyrussell"',
+        "plugins=(git sudo)",
+        'source "$ZSH/oh-my-zsh.sh"',
+        "# Last: it wraps the widgets defined before it.",
+        "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh",
+    ]
+    # At the top: what is there already comes after, and overrides it.
+    assert zshrc.read_text() == "source ~/.config/zsh/dotfiles.zsh\n# mine\nalias ll='ls -l'\n"
+    assert ["chsh", "-s", "/usr/bin/zsh", "u"] in machine.calls
+    out, err = capsys.readouterr()
+    assert "-> login shell of u: /usr/bin/zsh (was /bin/bash)\n" in out
+    assert "log out and back in" in err
+    (home(".oh-my-zsh") / "oh-my-zsh.sh").touch()
+    login_shell(monkeypatch, "/bin/zsh")
+    machine.calls.clear()
+    apply("zsh", defaults(zsh={"plugins": ["git", "sudo"], "extras": ["zsh-syntax-highlighting"]}))
+    assert capsys.readouterr().out == ""
+    assert machine.calls == []
+
+
+def test_zsh_creates_zshrc_with_the_source_line(machine, monkeypatch):
+    login_shell(monkeypatch, "/usr/bin/zsh")
+    apply("zsh")
+    assert home(".zshrc").read_text() == "source ~/.config/zsh/dotfiles.zsh\n"
+    text = home(".config/zsh/dotfiles.zsh").read_text()
+    # By default no plugin of oh-my-zsh's and no extra.
+    assert "plugins=()\n" in text and "/usr/share/zsh/plugins" not in text
+    assert "p10k" not in text
+    assert not home(".p10k.zsh").exists()
+
+
+P10K_REPO = "https://github.com/romkatv/powerlevel10k.git"
+P10K = {"theme": {"name": "powerlevel10k/powerlevel10k", "repo": P10K_REPO}}
+
+
+def omz_cloned() -> None:
+    home(".oh-my-zsh").mkdir(parents=True)
+    (home(".oh-my-zsh") / "oh-my-zsh.sh").touch()
+
+
+def theme_clone(machine, url: str, branch: str) -> list[str]:
+    """powerlevel10k's clone made, as git reports it: URL, on BRANCH."""
+    theme = home(".oh-my-zsh/custom/themes/powerlevel10k")
+    (theme / ".git").mkdir(parents=True, exist_ok=True)
+    git = ("git", "-C", str(theme))
+    machine.answers[(*git, "remote", "get-url", "origin")] = (0, url)
+    machine.answers[(*git, "rev-parse", "--abbrev-ref", "HEAD")] = (0, branch)
+    return [*CLONE, url, str(theme)]
+
+
+def test_zsh_theme_from_its_repo_with_p10k_settings(machine, monkeypatch, capsys):
+    login_shell(monkeypatch, "/usr/bin/zsh")
+    omz_cloned()
+    apply("zsh", defaults(zsh=P10K))
+    theme = home(".oh-my-zsh/custom/themes/powerlevel10k")
+    assert [c for c in machine.calls if c[:2] == ["git", "clone"]] == [
+        [*CLONE, P10K_REPO, str(theme)]
+    ]
+    assert home(".p10k.zsh").read_text() == (Layout().home / ".p10k.zsh").read_text()
+    text = home(".config/zsh/dotfiles.zsh").read_text()
+    # Instant prompt before oh-my-zsh, the settings after it.
+    assert text.index("p10k-instant-prompt") < text.index('ZSH_THEME="powerlevel10k/powerlevel10k"')
+    assert text.index('source "$ZSH/oh-my-zsh.sh"') < text.index("source ~/.p10k.zsh")
+    theme_clone(machine, P10K_REPO, "master")
+    capsys.readouterr()
+    machine.calls.clear()
+    apply("zsh", defaults(zsh=P10K))
+    assert capsys.readouterr().out == ""
+    assert not [c for c in machine.calls if c[:2] == ["git", "clone"]]
+
+
+def test_zsh_theme_on_another_branch_or_repo_is_cloned_again(machine, monkeypatch, capsys):
+    login_shell(monkeypatch, "/usr/bin/zsh")
+    omz_cloned()
+    clone = theme_clone(machine, P10K_REPO, "master")
+    on_dev = defaults(zsh={"theme": {**P10K["theme"], "branch": "dev"}})
+    apply("zsh", on_dev)
+    assert [c for c in machine.calls if c[:2] == ["git", "clone"]] == [
+        [*clone[:-2], "--branch", "dev", *clone[-2:]]
+    ]
+    assert "-> theme powerlevel10k cloned into " in capsys.readouterr().out
+    theme_clone(machine, P10K_REPO, "dev")
+    machine.calls.clear()
+    apply("zsh", on_dev)
+    assert not [c for c in machine.calls if c[:2] == ["git", "clone"]]
+    theme_clone(machine, "https://example.org/fork.git", "dev")
+    apply("zsh", on_dev)
+    assert [c for c in machine.calls if c[:2] == ["git", "clone"]]
+
+
+def test_zsh_built_in_theme_clones_no_theme(machine, monkeypatch):
+    login_shell(monkeypatch, "/usr/bin/zsh")
+    omz_cloned()
+    apply("zsh", defaults(zsh={"theme": {"name": "agnoster"}}))
+    assert not [c for c in machine.calls if c[0] == "git"]
+    assert 'ZSH_THEME="agnoster"' in home(".config/zsh/dotfiles.zsh").read_text()
+
+
+def test_zsh_theme_of_a_repo_needs_its_dir(machine, monkeypatch):
+    login_shell(monkeypatch, "/usr/bin/zsh")
+    omz_cloned()
+    with pytest.raises(engine.Failed, match="must be <dir>/<name>"):
+        apply("zsh", defaults(zsh={"theme": {"name": "p10k", "repo": P10K_REPO}}))
+
+
+def test_zsh_dry_run_clones_nothing(machine, monkeypatch, capsys):
+    login_shell(monkeypatch, "/usr/bin/zsh")
+    leftover = home(".oh-my-zsh/half")
+    leftover.mkdir(parents=True)
+    engine.current().dry_run = True
+    apply("zsh")
+    assert machine.calls == []
+    assert leftover.exists()
+    assert "-> oh-my-zsh cloned into " in capsys.readouterr().out

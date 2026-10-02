@@ -8,7 +8,7 @@ depends on `packages` and `render`.
 Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
-`packaging`, `reflector`, `rustup`, `paru` and `no_beep`.
+`packaging`, `reflector`, `rustup`, `paru`, `no_beep` and `zsh`.
 
 ## Structure
 
@@ -37,7 +37,9 @@ A file a feature writes is a Jinja2 template under
 `system/`, at its path from `/`: `system/etc/pacman.conf.d/options.conf.j2`
 for `/etc/pacman.conf.d/options.conf`. `render.template(dst, **context)`
 renders it; the feature writes the text with `files.ensure`. The context is
-what the feature passes, not the whole config.
+what the feature passes, not the whole config. A dotfile's is under
+`home/`, at its path from `~`: `template("~/.config/zsh/dotfiles.zsh")`
+renders `home/.config/zsh/dotfiles.zsh.j2`.
 
 ## `packaging` — pacman and makepkg
 
@@ -193,6 +195,59 @@ Every Linux (`platforms/linux/features/no_beep.py`), off by default, on in
   It fails while a sound server holds `snd_pcsp`: a notice that the
   speaker is silent after a reboot.
 
+## `zsh` — zsh and oh-my-zsh
+
+An example; by default `plugins` and `extras` are empty, `theme.name` is
+`robbyrussell`, `theme.repo` and `theme.branch` are empty.
+
+```toml
+[features.zsh]
+enabled = true
+plugins = ["git"]
+extras  = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions"]
+
+[features.zsh.theme]
+name   = "powerlevel10k/powerlevel10k"
+repo   = "https://github.com/romkatv/powerlevel10k.git"
+branch = ""  # the repo's default
+```
+
+Arch only (`platforms/arch/features/zsh.py`): the extras' paths are
+Arch's. Off by default, on in `profiles/base.toml`. Its packages are
+`zsh`, `git` and the extras; then `apply()`:
+
+- `~/.oh-my-zsh/oh-my-zsh.sh` missing: `git clone --depth 1` of oh-my-zsh
+  there as the user, retried, a directory cut off halfway removed first.
+  It is never pulled: `omz update` is the user's, and never cloned again
+  once there: it may be the user's own, with their `custom/`. A dry run
+  clones nothing.
+- The theme: without `repo`, one of oh-my-zsh's own, nothing cloned. With
+  `repo`, `name` is `<dir>/<name>` (else apply fails): the theme `<name>`
+  of `repo` cloned the same way into `~/.oh-my-zsh/custom/themes/<dir>`
+  (`powerlevel10k/powerlevel10k`: the theme `powerlevel10k` of the clone
+  `powerlevel10k`), `--branch` when `branch` is set; cloned again in place
+  of what is there whenever `git remote get-url origin` is not `repo`, or
+  the branch checked out is not `branch`. Never pulled.
+- `<dir>` is `powerlevel10k`: `~/.p10k.zsh` written as it is from
+  `home/.p10k.zsh` (`render.source`, no Jinja: the file `p10k configure`
+  makes is full of `${#...}`), its instant prompt at the top of the
+  snippet and `source ~/.p10k.zsh` after oh-my-zsh. `p10k configure` on a
+  machine is undone by the next apply: its file goes into the repo.
+- `~/.config/zsh/dotfiles.zsh` from `home/.config/zsh/dotfiles.zsh.j2`:
+  `ZSH`, `ZSH_THEME`, `plugins`, `source $ZSH/oh-my-zsh.sh`, then the
+  extras' scripts, syntax highlighting last. zsh-completions is only its
+  package: its functions are in zsh's `fpath` already.
+- `source ~/.config/zsh/dotfiles.zsh` in `~/.zshrc`, at the top, so the
+  rest of the file stays the user's and overrides ours; a missing
+  `~/.zshrc` is created with that line alone.
+- A login shell other than zsh: `chsh -s /usr/bin/zsh` as root, and a
+  notice to log out and back in.
+
+`Zsh.rules`: `theme.name` one such name or two joined by `/`, each of
+`plugins` letters, digits, `.`, `_` and `-`; `theme.repo` empty or an
+`https://` URL; `theme.branch` empty or a branch name; `extras` names
+from the three above.
+
 ## Project Structure
 
 ```
@@ -207,6 +262,9 @@ dotfiles/platforms/arch/features/rustup.py     Rustup: rustup for rust, its defa
 dotfiles/platforms/arch/features/paru.py       Paru: built from the AUR while it does not run
 dotfiles/platforms/linux/features/no_beep.py   NoBeep: blacklist, unload
 system/etc/modprobe.d/nobeep.conf.j2           its template
+dotfiles/platforms/arch/features/zsh.py        Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
+home/.config/zsh/dotfiles.zsh.j2               its template
+home/.p10k.zsh                                 powerlevel10k's settings, copied as they are
 dotfiles/defaults.toml                         every feature and its settings
 tests/test_features.py                         each feature against a fake machine
 tests/test_apply.py                            test_real_features_are_consistent
@@ -237,6 +295,13 @@ tests/test_apply.py                            test_real_features_are_consistent
   a dry run only checks.
 - no_beep: the blacklist, a loaded driver unloaded once, nothing the
   second time; a driver in use is a notice.
+- zsh: one clone, the snippet with the plugins chosen, the source line on
+  top of an existing `~/.zshrc` or alone in a new one, `chsh` and its
+  notice; nothing the second time; a dry run clones nothing and leaves a
+  half clone alone. powerlevel10k: its clone, `~/.p10k.zsh` the repo's,
+  the instant prompt before oh-my-zsh and the settings after; no p10k
+  otherwise. Another branch or origin cloned again, `--branch` passed; a
+  built-in theme clones nothing; a repo's theme without `<dir>/` fails.
 - `test_real_features_are_consistent`: every schema feature has a module
   and every module a schema table; paru alone requires others
   (packaging, rustup).

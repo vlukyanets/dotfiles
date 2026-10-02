@@ -26,7 +26,7 @@ master and every PR; uv is pinned there by version and sha256.
   machine runs from `~/.config/dotfiles/config.toml` (`config.init`,
   `layout.local_config`); the CLI (`dotfiles/cli.py`) picks it or a checkout.
 - Where things are: `dotfiles/layout.py` — `Layout(root)` names a checkout's
-  paths (`defaults`, `hosts`, `profiles`, `system`),
+  paths (`defaults`, `hosts`, `profiles`, `system`, `home`),
   `named(name)` a host or profile by bare name (ambiguous → error) or by
   path under `hosts/`, which nests folders; `local_config()` this machine's
   config, `shown(path)` a path with `~`; code asks it, never joins
@@ -34,9 +34,11 @@ master and every PR; uv is pinned there by version and sha256.
 - Resolution, validation, merge, explain, check: `dotfiles/config.py`; it
   imports no feature: the entry points pass `checks=feature.checks()`.
   `ConfigError` lives in `dotfiles/errors.py`, for every layer.
-- Files features write, dotfiles too: templates under `system/` at their
-  path from `/`, rendered by `render.template` (`dotfiles/render.py`) and
-  written with `files.ensure`. No file is deployed outside a feature.
+- Files features write: templates under `system/` at their path from `/`,
+  dotfiles under `home/` at their path from `~` (`template("~/.x")`;
+  `render.source` for a generated file Jinja must not read),
+  rendered by `render.template` (`dotfiles/render.py`) and written with
+  `files.ensure`. No file is deployed outside a feature.
 - Helpers the same on every system: `dotfiles/engine.py` (`Report`,
   `Shell`, `Files` in a `Machine`, passed from `apply()` to the platform
   as `self.report`, `self.shell`, `self.files`, and reached by every
