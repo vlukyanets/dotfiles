@@ -57,7 +57,7 @@ class Zsh(Feature):
         clone, slash, _ = theme["name"].partition("/")
         if theme["repo"]:
             if not slash:
-                die(f"zsh: theme {theme['name']} of a repo must be <dir>/<name>")
+                die(f"theme {theme['name']} of a repo must be <dir>/<name>")
             dst = omz / "custom" / "themes" / clone
             if not self._cloned(dst, theme["repo"], theme["branch"]):
                 self._clone(theme["repo"], dst, f"theme {clone}", theme["branch"])
@@ -66,7 +66,12 @@ class Zsh(Feature):
         # At the top: the rest of ~/.zshrc stays the user's, and overrides ours.
         system.files.line(home / ".zshrc", f"^{re.escape(_SOURCE)}$", _SOURCE, before=".")
         shell, me = settings["shell"], pwd.getpwuid(os.geteuid())
-        if os.path.realpath(me.pw_shell) != os.path.realpath(shell):  # /bin is /usr/bin
+        # Its package is installed by now: a path that is not there is a typo. Before chsh, which
+        # a dry run skips.
+        if not os.access(system.files.path(shell), os.X_OK):
+            die(f"shell {shell} does not exist or is not executable")
+        real = [os.path.realpath(system.files.path(p)) for p in (me.pw_shell, shell)]
+        if real[0] != real[1]:  # /bin/zsh is /usr/bin/zsh where /bin links to usr/bin
             with system.shell.as_root():
                 system.shell.run("chsh", "-s", shell, me.pw_name)
             system.report.changed(f"login shell of {me.pw_name}: {shell} (was {me.pw_shell})")

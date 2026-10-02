@@ -240,8 +240,10 @@ files included, the user sets up in `~/.zshrc`. Its packages are `zsh`,
 - `source ~/.config/zsh/dotfiles.zsh` in `~/.zshrc`, at the top, so the
   rest of the file stays the user's and overrides ours; a missing
   `~/.zshrc` is created with that line alone.
-- A login shell other than `shell`: `chsh -s <shell>` as root, and a
-  notice to log out and back in. Both paths are compared resolved, so
+- `shell` not an executable file: apply fails before `chsh`, in a dry run
+  too; zsh's package is installed by then, so it is a typo. A login shell
+  other than `shell`: `chsh -s <shell>` as root, and a notice to log out
+  and back in. Both paths are compared resolved, so
   `/bin/zsh` is `/usr/bin/zsh` where `/bin` links to `/usr/bin`.
 
 `Zsh.rules`: `shell` an absolute path; `theme.name` one such name or two joined by `/`, each of
@@ -302,7 +304,7 @@ tests/test_apply.py                            test_real_features_are_consistent
   nothing written but the snippet and `~/.zshrc`'s line. Another branch or
   origin cloned again, `--branch` passed; a built-in theme clones nothing;
   a repo's theme without `<dir>/` fails. Another `shell` set: `chsh -s`
-  with it.
+  with it; one that is not there fails before `chsh`, in a dry run too.
 - `test_real_features_are_consistent`: every schema feature has a module
   and every module a schema table; paru alone requires others
   (packaging, rustup).

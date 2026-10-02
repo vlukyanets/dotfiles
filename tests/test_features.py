@@ -295,8 +295,14 @@ def test_no_beep_driver_in_use_is_a_notice(machine, capsys):
 
 
 def login_shell(monkeypatch, shell: str) -> None:
+    """SHELL the login shell; /usr/bin/zsh there, and /bin a link to usr/bin, as on Arch."""
     me = SimpleNamespace(pw_name="u", pw_shell=shell)
     monkeypatch.setattr(pwd, "getpwuid", lambda uid: me)
+    zsh = engine.current().files.path("/usr/bin/zsh")
+    if not zsh.exists():
+        zsh.parent.mkdir(parents=True)
+        zsh.touch(mode=0o755)
+        engine.current().files.path("/bin").symlink_to("usr/bin")
 
 
 def home(name: str) -> Path:
@@ -337,8 +343,20 @@ def test_zsh_clones_writes_sources_and_switches_once(machine, monkeypatch, capsy
 
 def test_zsh_login_shell_is_the_one_set(machine, monkeypatch):
     login_shell(monkeypatch, "/usr/bin/zsh")
+    shell = engine.current().files.path("/usr/local/bin/zsh")
+    shell.parent.mkdir(parents=True)
+    shell.touch(mode=0o755)
     apply("zsh", defaults(zsh={"shell": "/usr/local/bin/zsh"}))
     assert ["chsh", "-s", "/usr/local/bin/zsh", "u"] in machine.calls
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_zsh_shell_that_is_not_there_fails_before_chsh(machine, monkeypatch, dry_run):
+    login_shell(monkeypatch, "/bin/bash")
+    engine.current().dry_run = dry_run
+    with pytest.raises(engine.Failed, match="^shell /usr/bin/zhs does not exist or is not"):
+        apply("zsh", defaults(zsh={"shell": "/usr/bin/zhs"}))
+    assert not [c for c in machine.calls if c[0] == "chsh"]
 
 
 def test_zsh_creates_zshrc_with_the_source_line(machine, monkeypatch):

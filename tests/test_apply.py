@@ -515,7 +515,16 @@ def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
     for table in cfg["features"].values():
         table["enabled"] = True
     cfg["features"]["packaging"]["pacman"]["flags"] = ["Color"]  # it writes only what is set
+    # Every package counts as installed: zsh's among them.
+    zsh = engine.current().files.path("/usr/bin/zsh")
+    zsh.parent.mkdir(parents=True)
+    zsh.touch(mode=0o755)
     assert apply("hyper", dry_run=True, cfg=cfg) == 0
     out = capsys.readouterr().out
     assert "-> /etc/pacman.conf.d/options.conf (missing)\n" in out
-    assert not engine.current().files.path("/").exists()
+    root = engine.current().files.path("/")
+    assert sorted(p.relative_to(root).as_posix() for p in root.rglob("*")) == [
+        "usr",
+        "usr/bin",
+        "usr/bin/zsh",
+    ]
