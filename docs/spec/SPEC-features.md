@@ -200,10 +200,13 @@ Every Linux (`platforms/linux/features/no_beep.py`), off by default, on in
 ```toml
 [features.zsh]
 enabled = true
-theme      = "powerlevel10k/powerlevel10k"   # robbyrussell by default
-theme_repo = "https://github.com/romkatv/powerlevel10k.git"  # empty by default
-plugins    = ["git"]
-extras     = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions"]
+plugins = ["git"]
+extras  = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions"]
+
+[features.zsh.theme]
+name   = "powerlevel10k/powerlevel10k"                 # robbyrussell by default
+repo   = "https://github.com/romkatv/powerlevel10k.git"  # empty by default: built in
+branch = ""                                            # empty: the repo's default
 ```
 
 Arch only (`platforms/arch/features/zsh.py`): the extras' paths are
@@ -212,11 +215,16 @@ Arch's. Off by default, on in `profiles/base.toml`. Its packages are
 
 - `~/.oh-my-zsh/oh-my-zsh.sh` missing: `git clone --depth 1` of oh-my-zsh
   there as the user, retried, a directory cut off halfway removed first.
-  It is never pulled: `omz update` is the user's. A dry run clones nothing.
-- `theme_repo` set: cloned the same way into
-  `~/.oh-my-zsh/custom/themes/<dir>`, `<dir>` the part of `theme` before
-  `/` (`powerlevel10k/powerlevel10k`: the theme `powerlevel10k` of the
-  clone `powerlevel10k`), while that clone has no `.git`.
+  It is never pulled: `omz update` is the user's, and never cloned again
+  once there: it may be the user's own, with their `custom/`. A dry run
+  clones nothing.
+- The theme: without `repo`, one of oh-my-zsh's own, nothing cloned. With
+  `repo`, `name` is `<dir>/<name>` (else apply fails): the theme `<name>`
+  of `repo` cloned the same way into `~/.oh-my-zsh/custom/themes/<dir>`
+  (`powerlevel10k/powerlevel10k`: the theme `powerlevel10k` of the clone
+  `powerlevel10k`), `--branch` when `branch` is set; cloned again in place
+  of what is there whenever `git remote get-url origin` is not `repo`, or
+  the branch checked out is not `branch`. Never pulled.
 - `<dir>` is `powerlevel10k`: `~/.p10k.zsh` written as it is from
   `home/.p10k.zsh` (`render.source`, no Jinja: the file `p10k configure`
   makes is full of `${#...}`), its instant prompt at the top of the
@@ -232,9 +240,10 @@ Arch's. Off by default, on in `profiles/base.toml`. Its packages are
 - A login shell other than zsh: `chsh -s /usr/bin/zsh` as root, and a
   notice to log out and back in.
 
-`Zsh.rules`: `theme` one such name or two joined by `/`, each of
-`plugins` letters, digits, `.`, `_` and `-`; `theme_repo` empty or an
-`https://` URL; `extras` names from the three above.
+`Zsh.rules`: `theme.name` one such name or two joined by `/`, each of
+`plugins` letters, digits, `.`, `_` and `-`; `theme.repo` empty or an
+`https://` URL; `theme.branch` empty or a branch name; `extras` names
+from the three above.
 
 ## Project Structure
 
@@ -288,7 +297,8 @@ tests/test_apply.py                            test_real_features_are_consistent
   notice; nothing the second time; a dry run clones nothing and leaves a
   half clone alone. powerlevel10k: its clone, `~/.p10k.zsh` the repo's,
   the instant prompt before oh-my-zsh and the settings after; no p10k
-  otherwise.
+  otherwise. Another branch or origin cloned again, `--branch` passed; a
+  built-in theme clones nothing; a repo's theme without `<dir>/` fails.
 - `test_real_features_are_consistent`: every schema feature has a module
   and every module a schema table; paru alone requires others
   (packaging, rustup).
