@@ -27,8 +27,8 @@ depend on each other; the order of the features follows from that.
 4. Print the notices collected along the way.
 
 Out of scope: installing from the repositories (`packages`), and every
-feature, `packaging`, `reflector`, `rustup` and `paru` (the AUR) included
-(`features`).
+feature, `packaging`, `reflector`, `rustup`, `paru` (the AUR) and
+`no_beep` included (`features`).
 
 ## Tech Stack
 

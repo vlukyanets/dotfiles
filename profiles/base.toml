@@ -9,3 +9,6 @@ enabled = true
 
 [features.paru]
 enabled = true
+
+[features.no_beep]
+enabled = true

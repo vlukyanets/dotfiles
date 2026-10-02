@@ -8,8 +8,9 @@ host configuration and runs `dotfiles apply` on Arch: packages from the
 repositories and every feature of `dotfiles/defaults.toml`, one module
 each per platform in `dotfiles/platforms/<name>/features/`. Today there
 are `packaging` (pacman and makepkg drop-ins), `reflector` (the
-mirrorlist on a timer), `rustup` (cargo and rustc) and `paru` (the AUR
-helper). See the [capability map](docs/spec/CAPABILITY-MAP.md).
+mirrorlist on a timer), `rustup` (cargo and rustc), `paru` (the AUR
+helper) and `no_beep` (no PC speaker). See the
+[capability map](docs/spec/CAPABILITY-MAP.md).
 
 ## How a host is described
 

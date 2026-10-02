@@ -17,6 +17,7 @@ from dotfiles.plan import Step, cycles, order, steps
 from dotfiles.platforms import discovery
 from dotfiles.platforms.arch import ArchLinuxOs
 from dotfiles.platforms.linux import LinuxOs
+from dotfiles.platforms.operating_system import OperatingSystem
 from dotfiles.platforms.package_manager import PackageManager
 
 HEAD = "from dotfiles.engine import defer, die\nfrom dotfiles.feature import Feature\n\n\n"
@@ -59,7 +60,7 @@ class FakeManager(PackageManager):
         return self.depends(names)
 
 
-class FakeArch(LinuxOs):
+class FakeArch(OperatingSystem):  # not LinuxOs: no real feature of Linux's
     manager_class = FakeManager
 
 
