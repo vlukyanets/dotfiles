@@ -340,7 +340,8 @@ def test_zsh_creates_zshrc_with_the_source_line(machine, monkeypatch):
     apply("zsh")
     assert home(".zshrc").read_text() == "source ~/.config/zsh/dotfiles.zsh\n"
     text = home(".config/zsh/dotfiles.zsh").read_text()
-    assert "zsh-autosuggestions.zsh" in text and "zsh-syntax-highlighting.zsh" in text
+    # By default no plugin of oh-my-zsh's and no extra.
+    assert "plugins=()\n" in text and "/usr/share/zsh/plugins" not in text
     assert "p10k" not in text
     assert not home(".p10k.zsh").exists()
 

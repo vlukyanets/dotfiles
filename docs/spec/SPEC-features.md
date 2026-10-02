@@ -197,6 +197,9 @@ Every Linux (`platforms/linux/features/no_beep.py`), off by default, on in
 
 ## `zsh` — zsh and oh-my-zsh
 
+An example; by default `plugins` and `extras` are empty, `theme.name` is
+`robbyrussell`, `theme.repo` and `theme.branch` are empty.
+
 ```toml
 [features.zsh]
 enabled = true
@@ -204,9 +207,9 @@ plugins = ["git"]
 extras  = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions"]
 
 [features.zsh.theme]
-name   = "powerlevel10k/powerlevel10k"                 # robbyrussell by default
-repo   = "https://github.com/romkatv/powerlevel10k.git"  # empty by default: built in
-branch = ""                                            # empty: the repo's default
+name   = "powerlevel10k/powerlevel10k"
+repo   = "https://github.com/romkatv/powerlevel10k.git"
+branch = ""  # the repo's default
 ```
 
 Arch only (`platforms/arch/features/zsh.py`): the extras' paths are
