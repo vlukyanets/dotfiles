@@ -1,9 +1,7 @@
 # Spec: `engine` — helpers, platforms and `dotfiles apply`
 
-Status: draft 2026-09-24, revises the version approved the same day
-(platforms, features as classes, order from the package graph and each
-feature's requirements); platforms in directories of their own 2026-09-29. Module of
-the [capability map](CAPABILITY-MAP.md); depends on `config`.
+Status: draft. Module of the [capability map](CAPABILITY-MAP.md);
+depends on `config`.
 
 ## Objective
 
@@ -518,8 +516,8 @@ class Locale(Feature):  # platforms/linux/features/locale.py: glibc is always th
    part, a provider chosen by another feature) is declared per platform,
    where it holds, and checked against the host's config. Order the graph does
    not cover is fixed by the phases: the package manager is ready before
-   any install (`setup`). No dotfiles are deployed outside the features
-   (2026-10-02): a dotfile is a feature's file, ordered like the rest.
+   any install (`setup`). No dotfiles are deployed outside the features:
+   a dotfile is a feature's file, ordered like the rest.
 2. **Platforms are directories that do not intersect.** A platform does
    with its own tools what differs between systems, and its features are
    its own: a feature is written per platform, not as shared code with a

@@ -1,7 +1,6 @@
 # Spec: `config` — host configuration with inheritance
 
-Status: approved 2026-09-23; machine config approved 2026-09-24. Module of the
-[capability map](CAPABILITY-MAP.md).
+Status: approved. Module of the [capability map](CAPABILITY-MAP.md).
 
 ## Objective
 

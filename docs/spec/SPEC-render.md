@@ -1,9 +1,7 @@
 # Spec: `render` — templates of the files features write
 
-Status: approved 2026-09-23; the unconditional `home/` deploy, `render`
-and `deploy` went on 2026-10-02, and `home/` came back the same day for
-the dotfile templates features name. Module of the [capability map](CAPABILITY-MAP.md); depends
-on `config`.
+Status: approved. Module of the [capability map](CAPABILITY-MAP.md);
+depends on `config`.
 
 ## Objective
 
@@ -76,9 +74,9 @@ tests/test_render.py   templates in tmp_path; check on a copy of the real data
 
 1. Whitespace is handled once, by `trim_blocks` and `lstrip_blocks`, not
    with `{%-` on each tag: a template reads like the file it produces.
-2. **No unconditional dotfiles** (2026-10-02). `home/` was deployed on every
+2. **No unconditional dotfiles.** `home/` was deployed on every
    host before any feature ran, with its own manifest of modes and gates
    (`home.toml`) and its own commands (`render`, `deploy`). A dotfile is a
    feature's like any other file: the feature gates it, and the engine
    writes it. Its template is under `home/` again, but only as a template
-   a feature names (`zsh`, 2026-10-02).
+   a feature names (`zsh`).

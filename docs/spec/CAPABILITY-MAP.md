@@ -1,6 +1,6 @@
 # Capability Map: dotfiles
 
-Approved 2026-09-23. A Python tool that describes each machine in TOML
+A Python tool that describes each machine in TOML
 and brings the live system in line with that description, checking
 before every change. Module ids are stable; specs, plans and commits
 refer to work by them.
