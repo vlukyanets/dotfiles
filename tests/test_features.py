@@ -91,6 +91,15 @@ def test_packaging_writes_what_is_set(machine, monkeypatch):
     ]
 
 
+def test_packaging_installs_pacman_contrib_only_when_asked():
+    def packages(cfg):
+        cls = classes(ArchLinuxOs)["packaging"]
+        return cls(cfg["features"]["packaging"], ArchLinuxOs(engine.current())).packages()
+
+    assert packages(defaults()) == []
+    assert packages(defaults(packaging={"pacman": {"contrib": True}})) == ["pacman-contrib"]
+
+
 @pytest.mark.parametrize(("value", "threads"), [(4, 4), ("50%", 8), ("1%", 1)])
 def test_jobs(monkeypatch, value, threads):
     monkeypatch.setattr(os, "cpu_count", lambda: 16)

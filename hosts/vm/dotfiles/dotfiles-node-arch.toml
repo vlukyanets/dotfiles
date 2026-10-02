@@ -5,11 +5,13 @@ name = "Dotfiles Node Arch"
 email = "no.email.arch@hosting.net"
 
 [features.packaging.pacman]
+contrib = true
 parallel_downloads = 2
 
 [features.packaging.makepkg]
 jobs = 1
 packager = "Dotfiles Node Arch <no.email.arch@hosting.net>"
+options = ["!debug"]
 
 [features.reflector]
 enabled = true

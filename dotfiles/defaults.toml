@@ -14,9 +14,11 @@ email = ""
 
 # packaging: drop-ins in /etc/pacman.conf.d and /etc/makepkg.conf.d. No
 # `enabled`: pacman itself is always there, so it always runs on Arch.
-# Its keys have no default (their types are Packaging.types): only a key a
-# host or profile sets is written; pacman.conf and makepkg.conf keep the rest.
+# Its keys but contrib have no default (their types are Packaging.types):
+# only a key a host or profile sets is written; pacman.conf and
+# makepkg.conf keep the rest.
 [features.packaging.pacman]
+contrib = false               # pacman-contrib installed too: paccache, checkupdates, pactree, ...
 # parallel_downloads = 5      ParallelDownloads, 1 or more
 # multilib = true             the [multilib] repository; false takes out only ours
 # flags = ["Color"]           options pacman takes without a value, on by their

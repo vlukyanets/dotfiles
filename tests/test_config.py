@@ -109,7 +109,10 @@ def test_a_key_without_default_is_there_only_when_set(tmp_path):
     write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
     write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = true\n")
     cfg = resolve("h", tmp_path, checks=feature.checks())
-    assert cfg["features"]["packaging"] == {"pacman": {"multilib": True}, "makepkg": {}}
+    assert cfg["features"]["packaging"] == {
+        "pacman": {"contrib": False, "multilib": True},
+        "makepkg": {},
+    }
     write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = 1\n")
     with pytest.raises(ConfigError, match=r"multilib: must be boolean, got integer$"):
         resolve("h", tmp_path, checks=feature.checks())
