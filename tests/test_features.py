@@ -7,6 +7,7 @@ from dotfiles import engine
 from dotfiles.feature import classes
 from dotfiles.layout import Layout
 from dotfiles.platforms.arch import ArchLinuxOs
+from dotfiles.platforms.arch._pacman import Pacman
 from dotfiles.platforms.arch.features.packaging import _jobs
 
 
@@ -88,6 +89,15 @@ def test_packaging_writes_what_is_set(machine, monkeypatch):
         'PACKAGER="A B <a@b>"',
         "OPTIONS+=(ccache !debug)",
     ]
+
+
+def test_packaging_installs_pacman_contrib_only_when_asked():
+    def packages(cfg):
+        cls = classes(ArchLinuxOs)["packaging"]
+        return cls(cfg["features"]["packaging"], ArchLinuxOs(engine.current())).packages()
+
+    assert packages(defaults()) == []
+    assert packages(defaults(packaging={"pacman": {"contrib": True}})) == ["pacman-contrib"]
 
 
 @pytest.mark.parametrize(("value", "threads"), [(4, 4), ("50%", 8), ("1%", 1)])
@@ -202,3 +212,54 @@ def test_reflector_failed_refresh_is_a_notice(machine, capsys):
     assert "mirrorlist refreshed" not in out
     assert "refreshing the mirrorlist failed (network?)" in err
     assert engine.current().report.notices
+
+
+PARU_RUNS = {("paru", "--version"): (0, "paru v2.0.4 - libalpm v15.0.0")}
+
+
+def test_paru_is_built_from_the_aur_while_it_does_not_run(machine, monkeypatch):
+    built = []
+    monkeypatch.setattr(Pacman, "build", lambda self, names: built.append(names))
+    apply("paru")
+    assert built == [["paru"]]  # installed but not running (a libalpm bump) counts too
+    machine.answers.update(PARU_RUNS)
+    apply("paru")
+    assert built == [["paru"]]
+    assert machine.calls == [["paru", "--version"]] * 2
+
+
+def test_paru_dry_run_builds_nothing(machine, capsys):
+    engine.current().dry_run = True
+    apply("paru")
+    assert capsys.readouterr().out == "-> paru built from the AUR\n"
+    assert machine.calls == [["paru", "--version"]]  # the check only
+
+
+RUSTUP_SHOW = (0, "Default host: x86_64-unknown-linux-gnu\nrustup home:  /home/u/.rustup")
+
+
+def test_rustup_sets_the_toolchain_once(machine, capsys):
+    machine.answers[("rustup", "show")] = RUSTUP_SHOW
+    apply("rustup")
+    assert machine.calls[-1] == ["rustup", "default", "stable"]
+    assert capsys.readouterr().out == "-> rustup default stable (was none)\n"
+    machine.answers[("rustup", "default")] = (0, "stable-x86_64-unknown-linux-gnu (default)")
+    machine.calls.clear()
+    apply("rustup")
+    assert machine.calls == [["rustup", "default"], ["rustup", "show"]]
+    assert capsys.readouterr().out == ""
+
+
+def test_rustup_switches_to_another_toolchain(machine, capsys):
+    machine.answers[("rustup", "show")] = RUSTUP_SHOW
+    machine.answers[("rustup", "default")] = (0, "stable-x86_64-unknown-linux-gnu (default)")
+    apply("rustup", defaults(rustup={"toolchain": "nightly-2026-09-01"}))
+    assert machine.calls[-1] == ["rustup", "default", "nightly-2026-09-01"]
+    assert capsys.readouterr().out == (
+        "-> rustup default nightly-2026-09-01 (was stable-x86_64-unknown-linux-gnu)\n"
+    )
+    # A dated nightly is not "nightly": the host alone may follow the name.
+    machine.answers[("rustup", "default")] = (0, "nightly-2026-09-01-x86_64-unknown-linux-gnu")
+    machine.calls.clear()
+    apply("rustup", defaults(rustup={"toolchain": "nightly"}))
+    assert machine.calls[-1] == ["rustup", "default", "nightly"]

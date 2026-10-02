@@ -27,7 +27,7 @@ _PACMAN_FLAGS = (
 
 
 class Packaging(Feature):
-    """No packages, no requirements; the drop-ins and multilib."""
+    """pacman-contrib if asked, no requirements; the drop-ins and multilib."""
 
     rules: ClassVar[dict[str, tuple]] = {
         "pacman.parallel_downloads": (lambda v: v >= 1, "1 or more"),
@@ -53,6 +53,10 @@ class Packaging(Feature):
         "makepkg.packager": (str,),
         "makepkg.options": (list,),
     }
+
+    def packages(self) -> list[str]:
+        """pacman-contrib when `pacman.contrib`; false never removes it."""
+        return ["pacman-contrib"] if self.settings["pacman"]["contrib"] else []
 
     def apply(self) -> None:
         """Only what is set: its drop-in written and included; multilib synced when on."""

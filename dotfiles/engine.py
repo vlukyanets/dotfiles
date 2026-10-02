@@ -51,11 +51,6 @@ class Report:
         self.printed = True
         print(f"-> {msg}")
 
-    def line(self, msg: str) -> None:
-        """MSG as it is, counted as a change: a line render.deploy made."""
-        self.printed = True
-        print(msg)
-
     def notice(self, msg: str) -> None:
         """Print now and again at the end, where it is not lost under package output."""
         self.warn(msg)

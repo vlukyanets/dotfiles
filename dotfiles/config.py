@@ -215,7 +215,7 @@ def init(
     text = (
         f"# This machine's config: {found.relative_to(source)} and everything it extends,\n"
         f"# resolved by `dotfiles init` from {source.resolve()}.\n"
-        "# apply, deploy, config and render read it; the next init overwrites it.\n\n"
+        "# apply and config read it; the next init overwrites it.\n\n"
     ) + tomli_w.dumps(resolve(host, root, source=source, checks=checks))
     if path.is_file() and path.read_text() == text:
         return None

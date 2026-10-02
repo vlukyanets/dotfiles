@@ -1,12 +1,1 @@
-# A test node: a Void Linux VM, a distribution without systemd.
-#
-# dotfiles has no Void platform yet (dotfiles/platforms/void.py), so today
-# `apply` stops before any change with `no platform for void`.
-# What to try here:
-# - `dotfiles init dotfiles-node-voidlinux`, `config`, `check`.
-# - `render --out DIR`, `deploy --dry-run`, `deploy`: the dotfiles in $HOME,
-#   and a second deploy that changes nothing.
-# - `apply --dry-run`: the error above, with nothing changed.
-# - Once a Void platform exists: every place that assumes systemd
-#   (`Linux.ensure_service`, sysctl.d) has to be overridden there.
 extends = ["vm"]

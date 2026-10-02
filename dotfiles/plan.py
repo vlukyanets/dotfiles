@@ -50,6 +50,8 @@ def _unmet(cfg: dict, requires: dict[str, frozenset[str]]) -> list[str]:
     problems = []
     for feature, names in sorted(requires.items()):
         for name in sorted(names):
+            if name in requires:  # it runs: on, or always on without a table of its own
+                continue
             if name not in cfg["features"]:
                 problems.append(f"{feature}: requires {name}, which is not a feature")
             elif not cfg["features"][name].get("enabled", True):

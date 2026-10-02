@@ -109,7 +109,10 @@ def test_a_key_without_default_is_there_only_when_set(tmp_path):
     write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
     write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = true\n")
     cfg = resolve("h", tmp_path, checks=feature.checks())
-    assert cfg["features"]["packaging"] == {"pacman": {"multilib": True}, "makepkg": {}}
+    assert cfg["features"]["packaging"] == {
+        "pacman": {"contrib": False, "multilib": True},
+        "makepkg": {},
+    }
     write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = 1\n")
     with pytest.raises(ConfigError, match=r"multilib: must be boolean, got integer$"):
         resolve("h", tmp_path, checks=feature.checks())
@@ -239,10 +242,10 @@ def test_a_name_in_two_folders_is_ambiguous(root):
 
 
 def test_real_profiles():
-    assert [w for w, _ in chain("hyper-lin", Layout.root)] == [
+    assert [w for w, _ in chain("hyper", Layout.root)] == [
         "profiles/base.toml",
         "profiles/laptop.toml",
-        "hosts/hyper-lin.toml",
+        "hosts/hyper.toml",
     ]
     assert [w for w, _ in chain("echo-server", Layout.root)] == [
         "profiles/base.toml",

@@ -30,6 +30,8 @@ class FakeManager(PackageManager):
     graph: ClassVar[dict[str, set[str]]] = {}  # package -> everything it needs
     installs: ClassVar[list[list[str]]] = []
     replaced: ClassVar[list[list[str]]] = []  # REPLACES of each install
+    aur: ClassVar[set[str]] = set()  # not in its repositories: left for build()
+    builds: ClassVar[list[list[str]]] = []
     broken = False  # install fails
 
     def missing(self, names):
@@ -40,6 +42,11 @@ class FakeManager(PackageManager):
         self.replaced.append(list(replaces))
         if self.broken:
             raise RuntimeError("mirror down")
+        self.installed.update(set(names) - self.aur)
+        return [n for n in names if n in self.aur]
+
+    def build(self, names):
+        self.builds.append(names)
         self.installed.update(names)
 
     def upgrade(self):
@@ -65,6 +72,8 @@ def system(monkeypatch) -> type[FakeManager]:
     monkeypatch.setattr(FakeManager, "graph", {})
     monkeypatch.setattr(FakeManager, "installs", [])
     monkeypatch.setattr(FakeManager, "replaced", [])
+    monkeypatch.setattr(FakeManager, "aur", set())
+    monkeypatch.setattr(FakeManager, "builds", [])
     monkeypatch.setattr(FakeManager, "broken", False)
     monkeypatch.setattr(discovery, "detect", lambda machine: FakeArch(machine))
     monkeypatch.setattr(discovery, "every", lambda machine: [FakeArch(machine)])
@@ -175,6 +184,30 @@ def test_one_install_then_silence(root, system, tmp_path, monkeypatch, capsys):
     assert apply("h", root) == 0
     assert system.installs == [["git", "postgres"]]
     assert capsys.readouterr() == ("nothing to change\n", "")
+
+
+def test_an_aur_package_is_built_at_its_feature_s_turn(root, system, tmp_path, monkeypatch, capsys):
+    (root / "dotfiles/defaults.toml").write_text(
+        "[features]\n" + "".join(f"{n}.enabled = true\n" for n in ("base", "app"))
+    )
+    make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "base": feature(
+                "Base", "self.system.report.changed(str(self.system.manager.installed))"
+            ),
+            "app": feature("App", packages=["git", "app-bin"], requires=["base"]),
+        },
+    )
+    system.aur = {"app-bin"}
+    assert apply("h", root) == 0
+    assert system.installs == [["app-bin", "git"]]
+    assert system.builds == [["app-bin"]]
+    # base ran before app's AUR package was built
+    assert capsys.readouterr().out == "-> packages: app-bin git (missing)\n-> {'git'}\n"
+    assert apply("h", root) == 0
+    assert system.builds == [["app-bin"]]
 
 
 def test_dry_run_leaves_features_whose_packages_are_missing(
@@ -442,7 +475,7 @@ def test_notices_survive_ctrl_c(root, system, tmp_path, monkeypatch, capsys):
         tmp_path, monkeypatch, {"note": feature("Note", 'self.system.report.notice("reboot")')}
     )
     monkeypatch.setattr(FakeManager, "setup", lambda self: self.report.notice("reboot"))
-    monkeypatch.setattr("dotfiles.apply._deploy", interrupt)
+    monkeypatch.setattr("dotfiles.apply.Apply._features", interrupt)
     with pytest.raises(KeyboardInterrupt):
         apply("h", root)
     assert capsys.readouterr().out.endswith("Notices from this apply:\n    reboot\n")
@@ -463,7 +496,9 @@ def test_real_features_are_consistent():
     assert not set(found) - set(cfg["features"]), "features not in the schema"
     missing = set(cfg["features"]) - set(found)
     assert not missing, f"features without a module: {sorted(missing)}"
-    assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {}
+    assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {
+        "paru": ["packaging", "rustup"]
+    }
 
 
 def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
@@ -475,13 +510,11 @@ def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
         return subprocess.CompletedProcess(argv, 1, "", "")
 
     monkeypatch.setattr(engine.current().shell, "execute", checks_only)
-    cfg = config.resolve("hyper-lin")
+    cfg = config.resolve("hyper")
     for table in cfg["features"].values():
         table["enabled"] = True
     cfg["features"]["packaging"]["pacman"]["flags"] = ["Color"]  # it writes only what is set
-    assert apply("hyper-lin", dry_run=True, cfg=cfg) == 0
+    assert apply("hyper", dry_run=True, cfg=cfg) == 0
     out = capsys.readouterr().out
     assert "-> /etc/pacman.conf.d/options.conf (missing)\n" in out
-    assert "-> ~/.gitconfig (missing)\n" in out
-    assert not (Path.home() / ".gitconfig").exists()
     assert not engine.current().files.path("/").exists()

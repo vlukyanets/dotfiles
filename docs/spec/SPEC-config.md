@@ -8,15 +8,15 @@ Status: approved 2026-09-23; machine config approved 2026-09-24. Module of the
 Describe a machine as a short host file that inherits from profiles
 (`base`, `server`, `laptop`, …) or from another host, and get back one
 fully resolved, validated configuration. That configuration is the only
-input the later modules (`render`, `engine`, `features`) read.
+input the later modules (`engine`, `features`) read.
 
 User stories:
 
 - A new laptop is `hosts/<name>.toml` with `extends = ["laptop"]`, git
   identity and a handful of overrides, not 70 feature flags copied by hand.
-- A second machine like an existing one is `extends = ["hyper-lin"]` plus
+- A second machine like an existing one is `extends = ["hyper"]` plus
   what differs.
-- A typo (`features.nvidai`), a wrong type (`features.swap.size = 20`), an unknown
+- A typo (`features.nvidai`), a wrong type (`features.reflector.latest = "20"`), an unknown
   parent or an inheritance cycle fails with the file and the key path
   named, for every host at once in CI.
 
@@ -35,7 +35,7 @@ User stories:
 ```
 dotfiles/defaults.toml  schema: every key, its type, its default
 profiles/<name>.toml    partial config + optional extends
-hosts/<hostname>.toml   partial config + optional extends
+hosts/[<dir>/]<name>.toml  partial config + optional extends; folders nest
 ```
 
 A profile or host file:
@@ -47,7 +47,7 @@ extends = ["laptop"]           # optional; names of profiles or hosts, merged le
 name  = "Valentin Lukyanets"
 email = "valikluks95@gmail.com"
 
-[features.packaging]           # a feature: its own table
+[features.reflector]           # a feature: its own table
 enabled = true
 
 [features.packaging.makepkg]   # settings may nest
@@ -55,8 +55,8 @@ jobs = "50%"
 ```
 
 Every feature is a table `features.<name>` with `enabled` (default
-`false`) and its settings; `git` is not a feature and stays at the top
-level.
+`false`; none on a feature that always runs, `packaging`) and its
+settings; `git` is not a feature and stays at the top level.
 
 Resolution for host `H`:
 
@@ -69,19 +69,18 @@ Resolution for host `H`:
    (`vm/dotfiles/dotfiles-node-arch`, `.toml` optional) or a bare name
    (`dotfiles-node-arch`) looked up in `profiles/` and every folder of
    `hosts/` (`Layout.named`). A bare name found more than once is an error
-   listing the files: `ambiguous name 'n': hosts/a/n.toml, hosts/b/n.toml`;
-   its path then picks one. Unknown name → error.
+   listing the files: `ambiguous name 'n': hosts/a/n.toml, hosts/b/n.toml;
+   give its path under hosts/`; its path then picks one. Unknown name →
+   error (`extends: no profile or host 'n'`).
    A cycle → error listing the cycle (`a → b → a`).
 3. **Validation, per file, before merging.** Every key must exist in
    `dotfiles/defaults.toml` at the same path, at any depth, with the same
    type. `bool` and `int` are different types; lists match any list;
-   tables recurse. A feature's `types` gives a key its types where no
-   default says them: several (`makepkg.jobs`: integer or string, the
-   default's first), or a key with no default at all (every key of
-   `Packaging.types`), which is in the resolved config only when a file
-   sets it. `extends` is the only key not in the schema and must be a list
+   tables recurse. A feature's `types` gives the types of a key with no
+   default (every key of `Packaging.types`; `makepkg.jobs`: integer or
+   string), which is in the resolved config only when a file sets it. `extends` is the only key not in the schema and must be a list
    of strings. Errors name the file and the dotted key path:
-   `hosts/hyper-lin.toml: features.nvidai: unknown key`.
+   `hosts/hyper.toml: features.nvidai: unknown key`.
 4. **Merge.** Tables merge recursively; scalars and lists are replaced by
    the later file, so lists never append.
 5. **Value checks** on the merged result: what a type cannot say, from
@@ -115,7 +114,7 @@ repository's `hosts/`:
   `-> ~/.config/dotfiles/config.toml (missing | content differs)`, or
   `nothing to change` when the file already holds exactly that. A header
   comment names the host and the checkout it came from.
-- **Read by `apply`, `deploy`, `config` and `render`.** The file is
+- **Read by `apply` and `config`.** The file is
   validated against the schema like any host file (an unknown key or a
   wrong type fails with the file and key named) and merged over
   `defaults.toml`, so a key added to the schema later gets its default until
@@ -123,17 +122,17 @@ repository's `hosts/`:
 - **Missing file:** `error: no ~/.config/dotfiles/config.toml — run dotfiles
   init <host>, or pass --source <checkout>`, exit 1. Nothing falls back to
   defaults.
-- **`--source PATH`** (on `apply`, `deploy`, `config`, `render`, `init`,
+- **`--source PATH`** (on `apply`, `config`, `init` and
   `check`) reads the config from the checkout at PATH instead of
-  `~/.config/dotfiles`: `hosts/<name>.toml` there with everything it
-  extends, as before. The name is `--host` where the command has it,
+  `~/.config/dotfiles`: the host of that name in `hosts/` there, in any
+  folder, with everything it extends, as before. The name is `--host` where the command has it,
   else the hostname. `--host NAME` without `--source` means `--source`
-  of the checkout the tool runs from. The schema (`dotfiles/defaults.toml`),
-  templates and `home.toml` always come from the checkout the
+  of the checkout the tool runs from. The schema (`dotfiles/defaults.toml`)
+  and the templates always come from the checkout the
   tool runs from: the schema belongs to the code that reads the keys, so an
   older `--source` gets the defaults of keys it does not know yet. In code,
   `root` is that checkout and `source` (default `root`) the one of the hosts.
-- **`check`** resolves and renders every host in `hosts/` as before, plus
+- **`check`** resolves every host in `hosts/` and checks its requirements, plus
   `~/.config/dotfiles/config.toml` when it exists (listed as `local`).
 - `hosts/` stays in the repository: it is what `init` reads, and CI checks it.
 
@@ -145,8 +144,8 @@ uv run --exact dotfiles init                      # ~/.config/dotfiles/config.to
 uv run --exact dotfiles init echo-server          # ... from hosts/echo-server.toml; overwrites the file
 uv run --exact dotfiles config                    # this machine, from ~/.config/dotfiles/config.toml
 uv run --exact dotfiles config --source .         # this machine, from hosts/<hostname>.toml of the checkout at .
-uv run --exact dotfiles config --host hyper-lin   # any host of this checkout, TOML on stdout
-uv run --exact dotfiles config --host hyper-lin --explain # every leaf as a dotted key, with the file it came from
+uv run --exact dotfiles config --host hyper   # any host of this checkout, TOML on stdout
+uv run --exact dotfiles config --host hyper --explain # every leaf as a dotted key, with the file it came from
 uv run --isolated dotfiles check                  # every host in hosts/ + one unknown host (+ local); exit 1 on any error, all errors listed
 uv run --isolated --group dev pytest              # verification: a throwaway environment, .venv/ untouched
 uv run --isolated --group dev ruff check . && uv run --isolated --group dev ruff format --check .
@@ -157,7 +156,7 @@ Output of `config` is TOML, the same shape as the input files. `--explain`
 prints one line per leaf, itself valid TOML:
 
 ```
-git.name = "Valentin Lukyanets"  # hosts/hyper-lin.toml
+git.name = "Valentin Lukyanets"  # hosts/hyper.toml
 ```
 
 Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
@@ -166,13 +165,14 @@ Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
 
 ```
 pyproject.toml           project, [project.scripts] dotfiles = "dotfiles.cli:main"
-dotfiles/cli.py          argparse CLI: init, config, render, deploy, check, apply
+dotfiles/cli.py          argparse CLI: init, config, check, apply
 dotfiles/__main__.py     `python -m dotfiles`: calls cli.main
 dotfiles/config.py       load, chain, validate, merge — pure functions over dicts and a root Path
-dotfiles/layout.py       Layout(root): a checkout's paths (this one by default), named() a host or profile; local_config(), shown()
+dotfiles/layout.py       Layout(root): a checkout's paths (this one by default), named() a host or profile, host_names(); local_config(), shown()
+dotfiles/errors.py       ConfigError, for every layer
 dotfiles/defaults.toml   schema
 profiles/                base, server, laptop, vm
-hosts/                   hyper-lin (extends laptop), echo-server (extends server),
+hosts/                   hyper (extends laptop), echo-server (extends server),
                          vm/dotfiles/dotfiles-node-{arch,debian,voidlinux} (extend vm; test VMs)
 tests/test_config.py     unit tests on tmp_path fixtures + checks on the real data
 tests/test_cli.py        the commands: which config they read, their errors
@@ -186,10 +186,15 @@ without installing the package.
 
 ```python
 def resolve(
-    host: str, root: Path = Layout.root, local: Path | None = None, source: Path | None = None
+    host: str,
+    root: Path = Layout.root,
+    local: Path | None = None,
+    source: Path | None = None,
+    *,
+    checks: Checks = _NO_CHECKS,
 ) -> dict:
     """Merged config for HOST: the defaults, then every file in its chain."""
-    return resolve_with_sources(host, root, local, source)[0]
+    return resolve_with_sources(host, root, local, source, checks=checks)[0]
 ```
 
 - Pure functions over plain `dict`s; no classes until something needs state.
@@ -200,7 +205,8 @@ def resolve(
 
 ## Testing Strategy
 
-- `pytest`, one file `tests/test_config.py`, fixtures written to `tmp_path`.
+- `pytest`, `tests/test_config.py` (the commands in `tests/test_cli.py`),
+  fixtures written to `tmp_path`.
 - Cases: single-level extends; multi-parent order; diamond (shared ancestor
   merged once); host extends host; cycle; unknown parent; a bare name found twice
   (ambiguous); a nested host by name and by path; unknown key at depth 1 and 2; wrong type incl. `bool` vs
@@ -223,15 +229,16 @@ def resolve(
 
 ## Success Criteria
 
-1. `uv run --exact dotfiles config --host hyper-lin` prints that machine's whole
+1. `uv run --exact dotfiles config --host hyper` prints that machine's whole
    configuration as TOML: every key of the schema, with its resolved value.
-2. `hosts/hyper-lin.toml` extends `laptop` and holds only what differs from
+2. `hosts/hyper.toml` extends `laptop` and holds only what differs from
    it; `echo-server` extends `server`; `laptop` and `server` extend `base`.
 3. `uv run --isolated dotfiles check` exits 0 on the repo data and 1 on each broken
    fixture from the test list, naming file and key.
 4. `uv run --isolated --group dev pytest` and `ruff` pass.
 5. Runs with `python -m dotfiles` from a checkout with no venv when
-   `python-tomli-w` is the only third-party package installed.
+   `python-tomli-w` and `python-jinja` are the only third-party packages
+   installed.
 
 ## Decisions (were open questions)
 
@@ -240,8 +247,9 @@ def resolve(
 3. `config --explain` is in this iteration.
 4. Profiles: `base`; `server`, `laptop` and `vm` extend it. A feature is
    enabled in the profile of the machines that want it.
-5. Every feature is a table under `features` with `enabled` and its own
-   settings, so a feature's switch and its settings sit in one place.
+5. Every feature is a table under `features` with `enabled` (unless it
+   always runs) and its own settings, so a feature's switch and its
+   settings sit in one place.
 6. **The machine keeps its own resolved config** in
    `~/.config/dotfiles/config.toml`, written by `init`: a later change in
    `hosts/` or `profiles/` reaches the machine only through the next `init`,

@@ -10,11 +10,9 @@ holds the capability map and the module specs that drive the work.
 | Tests | `uv run --isolated --group dev pytest` |
 | Lint and format | `uv run --isolated --group dev ruff check . && uv run --isolated --group dev ruff format --check .` |
 | Every host resolves | `uv run --isolated dotfiles check` |
-| This machine's config | `uv run --exact dotfiles init [host]` writes `~/.config/dotfiles/config.toml`; commands read it unless `--source <checkout>` or `--host` |
+| This machine's config | `uv run --exact dotfiles init [host]` writes `~/.config/dotfiles/config.toml`; commands read it unless `--source <checkout>` or `config --host` |
 | One host, with sources | `uv run --exact dotfiles config --host <name> --explain` |
-| A host's home tree | `uv run --exact dotfiles render --host <name> --out <empty dir>` |
-| Dotfiles into `$HOME` | `uv run --exact dotfiles deploy --dry-run`, then without the flag |
-| Features + dotfiles | `uv run --exact dotfiles apply --dry-run`, then without the flag |
+| Packages + features | `uv run --exact dotfiles apply --dry-run`, then without the flag |
 
 CI (`.github/workflows/ci.yml`) runs the first three on every push to
 master and every PR; uv is pinned there by version and sha256.
@@ -22,12 +20,13 @@ master and every PR; uv is pinned there by version and sha256.
 ## Navigation
 
 - Keys and defaults: `dotfiles/defaults.toml` — the schema; a new key goes here first.
-  A feature is `features.<name>.enabled` plus its settings in the same table.
+  A feature is `features.<name>.enabled` plus its settings in the same table;
+  one without `enabled` (`packaging`) always runs.
 - Profiles `profiles/`, machines `hosts/`; one namespace for `extends`. A
   machine runs from `~/.config/dotfiles/config.toml` (`config.init`,
   `layout.local_config`); the CLI (`dotfiles/cli.py`) picks it or a checkout.
 - Where things are: `dotfiles/layout.py` — `Layout(root)` names a checkout's
-  paths (`defaults`, `hosts`, `profiles`, `home`, `home_toml`, `system`),
+  paths (`defaults`, `hosts`, `profiles`, `system`),
   `named(name)` a host or profile by bare name (ambiguous → error) or by
   path under `hosts/`, which nests folders; `local_config()` this machine's
   config, `shown(path)` a path with `~`; code asks it, never joins
@@ -35,10 +34,9 @@ master and every PR; uv is pinned there by version and sha256.
 - Resolution, validation, merge, explain, check: `dotfiles/config.py`; it
   imports no feature: the entry points pass `checks=feature.checks()`.
   `ConfigError` lives in `dotfiles/errors.py`, for every layer.
-- Dotfiles: `home/` (real names, `*.j2` templates), modes and gates in
-  `home.toml`, rendering in `dotfiles/render.py`.
-- Files features write outside `$HOME`: templates under `system/` at their
-  path from `/`, rendered by `render.template` and written with `files.ensure`.
+- Files features write, dotfiles too: templates under `system/` at their
+  path from `/`, rendered by `render.template` (`dotfiles/render.py`) and
+  written with `files.ensure`. No file is deployed outside a feature.
 - Helpers the same on every system: `dotfiles/engine.py` (`Report`,
   `Shell`, `Files` in a `Machine`, passed from `apply()` to the platform
   as `self.report`, `self.shell`, `self.files`, and reached by every
@@ -55,8 +53,9 @@ master and every PR; uv is pinned there by version and sha256.
   subclass each, named after the module (`packaging` → `Packaging`), built
   with its table `features.<feature>` as `self.settings` and the platform
   as `self.system`; checks the types cannot make are its `rules`, the
-  types of keys without a default its `types`. It declares its packages (`packages()`, from the
-  repositories), the ones they replace (`replaces()`) and the features it
+  types of keys without a default its `types`. It declares its packages (`packages()`: the
+  repositories, else the AUR, built as the user at its turn and installed
+  as root, `arch/_aur.py`), the ones they replace (`replaces()`) and the features it
   needs (`requires()`: enabled, or check fails; run first), then does the
   rest in `apply()`. The name gates it; the order comes from the package
   graph and those requirements (`dotfiles/plan.py`; `dotfiles/apply.py`
@@ -96,5 +95,3 @@ master and every PR; uv is pinned there by version and sha256.
 - Templates: a tag alone on its line vanishes with its newline
   (trim_blocks, lstrip_blocks). Booleans print as `True` in Jinja: write
   `{{ x | lower }}` where the file needs `true`.
-- A `.keep` that only holds a directory in git is gated off with
-  `when = "false"` in `home.toml`, so no empty file lands in `$HOME`.
