@@ -53,9 +53,11 @@ enabled = false
 # the rest of ~/.zshrc stays the user's.
 [features.zsh]
 enabled = false
-theme   = "robbyrussell"  # one of oh-my-zsh's themes
-plugins = ["git"]         # oh-my-zsh's own plugins
-extras  = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions"]  # from the repositories
+theme      = "robbyrussell"  # one of oh-my-zsh's themes, or <dir>/<name> of theme_repo
+theme_repo = ""              # https git URL cloned into ~/.oh-my-zsh/custom/themes/<dir>;
+                             # powerlevel10k also gets ~/.p10k.zsh from home/.p10k.zsh
+plugins    = ["git"]         # oh-my-zsh's own plugins
+extras     = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions"]  # from the repositories
 
 # rustup: cargo and rustc from rustup in place of rust, with `toolchain`
 # installed and the default.

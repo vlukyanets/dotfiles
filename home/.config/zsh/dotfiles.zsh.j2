@@ -1,10 +1,20 @@
 # Managed by dotfiles (features.zsh) — edit
 # home/.config/zsh/dotfiles.zsh.j2 in the repo, not this file.
 # Sourced from the top of ~/.zshrc: what follows it there overrides this.
+{% if p10k %}
+# powerlevel10k's instant prompt: close to the top, before anything that prints.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+{% endif %}
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="{{ zsh.theme }}"
 plugins=({{ zsh.plugins | join(" ") }})
 source "$ZSH/oh-my-zsh.sh"
+{% if p10k %}
+# `p10k configure` rewrites it; home/.p10k.zsh in the repo is what apply puts back.
+source ~/.p10k.zsh
+{% endif %}
 {% if "zsh-autosuggestions" in zsh.extras %}
 source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
 {% endif %}
