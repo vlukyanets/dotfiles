@@ -3,24 +3,17 @@ import socket
 import subprocess
 import sys
 import sysconfig
-import tempfile
 import traceback
 from contextlib import contextmanager
 from pathlib import Path
 
-from dotfiles import config, engine, feature, render, retry
+from dotfiles import config, engine, feature, retry
 from dotfiles.config import MissingKey
 from dotfiles.errors import ConfigError
 from dotfiles.layout import Layout, local_config
 from dotfiles.plan import Step, circle, cycles, order, requirements, steps
 from dotfiles.platforms import discovery
 from dotfiles.platforms.operating_system import OperatingSystem
-
-
-def _deploy(host: str, root: Path, cfg: dict, machine: engine.Machine) -> None:
-    """The dotfiles into $HOME, printing each change into MACHINE's report."""
-    for line in render.deploy(host, root, dry_run=machine.dry_run, cfg=cfg):
-        machine.report.line(line)
 
 
 def _where(e: BaseException) -> str:
@@ -56,7 +49,7 @@ def _error(name: str, msg) -> None:
 
 
 class Apply:
-    """One apply on SYSTEM: setup, packages, dotfiles, then the features in order."""
+    """One apply on SYSTEM: setup, packages, then the features in order."""
 
     def __init__(
         self, host: str, root: Path, cfg: dict, system: OperatingSystem, found: list[Step]
@@ -76,8 +69,6 @@ class Apply:
         """Every phase in turn; 1 if anything failed."""
         ready = self._setup()
         self._packages(ready)
-        with self._guard("dotfiles"):
-            _deploy(self.host, self.root, self.cfg, self.system.machine)
         self._features()
         if not self.report.printed and not self.failed:
             print("nothing to change")
@@ -154,7 +145,7 @@ class Apply:
 
 
 def check(root: Path = Layout.root, source: Path | None = None) -> dict[str, str | None]:
-    """Every host, and this machine's config, resolved, required and rendered: host -> error."""
+    """Every host, and this machine's config, resolved and its requirements met: host -> error."""
     checks = feature.checks()
     results = config.check(root, source, checks=checks)
     local = local_config()
@@ -162,17 +153,14 @@ def check(root: Path = Layout.root, source: Path | None = None) -> dict[str, str
         results["local"] = None
     for host, error in results.items():
         if error is None:
-            with tempfile.TemporaryDirectory() as tmp:
-                try:
-                    if host == "local":
-                        name = socket.gethostname()
-                        cfg = config.resolve(name, root, local, checks=checks)
-                    else:
-                        name, cfg = host, config.resolve(host, root, source=source, checks=checks)
-                    requirements(cfg)
-                    render.render(name, Path(tmp) / "home", root, cfg=cfg)
-                except ConfigError as e:
-                    results[host] = str(e)
+            try:
+                if host == "local":
+                    cfg = config.resolve(socket.gethostname(), root, local, checks=checks)
+                else:
+                    cfg = config.resolve(host, root, source=source, checks=checks)
+                requirements(cfg)
+            except ConfigError as e:
+                results[host] = str(e)
     return results
 
 
@@ -182,7 +170,7 @@ def apply(
     dry_run: bool = False,
     cfg: dict | None = None,
 ) -> int:
-    """Every enabled feature and the dotfiles on this machine; 1 if anything failed."""
+    """Every enabled feature on this machine; 1 if anything failed."""
     cfg = config.resolve(host, root, checks=feature.checks()) if cfg is None else cfg
     machine = engine.current().fresh(dry_run)
     try:

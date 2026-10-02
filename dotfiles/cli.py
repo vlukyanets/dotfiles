@@ -8,7 +8,7 @@ from pathlib import Path
 
 import tomli_w
 
-from dotfiles import apply, config, feature, render
+from dotfiles import apply, config, feature
 from dotfiles.errors import ConfigError
 from dotfiles.layout import Layout, local_config, shown
 
@@ -33,14 +33,8 @@ def main() -> int:
     p = sub.add_parser("config", help="print the resolved config of a host")
     p.add_argument("--host", help="a host of the checkout; default: this machine's config")
     p.add_argument("--explain", action="store_true", help="one line per key, with its file")
-    p = sub.add_parser("render", help="write a host's home tree into a directory")
-    p.add_argument("--host", help="a host of the checkout; default: this machine's config")
-    p.add_argument("--out", type=Path, required=True, help="missing or empty directory")
-    p.add_argument("--current", type=Path, help="home whose files merged templates read")
-    p = sub.add_parser("deploy", help="write this machine's dotfiles into $HOME where they differ")
-    p.add_argument("--dry-run", action="store_true", help="print what would change, write nothing")
-    sub.add_parser("check", help="resolve and render every host, and this machine's config")
-    p = sub.add_parser("apply", help="this machine: features, dotfiles, notices")
+    sub.add_parser("check", help="resolve every host, and this machine's config")
+    p = sub.add_parser("apply", help="this machine: packages, features, notices")
     p.add_argument("--dry-run", action="store_true", help="print what would change, no sudo")
     for name, p in sub.choices.items():
         if name != "init":  # init has its own, defaulting to this checkout
@@ -81,13 +75,7 @@ def main() -> int:
         cfg = config.resolve(host, local=local, source=source, checks=feature.checks())
         if args.command == "apply":
             return apply.apply(host, dry_run=args.dry_run, cfg=cfg)
-        if args.command == "deploy":
-            lines = render.deploy(host, dry_run=args.dry_run, cfg=cfg)
-            print("\n".join(lines) or "nothing to change")
-        elif args.command == "render":
-            render.render(host, args.out, current=args.current, cfg=cfg)
-        else:
-            sys.stdout.write(tomli_w.dumps(cfg))
+        sys.stdout.write(tomli_w.dumps(cfg))
     except ConfigError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

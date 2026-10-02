@@ -442,7 +442,7 @@ def test_notices_survive_ctrl_c(root, system, tmp_path, monkeypatch, capsys):
         tmp_path, monkeypatch, {"note": feature("Note", 'self.system.report.notice("reboot")')}
     )
     monkeypatch.setattr(FakeManager, "setup", lambda self: self.report.notice("reboot"))
-    monkeypatch.setattr("dotfiles.apply._deploy", interrupt)
+    monkeypatch.setattr("dotfiles.apply.Apply._features", interrupt)
     with pytest.raises(KeyboardInterrupt):
         apply("h", root)
     assert capsys.readouterr().out.endswith("Notices from this apply:\n    reboot\n")
@@ -484,6 +484,4 @@ def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
     assert apply("hyper", dry_run=True, cfg=cfg) == 0
     out = capsys.readouterr().out
     assert "-> /etc/pacman.conf.d/options.conf (missing)\n" in out
-    assert "-> ~/.gitconfig (missing)\n" in out
-    assert not (Path.home() / ".gitconfig").exists()
     assert not engine.current().files.path("/").exists()

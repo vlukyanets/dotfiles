@@ -36,18 +36,8 @@ class Layout:
         return self.root / "profiles"
 
     @property
-    def home(self) -> Path:
-        """The dotfiles, at their path under $HOME."""
-        return self.root / "home"
-
-    @property
-    def home_toml(self) -> Path:
-        """Modes and gates of the paths under home/."""
-        return self.root / "home.toml"
-
-    @property
     def system(self) -> Path:
-        """Templates of the files features write outside $HOME, at their path from /."""
+        """Templates of the files features write, at their path from /."""
         return self.root / "system"
 
     def host_names(self) -> list[str]:
