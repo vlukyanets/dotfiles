@@ -294,6 +294,37 @@ def test_no_beep_driver_in_use_is_a_notice(machine, capsys):
     assert "pcspkr snd_pcsp in use: the PC speaker is silent after a reboot" in err
 
 
+PKGFILE_UPDATE = ["pkgfile", "--update"]
+
+
+def test_pkgfile_turns_the_timer_on_and_downloads_once(machine, capsys):
+    apply("pkgfile")
+    assert machine.calls[-2:] == [
+        ["systemctl", "enable", "--now", "pkgfile-update.timer"],
+        PKGFILE_UPDATE,
+    ]
+    assert capsys.readouterr().out.endswith("-> pkgfile's database downloaded\n")
+    write("/var/cache/pkgfile/core.files", "")
+    machine.answers.update(
+        {
+            ("systemctl", "is-enabled", "pkgfile-update.timer"): (0, "enabled"),
+            ("systemctl", "is-active", "pkgfile-update.timer"): (0, "active"),
+        }
+    )
+    machine.calls.clear()
+    apply("pkgfile")
+    assert capsys.readouterr().out == ""
+    assert PKGFILE_UPDATE not in machine.calls
+
+
+def test_pkgfile_failed_download_is_a_notice(machine, capsys):
+    machine.answers[tuple(PKGFILE_UPDATE)] = (1, "")
+    apply("pkgfile")
+    out, err = capsys.readouterr()
+    assert "database downloaded" not in out
+    assert "downloading pkgfile's database failed (network?)" in err
+
+
 def login_shell(monkeypatch, shell: str) -> None:
     """SHELL the login shell; /usr/bin/zsh there, and /bin a link to usr/bin, as on Arch."""
     me = SimpleNamespace(pw_name="u", pw_shell=shell)
