@@ -8,7 +8,8 @@ depends on `packages` and `render`.
 Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
-`packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile`, `zsh` and `command_not_found`.
+`packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile`, `git`, `zsh` and
+`command_not_found`.
 
 ## Structure
 
@@ -210,6 +211,32 @@ Arch only (`platforms/arch/features/pkgfile.py`), off by default, on in
   once, since until the timer's first run pkgfile finds nothing. A failed
   download is a notice; the timer tries again.
 
+## `git` — the user's name and email
+
+An example; by default `name` and `email` are empty.
+
+```toml
+[features.git]
+enabled = true
+name    = "Jane Doe"
+email   = "jane@example.org"
+```
+
+Every Linux (`platforms/linux/features/git.py`), off by default, on in
+`profiles/base.toml`; `name` and `email` are the host's. Its package is
+`git`; then `apply()`:
+
+- `~/.config/git/dotfiles.gitconfig` from
+  `home/.config/git/dotfiles.gitconfig.j2`: `[user]` with `name` (quoted)
+  and `email`, each only when set, none of it when neither is.
+- `[include] path = dotfiles.gitconfig` at the top of
+  `~/.config/git/config`, relative to it; a missing config is created
+  with that line alone. The rest of the config and `~/.gitconfig`, which
+  git reads after it, stay the user's and override ours.
+
+`Git.rules`: `name` without `"`, `\` or a newline, which would need
+escaping; `email` empty or one `@` between non-blanks.
+
 ## `zsh` — zsh and oh-my-zsh
 
 An example; by default `shell` is `/usr/bin/zsh`, `plugins` and `extras`
@@ -296,6 +323,8 @@ dotfiles/platforms/arch/features/paru.py       Paru: built from the AUR while it
 dotfiles/platforms/linux/features/no_beep.py   NoBeep: blacklist, unload
 system/etc/modprobe.d/nobeep.conf.j2           its template
 dotfiles/platforms/arch/features/pkgfile.py    Pkgfile: timer, first download
+dotfiles/platforms/linux/features/git.py       Git: our gitconfig, its include
+home/.config/git/dotfiles.gitconfig.j2         its template
 dotfiles/platforms/arch/features/zsh.py        Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
 home/.config/zsh/dotfiles.zsh.j2               its template
 dotfiles/platforms/arch/features/command_not_found.py  CommandNotFound: pkgfile's hook for zsh
@@ -332,6 +361,9 @@ tests/test_apply.py                            test_real_features_are_consistent
   second time; a driver in use is a notice.
 - pkgfile: the timer enabled and one download on the first apply,
   nothing once a database is there; a failed download is a notice.
+- git: `[user]` with both set, the include on top of an existing config,
+  nothing the second time; nothing set: no `[user]`, the config created
+  with the include alone.
 - zsh: one clone, the snippet with the plugins chosen, the source line on
   top of an existing `~/.zshrc` or alone in a new one, `chsh` and its
   notice; nothing the second time; a dry run clones nothing and leaves a

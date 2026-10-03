@@ -1,6 +1,6 @@
 extends = ["laptop"]
 
-[git]
+[features.git]
 name  = "Valentin Lukyanets"
 email = "valikluks95@gmail.com"
 

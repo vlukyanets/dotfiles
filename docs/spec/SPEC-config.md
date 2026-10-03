@@ -42,12 +42,12 @@ A profile or host file:
 ```toml
 extends = ["laptop"]           # optional; names of profiles or hosts, merged left to right
 
-[git]
-name  = "Valentin Lukyanets"
-email = "valikluks95@gmail.com"
-
 [features.reflector]           # a feature: its own table
 enabled = true
+
+[features.git]                 # enabled in a profile, set in the host
+name  = "Valentin Lukyanets"
+email = "valikluks95@gmail.com"
 
 [features.packaging.makepkg]   # settings may nest
 jobs = "50%"
@@ -55,7 +55,7 @@ jobs = "50%"
 
 Every feature is a table `features.<name>` with `enabled` (default
 `false`; none on a feature that always runs, `packaging`) and its
-settings; `git` is not a feature and stays at the top level.
+settings.
 
 Resolution for host `H`:
 
@@ -155,7 +155,7 @@ Output of `config` is TOML, the same shape as the input files. `--explain`
 prints one line per leaf, itself valid TOML:
 
 ```
-git.name = "Valentin Lukyanets"  # hosts/hyper.toml
+features.git.name = "Valentin Lukyanets"  # hosts/hyper.toml
 ```
 
 Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.

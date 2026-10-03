@@ -414,6 +414,34 @@ def test_command_not_found_writes_the_hook_zsh_sources(machine, capsys):
     assert machine.calls == []
 
 
+GIT_INCLUDE = "[include] path = dotfiles.gitconfig"
+
+
+def test_git_writes_ours_and_includes_it_on_top_once(machine, capsys):
+    config = home(".config/git/config")
+    config.parent.mkdir(parents=True)
+    config.write_text("[user]\n\temail = mine@example.org\n")
+    apply("git", defaults(git={"name": "Jane Doe", "email": "jane@example.org"}))
+    assert home(".config/git/dotfiles.gitconfig").read_text().splitlines()[3:] == [
+        "[user]",
+        '\tname = "Jane Doe"',
+        "\temail = jane@example.org",
+    ]
+    # At the top: the user's own settings come after, and override ours.
+    assert config.read_text() == f"{GIT_INCLUDE}\n[user]\n\temail = mine@example.org\n"
+    capsys.readouterr()
+    machine.calls.clear()
+    apply("git", defaults(git={"name": "Jane Doe", "email": "jane@example.org"}))
+    assert capsys.readouterr().out == ""
+    assert machine.calls == []
+
+
+def test_git_with_nothing_set_writes_no_user(machine):
+    apply("git")
+    assert "[user]" not in home(".config/git/dotfiles.gitconfig").read_text()
+    assert home(".config/git/config").read_text() == f"{GIT_INCLUDE}\n"
+
+
 THEME_REPO = "https://example.org/someone/mytheme.git"
 THEMED = {"theme": {"name": "mytheme/mytheme", "repo": THEME_REPO}}
 

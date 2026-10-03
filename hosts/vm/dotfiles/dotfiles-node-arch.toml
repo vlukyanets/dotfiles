@@ -1,6 +1,6 @@
 extends = ["vm"]
 
-[git]
+[features.git]
 name = "Dotfiles Node Arch"
 email = "no.email.arch@hosting.net"
 
