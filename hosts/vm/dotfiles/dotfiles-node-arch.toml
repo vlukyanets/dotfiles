@@ -38,3 +38,16 @@ plugins = ["git"]
 
 [features.zsh.theme]
 name = "agnoster"
+
+[features.fonts]
+enabled = true
+packages = ["noto-fonts-emoji"]
+nerd_fonts = ["JetBrainsMono"]
+
+[features.fonts.default]
+monospace = "JetBrainsMono Nerd Font"
+emoji = "Noto Color Emoji"
+
+[features.fonts.render]
+hinting = "slight"
+subpixel = "rgb"

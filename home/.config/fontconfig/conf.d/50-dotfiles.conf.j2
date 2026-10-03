@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<!-- Managed by dotfiles (features.fonts): edit
+     home/.config/fontconfig/conf.d/50-dotfiles.conf.j2 in the repo, not this file.
+     What is not set here stays fontconfig's own. -->
+<fontconfig>
+{% for generic, family in fonts.default.items() %}
+  <alias>
+    <family>{{ generic | replace("_", "-") }}</family>
+    <prefer><family>{{ family }}</family></prefer>
+  </alias>
+{% endfor %}
+{% if fonts.render %}
+  <match target="font">
+{% if fonts.render.antialias is defined %}
+    <edit name="antialias" mode="assign"><bool>{{ fonts.render.antialias | lower }}</bool></edit>
+{% endif %}
+{% if fonts.render.hinting is defined %}
+    <edit name="hinting" mode="assign"><bool>{{ (fonts.render.hinting != "none") | lower }}</bool></edit>
+{% if fonts.render.hinting != "none" %}
+    <edit name="hintstyle" mode="assign"><const>hint{{ fonts.render.hinting }}</const></edit>
+{% endif %}
+{% endif %}
+{% if fonts.render.subpixel is defined %}
+    <edit name="rgba" mode="assign"><const>{{ fonts.render.subpixel }}</const></edit>
+{% endif %}
+  </match>
+{% endif %}
+</fontconfig>
