@@ -294,6 +294,91 @@ def test_no_beep_driver_in_use_is_a_notice(machine, capsys):
     assert "pcspkr snd_pcsp in use: the PC speaker is silent after a reboot" in err
 
 
+NERD = "https://github.com/ryanoasis/nerd-fonts/releases/download"
+
+
+def nerd_calls(machine) -> list[list[str]]:
+    return [c[:2] for c in machine.calls if c[0] in ("curl", "tar", "fc-cache")]
+
+
+def test_fonts_downloads_each_nerd_font_once_and_caches(machine, capsys):
+    apply("fonts", defaults(fonts={"nerd_fonts": ["JetBrainsMono"]}))
+    fonts = home(".local/share/fonts/nerd-fonts")
+    curl = next(c for c in machine.calls if c[0] == "curl")
+    assert curl[-1] == f"{NERD}/v3.5.1/JetBrainsMono.tar.xz"
+    assert nerd_calls(machine) == [["curl", "-fsSL"], ["tar", "-xJf"], ["fc-cache", str(fonts)]]
+    assert (fonts / "JetBrainsMono/.version").read_text() == "v3.5.1\n"
+    assert "-> Nerd Font JetBrainsMono v3.5.1 into " in capsys.readouterr().out
+    machine.calls.clear()
+    apply("fonts", defaults(fonts={"nerd_fonts": ["JetBrainsMono"]}))
+    assert capsys.readouterr().out == ""
+    assert machine.calls == []
+
+
+def test_fonts_another_release_downloads_again(machine):
+    apply("fonts", defaults(fonts={"nerd_fonts": ["JetBrainsMono"]}))
+    machine.calls.clear()
+    apply("fonts", defaults(fonts={"nerd_fonts": ["JetBrainsMono"], "nerd_version": "v3.6.0"}))
+    assert next(c for c in machine.calls if c[0] == "curl")[-1].endswith(
+        "/v3.6.0/JetBrainsMono.tar.xz"
+    )
+
+
+def test_fonts_dry_run_downloads_nothing(machine, capsys):
+    engine.current().dry_run = True
+    apply("fonts", defaults(fonts={"nerd_fonts": ["FiraCode"]}))
+    assert nerd_calls(machine) == []
+    assert not home(".local/share/fonts").exists()
+    assert "-> Nerd Font FiraCode v3.5.1 into " in capsys.readouterr().out
+
+
+def test_fonts_packages():
+    cfg = defaults(fonts={"packages": ["noto-fonts-emoji"]})
+    fonts = classes(ArchLinuxOs)["fonts"](cfg["features"]["fonts"], None)
+    assert fonts.packages() == ["fontconfig", "noto-fonts-emoji"]
+    fonts.settings["nerd_fonts"] = ["FiraCode"]
+    assert fonts.packages() == ["fontconfig", "noto-fonts-emoji", "curl"]
+
+
+def fontconfig() -> list[str]:
+    text = home(".config/fontconfig/conf.d/50-dotfiles.conf").read_text()
+    return [line.strip() for line in text.split("<fontconfig>")[1].splitlines() if line.strip()]
+
+
+def test_fonts_writes_only_the_preferences_set(machine):
+    apply("fonts")
+    assert fontconfig() == ["</fontconfig>"]
+    apply(
+        "fonts",
+        defaults(
+            fonts={
+                "default": {"monospace": "JetBrainsMono Nerd Font", "sans_serif": "Noto Sans"},
+                "render": {"antialias": True, "hinting": "slight", "subpixel": "rgb"},
+            }
+        ),
+    )
+    assert fontconfig() == [
+        "<alias>",
+        "<family>monospace</family>",
+        "<prefer><family>JetBrainsMono Nerd Font</family></prefer>",
+        "</alias>",
+        "<alias>",
+        "<family>sans-serif</family>",
+        "<prefer><family>Noto Sans</family></prefer>",
+        "</alias>",
+        '<match target="font">',
+        '<edit name="antialias" mode="assign"><bool>true</bool></edit>',
+        '<edit name="hinting" mode="assign"><bool>true</bool></edit>',
+        '<edit name="hintstyle" mode="assign"><const>hintslight</const></edit>',
+        '<edit name="rgba" mode="assign"><const>rgb</const></edit>',
+        "</match>",
+        "</fontconfig>",
+    ]
+    apply("fonts", defaults(fonts={"render": {"hinting": "none"}}))
+    assert '<edit name="hinting" mode="assign"><bool>false</bool></edit>' in fontconfig()
+    assert not any("hintstyle" in line for line in fontconfig())
+
+
 def login_shell(monkeypatch, shell: str) -> None:
     """SHELL the login shell; /usr/bin/zsh there, and /bin a link to usr/bin, as on Arch."""
     me = SimpleNamespace(pw_name="u", pw_shell=shell)

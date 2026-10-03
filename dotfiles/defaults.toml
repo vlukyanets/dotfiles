@@ -48,6 +48,27 @@ on_boot_sec        = "15min"   # and OnBootSec
 [features.no_beep]
 enabled = false
 
+# fonts: font packages; Nerd Fonts from their GitHub release, each in
+# ~/.local/share/fonts/nerd-fonts/<name>, fc-cache after; and
+# ~/.config/fontconfig/conf.d/50-dotfiles.conf: the families preferred
+# and how glyphs are drawn. What is not set stays fontconfig's own.
+[features.fonts]
+enabled      = false
+packages     = []        # from the repositories, else the AUR, e.g. ["noto-fonts-emoji"]
+nerd_fonts   = []        # the release's archives, e.g. ["JetBrainsMono", "FiraCode"]
+nerd_version = "v3.5.1"  # their release; another downloads them again
+
+[features.fonts.default]  # the family preferred for each generic one
+# monospace  = "JetBrainsMono Nerd Font"
+# sans_serif = "Noto Sans"
+# serif      = "Noto Serif"
+# emoji      = "Noto Color Emoji"
+
+[features.fonts.render]
+# antialias = true        smoothed edges
+# hinting   = "slight"    none, slight, medium or full
+# subpixel  = "rgb"       the LCD's order: rgb, bgr, vrgb, vbgr or none (grayscale)
+
 # zsh: zsh the login shell (chsh), oh-my-zsh cloned into ~/.oh-my-zsh and
 # loaded by ~/.config/zsh/dotfiles.zsh, sourced from the top of ~/.zshrc;
 # the rest of ~/.zshrc stays the user's.
