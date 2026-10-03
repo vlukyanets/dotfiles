@@ -9,14 +9,12 @@ from typing import ClassVar
 
 from dotfiles.engine import die
 from dotfiles.feature import Feature
-from dotfiles.render import source, template
+from dotfiles.render import template
 from dotfiles.retry import retrying
 
 _OMZ = "https://github.com/ohmyzsh/ohmyzsh.git"
 _SNIPPET = "~/.config/zsh/dotfiles.zsh"
 _SOURCE = f"source {_SNIPPET}"
-_P10K = "~/.p10k.zsh"  # powerlevel10k's settings, made by `p10k configure`
-_ZSH = "/usr/bin/zsh"
 # zsh-completions is only its package: its functions are in zsh's fpath already.
 _EXTRAS = ("zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions")
 _NAME = r"[A-Za-z0-9._-]+"
@@ -32,6 +30,7 @@ class Zsh(Feature):
         ),
         "theme.repo": (lambda v: v == "" or re.fullmatch(r"https://\S+", v), "an https git URL"),
         "theme.branch": (lambda v: re.fullmatch(r"[A-Za-z0-9._/-]*", v), "a branch name"),
+        "shell": (lambda v: re.fullmatch(r"/\S+", v), "an absolute path, e.g. /usr/bin/zsh"),
         "plugins": (
             lambda v: all(re.fullmatch(_NAME, p) for p in v),
             "names of oh-my-zsh's plugins",
@@ -53,26 +52,29 @@ class Zsh(Feature):
         if not (omz / "oh-my-zsh.sh").is_file():
             self._clone(_OMZ, omz, "oh-my-zsh")
         theme = settings["theme"]
-        # powerlevel10k/powerlevel10k: the theme powerlevel10k of the clone powerlevel10k.
+        # oh-my-zsh's way for a theme of its own directory: ZSH_THEME=<dir>/<name> loads
+        # custom/themes/<dir>/<name>.zsh-theme.
         clone, slash, _ = theme["name"].partition("/")
         if theme["repo"]:
             if not slash:
-                die(f"zsh: theme {theme['name']} of a repo must be <dir>/<name>")
-            dst = omz / "custom/themes" / clone
+                die(f"theme {theme['name']} of a repo must be <dir>/<name>")
+            dst = omz / "custom" / "themes" / clone
             if not self._cloned(dst, theme["repo"], theme["branch"]):
                 self._clone(theme["repo"], dst, f"theme {clone}", theme["branch"])
-        p10k = clone == "powerlevel10k"
-        if p10k:
-            system.files.ensure(home / _P10K.removeprefix("~/"), source(_P10K))
-        text = template(_SNIPPET, zsh=settings, p10k=p10k)
+        text = template(_SNIPPET, zsh=settings)
         system.files.ensure(home / _SNIPPET.removeprefix("~/"), text)
         # At the top: the rest of ~/.zshrc stays the user's, and overrides ours.
         system.files.line(home / ".zshrc", f"^{re.escape(_SOURCE)}$", _SOURCE, before=".")
-        me = pwd.getpwuid(os.geteuid())
-        if Path(me.pw_shell).name != "zsh":  # /bin/zsh is /usr/bin/zsh too
+        shell, me = settings["shell"], pwd.getpwuid(os.geteuid())
+        # Its package is installed by now: a path that is not there is a typo. Before chsh, which
+        # a dry run skips.
+        if not os.access(system.files.path(shell), os.X_OK):
+            die(f"shell {shell} does not exist or is not executable")
+        real = [os.path.realpath(system.files.path(p)) for p in (me.pw_shell, shell)]
+        if real[0] != real[1]:  # /bin/zsh is /usr/bin/zsh where /bin links to usr/bin
             with system.shell.as_root():
-                system.shell.run("chsh", "-s", _ZSH, me.pw_name)
-            system.report.changed(f"login shell of {me.pw_name}: {_ZSH} (was {me.pw_shell})")
+                system.shell.run("chsh", "-s", shell, me.pw_name)
+            system.report.changed(f"login shell of {me.pw_name}: {shell} (was {me.pw_shell})")
             system.report.notice("zsh is the login shell — log out and back in for it")
 
     def _cloned(self, dst: Path, url: str, branch: str) -> bool:

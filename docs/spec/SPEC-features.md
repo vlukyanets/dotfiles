@@ -197,24 +197,29 @@ Every Linux (`platforms/linux/features/no_beep.py`), off by default, on in
 
 ## `zsh` — zsh and oh-my-zsh
 
-An example; by default `plugins` and `extras` are empty, `theme.name` is
-`robbyrussell`, `theme.repo` and `theme.branch` are empty.
+An example; by default `shell` is `/usr/bin/zsh`, `plugins` and `extras`
+are empty, `theme.name` is `robbyrussell`, `theme.repo` and `theme.branch`
+are empty.
 
 ```toml
 [features.zsh]
 enabled = true
+shell   = "/usr/bin/zsh"
 plugins = ["git"]
 extras  = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions"]
 
 [features.zsh.theme]
-name   = "powerlevel10k/powerlevel10k"
-repo   = "https://github.com/romkatv/powerlevel10k.git"
-branch = ""  # the repo's default
+name   = "mytheme/mytheme"                       # <dir>/<name>: a theme of the repo
+repo   = "https://example.org/someone/mytheme.git"
+branch = ""                                      # the repo's default
 ```
 
 Arch only (`platforms/arch/features/zsh.py`): the extras' paths are
-Arch's. Off by default, on in `profiles/base.toml`. Its packages are
-`zsh`, `git` and the extras; then `apply()`:
+Arch's. Off by default, on in `profiles/base.toml`. Of the user's files it
+writes two only: `~/.config/zsh/dotfiles.zsh`, and one line of
+`~/.zshrc`. Whatever a theme or a plugin needs besides, its own settings
+files included, the user sets up in `~/.zshrc`. Its packages are `zsh`,
+`git` and the extras; then `apply()`:
 
 - `~/.oh-my-zsh/oh-my-zsh.sh` missing: `git clone --depth 1` of oh-my-zsh
   there as the user, retried, a directory cut off halfway removed first.
@@ -224,15 +229,10 @@ Arch's. Off by default, on in `profiles/base.toml`. Its packages are
 - The theme: without `repo`, one of oh-my-zsh's own, nothing cloned. With
   `repo`, `name` is `<dir>/<name>` (else apply fails): the theme `<name>`
   of `repo` cloned the same way into `~/.oh-my-zsh/custom/themes/<dir>`
-  (`powerlevel10k/powerlevel10k`: the theme `powerlevel10k` of the clone
-  `powerlevel10k`), `--branch` when `branch` is set; cloned again in place
+  (oh-my-zsh loads `custom/themes/<dir>/<name>.zsh-theme` for
+  `ZSH_THEME=<dir>/<name>`), `--branch` when `branch` is set; cloned again in place
   of what is there whenever `git remote get-url origin` is not `repo`, or
   the branch checked out is not `branch`. Never pulled.
-- `<dir>` is `powerlevel10k`: `~/.p10k.zsh` written as it is from
-  `home/.p10k.zsh` (`render.source`, no Jinja: the file `p10k configure`
-  makes is full of `${#...}`), its instant prompt at the top of the
-  snippet and `source ~/.p10k.zsh` after oh-my-zsh. `p10k configure` on a
-  machine is undone by the next apply: its file goes into the repo.
 - `~/.config/zsh/dotfiles.zsh` from `home/.config/zsh/dotfiles.zsh.j2`:
   `ZSH`, `ZSH_THEME`, `plugins`, `source $ZSH/oh-my-zsh.sh`, then the
   extras' scripts, syntax highlighting last. zsh-completions is only its
@@ -240,10 +240,13 @@ Arch's. Off by default, on in `profiles/base.toml`. Its packages are
 - `source ~/.config/zsh/dotfiles.zsh` in `~/.zshrc`, at the top, so the
   rest of the file stays the user's and overrides ours; a missing
   `~/.zshrc` is created with that line alone.
-- A login shell other than zsh: `chsh -s /usr/bin/zsh` as root, and a
-  notice to log out and back in.
+- `shell` not an executable file: apply fails before `chsh`, in a dry run
+  too; zsh's package is installed by then, so it is a typo. A login shell
+  other than `shell`: `chsh -s <shell>` as root, and a notice to log out
+  and back in. Both paths are compared resolved, so
+  `/bin/zsh` is `/usr/bin/zsh` where `/bin` links to `/usr/bin`.
 
-`Zsh.rules`: `theme.name` one such name or two joined by `/`, each of
+`Zsh.rules`: `shell` an absolute path; `theme.name` one such name or two joined by `/`, each of
 `plugins` letters, digits, `.`, `_` and `-`; `theme.repo` empty or an
 `https://` URL; `theme.branch` empty or a branch name; `extras` names
 from the three above.
@@ -264,7 +267,6 @@ dotfiles/platforms/linux/features/no_beep.py   NoBeep: blacklist, unload
 system/etc/modprobe.d/nobeep.conf.j2           its template
 dotfiles/platforms/arch/features/zsh.py        Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
 home/.config/zsh/dotfiles.zsh.j2               its template
-home/.p10k.zsh                                 powerlevel10k's settings, copied as they are
 dotfiles/defaults.toml                         every feature and its settings
 tests/test_features.py                         each feature against a fake machine
 tests/test_apply.py                            test_real_features_are_consistent
@@ -298,10 +300,11 @@ tests/test_apply.py                            test_real_features_are_consistent
 - zsh: one clone, the snippet with the plugins chosen, the source line on
   top of an existing `~/.zshrc` or alone in a new one, `chsh` and its
   notice; nothing the second time; a dry run clones nothing and leaves a
-  half clone alone. powerlevel10k: its clone, `~/.p10k.zsh` the repo's,
-  the instant prompt before oh-my-zsh and the settings after; no p10k
-  otherwise. Another branch or origin cloned again, `--branch` passed; a
-  built-in theme clones nothing; a repo's theme without `<dir>/` fails.
+  half clone alone. A theme's repo cloned into `custom/themes/<dir>`, and
+  nothing written but the snippet and `~/.zshrc`'s line. Another branch or
+  origin cloned again, `--branch` passed; a built-in theme clones nothing;
+  a repo's theme without `<dir>/` fails. Another `shell` set: `chsh -s`
+  with it; one that is not there fails before `chsh`, in a dry run too.
 - `test_real_features_are_consistent`: every schema feature has a module
   and every module a schema table; paru alone requires others
   (packaging, rustup).

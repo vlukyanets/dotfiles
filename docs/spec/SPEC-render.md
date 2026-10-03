@@ -1,9 +1,7 @@
 # Spec: `render` — templates of the files features write
 
-Status: approved 2026-09-23; the unconditional `home/` deploy, `render`
-and `deploy` went on 2026-10-02, and `home/` came back the same day for
-the dotfile templates features name. Module of the [capability map](CAPABILITY-MAP.md); depends
-on `config`.
+Status: approved. Module of the [capability map](CAPABILITY-MAP.md);
+depends on `config`.
 
 ## Objective
 
@@ -50,10 +48,6 @@ under `home/`: `template("~/.config/zsh/dotfiles.zsh", zsh=...)` renders
 `Path.home() / ...` with `files.ensure`, as the user. Nothing reads
 `home/` but the features that name a template there.
 
-`render.source(dst)` gives a file of `system/` or `home/` as it is, no
-`.j2` and no Jinja: a generated file like `home/.p10k.zsh`, whose
-`${#...}` Jinja would read as its own.
-
 ## Project Structure
 
 ```
@@ -67,8 +61,7 @@ tests/test_render.py   templates in tmp_path; check on a copy of the real data
 
 - A template rendered with its context, a tag alone on its line gone; `fail()`
   and an undefined variable each an error naming the template and line.
-- `~/PATH` rendered from `home/PATH.j2`, its errors naming `home/`;
-  `source` returns a file as it is.
+- `~/PATH` rendered from `home/PATH.j2`, its errors naming `home/`.
 - `check` on a copy of the real hosts names a value its rule refuses.
 
 ## Boundaries
@@ -81,9 +74,9 @@ tests/test_render.py   templates in tmp_path; check on a copy of the real data
 
 1. Whitespace is handled once, by `trim_blocks` and `lstrip_blocks`, not
    with `{%-` on each tag: a template reads like the file it produces.
-2. **No unconditional dotfiles** (2026-10-02). `home/` was deployed on every
+2. **No unconditional dotfiles.** `home/` was deployed on every
    host before any feature ran, with its own manifest of modes and gates
    (`home.toml`) and its own commands (`render`, `deploy`). A dotfile is a
    feature's like any other file: the feature gates it, and the engine
    writes it. Its template is under `home/` again, but only as a template
-   a feature names (`zsh`, 2026-10-02).
+   a feature names (`zsh`).

@@ -1,8 +1,7 @@
 # Spec: `packages` — installing from the repositories and the AUR
 
-Status: approved 2026-09-24, narrowed 2026-09-28, the AUR back
-2026-10-02. Module of the
-[capability map](CAPABILITY-MAP.md); depends on `engine`.
+Status: approved. Module of the [capability map](CAPABILITY-MAP.md);
+depends on `engine`.
 
 ## Objective
 
@@ -147,11 +146,11 @@ tests/test_apply.py                    replaces reach install, only when somethi
 2. **A replaced package is named by the feature** that installs its
    replacement (`replaces()`) and removed with `pacman -Rdd` just before the
    install, rather than left to pacman's undocumented `--ask` answers.
-3. **No setup in the platform** (2026-09-28): pacman and makepkg are the
+3. **No setup in the platform.** pacman and makepkg are the
    `packaging` feature, the mirrorlist the `reflector` one; the AUR,
    paru and rustup went with the features that used them, and came back
    as the `paru` and `rustup` features.
-4. **The AUR without an AUR helper** (2026-10-02): makepkg builds as the
+4. **The AUR without an AUR helper.** makepkg builds as the
    user, the root process installs, so nothing but `pacman` asks for
    root and a password is asked at most once. paru, or `makepkg -si`,
    would call sudo themselves. A feature's AUR packages are built at its

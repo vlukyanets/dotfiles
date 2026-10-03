@@ -53,13 +53,15 @@ enabled = false
 # the rest of ~/.zshrc stays the user's.
 [features.zsh]
 enabled = false
-plugins = []  # oh-my-zsh's own plugins
-extras  = []  # from the repositories
+shell   = "/usr/bin/zsh"  # made the login shell by chsh; listed in /etc/shells
+plugins = []              # oh-my-zsh's own plugins
+extras  = []              # from the repositories
 
 # The theme: one of oh-my-zsh's own, without a repo; or <dir>/<name>, the
 # theme <name> of `repo` cloned into ~/.oh-my-zsh/custom/themes/<dir>, again
-# whenever its URL or branch differs. powerlevel10k also gets ~/.p10k.zsh
-# from home/.p10k.zsh.
+# whenever its URL or branch differs. Of the user's files zsh writes only
+# ~/.config/zsh/dotfiles.zsh and its line in ~/.zshrc: whatever a theme
+# needs besides is the user's, set up in ~/.zshrc.
 [features.zsh.theme]
 name   = "robbyrussell"
 repo   = ""  # an https git URL; empty: built in
