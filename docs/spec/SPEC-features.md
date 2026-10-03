@@ -8,7 +8,7 @@ depends on `packages` and `render`.
 Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
-`packaging`, `reflector`, `rustup`, `paru`, `no_beep` and `zsh`.
+`packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile` and `zsh`.
 
 ## Structure
 
@@ -195,6 +195,21 @@ Every Linux (`platforms/linux/features/no_beep.py`), off by default, on in
   It fails while a sound server holds `snd_pcsp`: a notice that the
   speaker is silent after a reboot.
 
+## `pkgfile` — which package has a file
+
+```toml
+[features.pkgfile]
+enabled = true
+```
+
+Arch only (`platforms/arch/features/pkgfile.py`), off by default, on in
+`profiles/base.toml`. No settings; its package is `pkgfile`; then `apply()`:
+
+- `ensure_service("pkgfile-update.timer")`: the database refreshed daily.
+- No `*.files` in `/var/cache/pkgfile`: `pkgfile --update` as root at
+  once, since until the timer's first run pkgfile finds nothing. A failed
+  download is a notice; the timer tries again.
+
 ## `zsh` — zsh and oh-my-zsh
 
 An example; by default `shell` is `/usr/bin/zsh`, `plugins` and `extras`
@@ -265,6 +280,7 @@ dotfiles/platforms/arch/features/rustup.py     Rustup: rustup for rust, its defa
 dotfiles/platforms/arch/features/paru.py       Paru: built from the AUR while it does not run
 dotfiles/platforms/linux/features/no_beep.py   NoBeep: blacklist, unload
 system/etc/modprobe.d/nobeep.conf.j2           its template
+dotfiles/platforms/arch/features/pkgfile.py    Pkgfile: timer, first download
 dotfiles/platforms/arch/features/zsh.py        Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
 home/.config/zsh/dotfiles.zsh.j2               its template
 dotfiles/defaults.toml                         every feature and its settings
@@ -297,6 +313,8 @@ tests/test_apply.py                            test_real_features_are_consistent
   a dry run only checks.
 - no_beep: the blacklist, a loaded driver unloaded once, nothing the
   second time; a driver in use is a notice.
+- pkgfile: the timer enabled and one download on the first apply,
+  nothing once a database is there; a failed download is a notice.
 - zsh: one clone, the snippet with the plugins chosen, the source line on
   top of an existing `~/.zshrc` or alone in a new one, `chsh` and its
   notice; nothing the second time; a dry run clones nothing and leaves a

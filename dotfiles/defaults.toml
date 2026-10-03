@@ -48,6 +48,12 @@ on_boot_sec        = "15min"   # and OnBootSec
 [features.no_beep]
 enabled = false
 
+# pkgfile: `pkgfile <command>` names the package with the file, from a
+# database pkgfile-update.timer refreshes daily, downloaded at once while
+# there is none.
+[features.pkgfile]
+enabled = false
+
 # zsh: zsh the login shell (chsh), oh-my-zsh cloned into ~/.oh-my-zsh and
 # loaded by ~/.config/zsh/dotfiles.zsh, sourced from the top of ~/.zshrc;
 # the rest of ~/.zshrc stays the user's.
