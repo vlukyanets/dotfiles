@@ -8,7 +8,7 @@ depends on `packages` and `render`.
 Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
-`packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile` and `zsh`.
+`packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile`, `zsh` and `command_not_found`.
 
 ## Structure
 
@@ -250,7 +250,8 @@ files included, the user sets up in `~/.zshrc`. Its packages are `zsh`,
   the branch checked out is not `branch`. Never pulled.
 - `~/.config/zsh/dotfiles.zsh` from `home/.config/zsh/dotfiles.zsh.j2`:
   `ZSH`, `ZSH_THEME`, `plugins`, `source $ZSH/oh-my-zsh.sh`, then the
-  extras' scripts, syntax highlighting last. zsh-completions is only its
+  extras' scripts, every `~/.config/zsh/dotfiles.d/*.zsh` (other
+  features' hooks), syntax highlighting last. zsh-completions is only its
   package: its functions are in zsh's `fpath` already.
 - `source ~/.config/zsh/dotfiles.zsh` in `~/.zshrc`, at the top, so the
   rest of the file stays the user's and overrides ours; a missing
@@ -265,6 +266,20 @@ files included, the user sets up in `~/.zshrc`. Its packages are `zsh`,
 `plugins` letters, digits, `.`, `_` and `-`; `theme.repo` empty or an
 `https://` URL; `theme.branch` empty or a branch name; `extras` names
 from the three above.
+
+## `command_not_found` — the package of a missing command
+
+```toml
+[features.command_not_found]
+enabled = true
+```
+
+Arch only (`platforms/arch/features/command_not_found.py`), off by
+default, on in `profiles/base.toml`. Requires `pkgfile`, whose database and
+handler it uses, and `zsh`, whose snippet loads it. No settings, no
+packages: `apply()` writes `~/.config/zsh/dotfiles.d/command-not-found.zsh`,
+which sources `/usr/share/doc/pkgfile/command-not-found.zsh`. A command
+zsh does not find then prints the packages that have it.
 
 ## Project Structure
 
@@ -283,6 +298,8 @@ system/etc/modprobe.d/nobeep.conf.j2           its template
 dotfiles/platforms/arch/features/pkgfile.py    Pkgfile: timer, first download
 dotfiles/platforms/arch/features/zsh.py        Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
 home/.config/zsh/dotfiles.zsh.j2               its template
+dotfiles/platforms/arch/features/command_not_found.py  CommandNotFound: pkgfile's hook for zsh
+home/.config/zsh/dotfiles.d/command-not-found.zsh.j2  its template
 dotfiles/defaults.toml                         every feature and its settings
 tests/test_features.py                         each feature against a fake machine
 tests/test_apply.py                            test_real_features_are_consistent
@@ -323,9 +340,11 @@ tests/test_apply.py                            test_real_features_are_consistent
   origin cloned again, `--branch` passed; a built-in theme clones nothing;
   a repo's theme without `<dir>/` fails. Another `shell` set: `chsh -s`
   with it; one that is not there fails before `chsh`, in a dry run too.
+- command_not_found: the hook sourcing pkgfile's handler, nothing the
+  second time.
 - `test_real_features_are_consistent`: every schema feature has a module
-  and every module a schema table; paru alone requires others
-  (packaging, rustup).
+  and every module a schema table; only paru (packaging, rustup) and
+  command_not_found (pkgfile, zsh) require others.
 
 ## Boundaries
 
@@ -348,3 +367,6 @@ tests/test_apply.py                            test_real_features_are_consistent
    without a value and `false` could not turn one off anyway.
 4. **`jobs` has no shell expressions** (`"$(nproc)"`): a number or a
    percent, resolved at the apply.
+5. **Another feature's zsh hook is a file of `~/.config/zsh/dotfiles.d`**,
+   which zsh's snippet sources: a feature gets only its own settings, so
+   it cannot add to zsh's template, and zsh need not know who adds what.
