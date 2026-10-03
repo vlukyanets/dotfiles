@@ -54,6 +54,12 @@ enabled = false
 [features.pkgfile]
 enabled = false
 
+# command_not_found: a command zsh does not find names the package that
+# has it, from pkgfile's handler in ~/.config/zsh/dotfiles.d, which zsh's
+# snippet sources. Requires pkgfile and zsh.
+[features.command_not_found]
+enabled = false
+
 # zsh: zsh the login shell (chsh), oh-my-zsh cloned into ~/.oh-my-zsh and
 # loaded by ~/.config/zsh/dotfiles.zsh, sourced from the top of ~/.zshrc;
 # the rest of ~/.zshrc stays the user's.

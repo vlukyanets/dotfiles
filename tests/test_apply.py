@@ -498,7 +498,8 @@ def test_real_features_are_consistent():
     missing = set(cfg["features"]) - set(found)
     assert not missing, f"features without a module: {sorted(missing)}"
     assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {
-        "paru": ["packaging", "rustup"]
+        "command_not_found": ["pkgfile", "zsh"],
+        "paru": ["packaging", "rustup"],
     }
 
 
