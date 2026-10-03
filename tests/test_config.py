@@ -252,7 +252,7 @@ def test_real_profiles():
         "profiles/server.toml",
         "hosts/echo-server.toml",
     ]
-    assert resolve("echo-server")["git"]["name"] == "Valentin Lukyanets"
+    assert resolve("echo-server")["features"]["git"]["name"] == "Valentin Lukyanets"
 
 
 def test_check_reports_every_broken_host(root):

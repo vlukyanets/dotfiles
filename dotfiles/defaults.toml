@@ -8,10 +8,6 @@
 # `docker.enabled = false`; one with settings has its own [features.<name>]
 # table.
 
-[git]
-name  = ""
-email = ""
-
 # packaging: drop-ins in /etc/pacman.conf.d and /etc/makepkg.conf.d. No
 # `enabled`: pacman itself is always there, so it always runs on Arch.
 # Its keys but contrib have no default (their types are Packaging.types):
@@ -47,6 +43,14 @@ on_boot_sec        = "15min"   # and OnBootSec
 # /etc/modprobe.d/nobeep.conf, and unloaded when loaded.
 [features.no_beep]
 enabled = false
+
+# git: user.name and user.email in ~/.config/git/dotfiles.gitconfig,
+# included from the top of ~/.config/git/config; the rest of the config,
+# and ~/.gitconfig, stay the user's and override it. Empty: not written.
+[features.git]
+enabled = false
+name    = ""
+email   = ""
 
 # zsh: zsh the login shell (chsh), oh-my-zsh cloned into ~/.oh-my-zsh and
 # loaded by ~/.config/zsh/dotfiles.zsh, sourced from the top of ~/.zshrc;
