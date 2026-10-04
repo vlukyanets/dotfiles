@@ -16,6 +16,7 @@ from dotfiles.platforms import discovery
 from dotfiles.platforms.arch import ArchLinuxOs
 from dotfiles.platforms.debian import DebianOs
 from dotfiles.platforms.discovery import detect
+from dotfiles.platforms.void import VoidOs
 
 
 @pytest.fixture
@@ -358,6 +359,8 @@ def test_detect(monkeypatch):
     assert type(detect(engine.current())) is DebianOs
     release(ID="linuxmint", ID_LIKE="ubuntu debian")
     assert type(detect(engine.current())) is DebianOs
+    release(ID="void")
+    assert type(detect(engine.current())) is VoidOs
     release(ID="rocky", ID_LIKE="rhel centos fedora")
     with pytest.raises(ConfigError, match="^no platform for rocky or rhel or centos or fedora$"):
         detect(engine.current())
@@ -431,3 +434,43 @@ def test_debian_depends_walks_the_graph(fake, debian):
         "nope": set(),
     }
     assert debian.manager.depends(["zsh"])["zsh"] >= {"libgcc-s1", "zsh-common"}
+
+
+@pytest.fixture
+def void() -> VoidOs:
+    return VoidOs(engine.current())
+
+
+def test_void_missing(fake, void):
+    fake.answers[("xbps-query", "-l")] = (
+        0,
+        "ii zsh-5.9.2_1   Z shell\nii python3-Jinja2-3.1.6_2   Jinja\nuu curl-8.22.0_1   half\n",
+    )
+    assert void.manager.missing(["zsh", "python3-Jinja2", "curl", "git"]) == ["curl", "git"]
+    assert void.manager.missing([]) == []
+
+
+def test_void_install_syncs_then_installs_in_one_transaction_as_root(fake, void, monkeypatch):
+    monkeypatch.setenv("SUDO_CMD", "sudo")
+    for name in ("zsh", "git"):
+        fake.answers[("xbps-query", "-R", "-p", "pkgver", name)] = (0, f"{name}-1.0_1")
+    fake.answers[("xbps-query", "-l")] = (0, "ii rustup-1.29.1_1   rustup\n")
+    assert void.manager.install(["zsh", "git", "nope"], ["rustup", "rust"]) == ["nope"]
+    assert [c for c in fake.calls if c[0] == "sudo"] == [
+        ["sudo", "xbps-install", "-S"],
+        ["sudo", "xbps-remove", "-y", "rustup"],
+        ["sudo", "xbps-install", "-y", "-D", "zsh", "git"],
+        ["sudo", "xbps-install", "-y", "zsh", "git"],
+    ]
+
+
+def test_void_depends_walks_the_graph(fake, void):
+    fake.answers[("xbps-query", "-R", "-x", "zsh")] = (0, "glibc>=2.41_1\nncurses-libs>=5.8_1\n")
+    fake.answers[("xbps-query", "-R", "-x", "ncurses-libs")] = (0, "ncurses-base-6.5_1\n")
+    assert void.manager.direct(["zsh", "nope"]) == {"zsh": {"glibc", "ncurses-libs"}, "nope": set()}
+    assert void.manager.depends(["zsh"])["zsh"] == {"glibc", "ncurses-libs", "ncurses-base"}
+
+
+def test_void_has_no_systemd(void):
+    with pytest.raises(Failed, match="^reflector.timer: Void has runit, not systemd$"):
+        void.ensure_service("reflector.timer")

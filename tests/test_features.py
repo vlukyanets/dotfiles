@@ -13,6 +13,7 @@ from dotfiles.platforms.arch import ArchLinuxOs
 from dotfiles.platforms.arch._pacman import Pacman
 from dotfiles.platforms.arch.features.packaging import _jobs
 from dotfiles.platforms.debian import DebianOs
+from dotfiles.platforms.void import VoidOs
 
 
 def defaults(**features) -> dict:
@@ -267,6 +268,23 @@ def test_rustup_switches_to_another_toolchain(machine, capsys):
     machine.calls.clear()
     apply("rustup", defaults(rustup={"toolchain": "nightly"}))
     assert machine.calls[-1] == ["rustup", "default", "nightly"]
+
+
+def test_rustup_on_void_runs_rustup_init_once_then_its_rustup(machine, capsys):
+    cfg = defaults(rustup={"toolchain": "beta"})
+    rustup = home(".cargo/bin/rustup")  # under the sysroot; it runs as str(real)
+    real = Path.home() / ".cargo/bin/rustup"
+    classes(VoidOs)["rustup"](cfg["features"]["rustup"], VoidOs(engine.current())).apply()
+    assert machine.calls[0] == ["rustup-init", "-y", "--default-toolchain", "beta"]
+    assert "-> rustup installed by rustup-init, default beta\n" in capsys.readouterr().out
+    rustup.parent.mkdir(parents=True)
+    rustup.touch(mode=0o755)
+    machine.answers[(str(real), "default")] = (0, "beta-x86_64-unknown-linux-gnu (default)")
+    machine.answers[(str(real), "show")] = RUSTUP_SHOW
+    machine.calls.clear()
+    classes(VoidOs)["rustup"](cfg["features"]["rustup"], VoidOs(engine.current())).apply()
+    assert [c[0] for c in machine.calls] == [str(real), str(real)]
+    assert capsys.readouterr().out == ""
 
 
 UNLOAD = ["modprobe", "-r", "pcspkr"]
