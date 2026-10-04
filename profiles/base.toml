@@ -21,3 +21,6 @@ enabled = true
 
 [features.command_not_found]
 enabled = true
+
+[features.git]
+enabled = true
