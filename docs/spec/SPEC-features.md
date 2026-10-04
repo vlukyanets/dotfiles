@@ -152,7 +152,12 @@ Every Linux (`platforms/linux/features/rustup.py`), off by default, on in
 `profiles/base.toml`. Its package is `rustup`; on Arch
 (`platforms/arch/features/rustup.py`, a subclass) it replaces `rust`,
 which conflicts with it, and on Debian apt removes `rustc` and `cargo`
-itself; then `rustup default TOOLCHAIN`, retried, which
+itself. Void's package has only `rustup-init`
+(`platforms/void/features/rustup.py`, a subclass): while
+`~/.cargo/bin/rustup` is not there, `rustup-init -y --default-toolchain
+TOOLCHAIN`, retried, which installs it, the toolchain, and `~/.cargo/bin`
+on the PATH of `~/.profile` and the shells' rc files; the checks after run
+that rustup by its path, not yet on this process's PATH. Then `rustup default TOOLCHAIN`, retried, which
 downloads it when missing: cargo runs only with a default toolchain. Not
 while it is the default already: `rustup default` prints it with the host
 (`stable-x86_64-unknown-linux-gnu`), taken from `Default host:` of
@@ -381,6 +386,7 @@ system/etc/xdg/reflector/reflector.conf.j2     its templates
 system/etc/systemd/system/reflector.timer.d/override.conf.j2
 dotfiles/platforms/linux/features/rustup.py    Rustup: rustup, its default toolchain
 dotfiles/platforms/arch/features/rustup.py     Rustup: Linux's, in place of rust
+dotfiles/platforms/void/features/rustup.py     Rustup: rustup-init first, then Linux's
 dotfiles/platforms/arch/features/paru.py       Paru: built from the AUR while it does not run
 dotfiles/platforms/linux/features/no_beep.py   NoBeep: blacklist, unload
 system/etc/modprobe.d/nobeep.conf.j2           its template
@@ -418,6 +424,8 @@ tests/test_apply.py                            test_real_features_are_consistent
   the timer enabled and one refresh on the first apply, nothing on the
   second; a changed setting refreshes without a reload; a failed refresh
   is a notice.
+- rustup on Void: `rustup-init` once, then `~/.cargo/bin/rustup` checked
+  by its path, nothing the second time.
 - rustup: `default stable` once, nothing while it is the default; another
   toolchain switched to, a dated nightly not taken for `nightly`.
 - paru: built from the AUR while `paru --version` fails, not once it runs;

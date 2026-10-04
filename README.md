@@ -1,17 +1,20 @@
 # dotfiles
 
-Takes an Arch Linux or Debian machine from a fresh install to a
-configured one. A machine is a short TOML file that inherits from
+Takes an Arch Linux, Debian or Void Linux machine from a fresh install
+to a configured one. A machine is a short TOML file that inherits from
 profiles; features are Python classes that check the live system and
 change only what differs, writing files from Jinja2 templates. Work in
 progress: today it resolves host configuration and runs `dotfiles apply`
-on Arch and Debian: packages from the repositories and every feature of
-`dotfiles/defaults.toml`, one module each per platform in
-`dotfiles/platforms/<name>/features/`. Today there
-are `packaging` (pacman and makepkg drop-ins), `reflector` (the
-mirrorlist on a timer) and `paru` (the AUR helper) on Arch, and on both
-`rustup` (cargo and rustc), `no_beep` (no PC speaker) and `zsh` (zsh with
-oh-my-zsh, the login shell). See the [capability map](docs/spec/CAPABILITY-MAP.md).
+on Arch, Debian and Void: packages from the repositories and every
+feature of `dotfiles/defaults.toml`, one module each per platform in
+`dotfiles/platforms/<name>/features/`. Today there are `packaging`
+(pacman and makepkg drop-ins), `reflector` (the mirrorlist on a timer),
+`paru` (the AUR helper), `pkgfile` (which package has a file),
+`command_not_found` (its hook in zsh) and `fonts` (fonts and fontconfig)
+on Arch, and on all `rustup` (cargo and rustc), `no_beep` (no PC
+speaker), `git` (the user's name and email) and `zsh` (zsh with
+oh-my-zsh, the login shell). See the
+[capability map](docs/spec/CAPABILITY-MAP.md).
 
 ## How a host is described
 

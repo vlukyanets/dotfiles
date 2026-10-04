@@ -52,12 +52,15 @@ dotfiles/platforms/arch/features/      Arch's features, one per file
 dotfiles/platforms/debian/_os.py       DebianOs(LinuxOs), id "debian", with Apt
 dotfiles/platforms/debian/_apt.py      Apt(PackageManager)
 dotfiles/platforms/debian/features/    Debian's features, one per file
+dotfiles/platforms/void/_os.py         VoidOs(LinuxOs), id "void", with Xbps; runit, not systemd
+dotfiles/platforms/void/_xbps.py       Xbps(PackageManager)
+dotfiles/platforms/void/features/      Void's features, one per file
 dotfiles/feature.py                    Feature; classes(platform), every(), checks()
 dotfiles/plan.py                       Step, steps(), requirements(), order(), cycles()
 dotfiles/apply.py                      the runner, check()
 dotfiles/errors.py                     ConfigError, raised by every layer
 tests/test_engine.py                   Shell, Files, Report, retries
-tests/test_platforms.py                LinuxOs, Pacman and Apt against a fake shell
+tests/test_platforms.py                LinuxOs, Pacman, Apt and Xbps against a fake shell
 tests/test_apply.py                    plan and runner with a fake platform and fake features
 ```
 
@@ -282,6 +285,26 @@ root. A name without a candidate in `apt-cache policy` is left for
 every alternative of a dependency and a virtual package by its name; the
 graph only orders the features, so a dependency too many costs nothing.
 
+```python
+class Xbps(PackageManager):  # void/_xbps.py
+    ...  # missing: xbps-query -l; install: -S, xbps-remove, -R -p pkgver, -y -D, -y;
+    # direct: xbps-query -R -x, one call per name; upgrade: -Syu -D, -yu
+
+
+class VoidOs(LinuxOs):  # void/_os.py
+    id = "void"
+    manager_class = Xbps
+
+    def ensure_service(self, unit, user=False): ...  # fails: runit, not systemd
+```
+
+`Xbps` syncs the repositories (`xbps-install -S`) first in `install()`, as
+`Apt` updates. A dependency is a pattern (`glibc>=2.41_1`) or a pkgver
+(`zsh-5.9.2_1`); its name is what comes before the operator or the
+version. Void runs no systemd, so `VoidOs.ensure_service` fails naming the
+unit: a feature that needs a service gets a Void module, with runit's
+`/etc/sv` and `/var/service`, when one is wanted there.
+
 - `detect(machine)` reads `/etc/os-release`: the platform is the
   concrete `OperatingSystem` subclass whose `id` is ID, else the first of
   ID_LIKE that one has (`cachyos` → `arch`), instantiated with
@@ -494,8 +517,11 @@ class Locale(Feature):  # platforms/linux/features/locale.py: glibc is always th
   `dpkg-query` / `apt-cache` output: not installed and config-files are
   missing, update then one download and one install as root, what has no
   candidate left, a replaced package removed, the graph through
-  Pre-Depends, alternatives and virtual names. `detect()` against fake
-  os-release files: ID, ID_LIKE (Mint is Debian), none.
+  Pre-Depends, alternatives and virtual names. `Xbps` against canned
+  `xbps-query` output: only `ii` installed, sync, removal, one download
+  and one install as root, the graph through patterns and pkgvers;
+  `ensure_service` fails on Void. `detect()` against fake os-release
+  files: ID, ID_LIKE (Mint is Debian), Void, none.
 - Features: a platform's own module of a name wins over its base's, the
   base's runs where the platform has none; the feature reaches the
   platform as `system`; a module without the class of its name → an error.
