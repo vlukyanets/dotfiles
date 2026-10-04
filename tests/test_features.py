@@ -355,6 +355,8 @@ def test_zsh_clones_writes_sources_and_switches_once(machine, monkeypatch, capsy
         'ZSH_THEME="robbyrussell"',
         "plugins=(git sudo)",
         'source "$ZSH/oh-my-zsh.sh"',
+        "# What other features add, e.g. command_not_found's hook.",
+        'for f in ~/.config/zsh/dotfiles.d/*.zsh(N); do source "$f"; done',
         "# Last: it wraps the widgets defined before it.",
         "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh",
     ]
@@ -397,6 +399,19 @@ def test_zsh_creates_zshrc_with_the_source_line(machine, monkeypatch):
     text = home(".config/zsh/dotfiles.zsh").read_text()
     # By default no plugin of oh-my-zsh's and no extra.
     assert "plugins=()\n" in text and "/usr/share/zsh/plugins" not in text
+
+
+def test_command_not_found_writes_the_hook_zsh_sources(machine, capsys):
+    apply("command_not_found")
+    hook = home(".config/zsh/dotfiles.d/command-not-found.zsh")
+    assert (
+        hook.read_text().splitlines()[-1] == "source /usr/share/doc/pkgfile/command-not-found.zsh"
+    )
+    capsys.readouterr()
+    machine.calls.clear()
+    apply("command_not_found")
+    assert capsys.readouterr().out == ""
+    assert machine.calls == []
 
 
 THEME_REPO = "https://example.org/someone/mytheme.git"
