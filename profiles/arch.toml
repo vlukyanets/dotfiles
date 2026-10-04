@@ -6,3 +6,9 @@ enabled = true
 
 [features.paru]
 enabled = true
+
+[features.pkgfile]
+enabled = true
+
+[features.command_not_found]
+enabled = true

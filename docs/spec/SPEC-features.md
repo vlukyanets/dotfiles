@@ -206,7 +206,7 @@ enabled = true
 ```
 
 Arch only (`platforms/arch/features/pkgfile.py`), off by default, on in
-`profiles/base.toml`. No settings; its package is `pkgfile`; then `apply()`:
+`profiles/arch.toml`. No settings; its package is `pkgfile`; then `apply()`:
 
 - `ensure_service("pkgfile-update.timer")`: the database refreshed daily.
 - No `*.files` in `/var/cache/pkgfile`: `pkgfile --update` as root at
@@ -363,7 +363,7 @@ enabled = true
 ```
 
 Arch only (`platforms/arch/features/command_not_found.py`), off by
-default, on in `profiles/base.toml`. Requires `pkgfile`, whose database and
+default, on in `profiles/arch.toml`. Requires `pkgfile`, whose database and
 handler it uses, and `zsh`, whose snippet loads it. No settings, no
 packages: `apply()` writes `~/.config/zsh/dotfiles.d/command-not-found.zsh`,
 which sources `/usr/share/doc/pkgfile/command-not-found.zsh`. A command
