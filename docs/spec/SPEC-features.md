@@ -240,14 +240,17 @@ escaping; `email` empty or one `@` between non-blanks.
 ## `fonts` — fonts and fontconfig
 
 An example; by default `packages` and `nerd_fonts` are empty,
-`nerd_version` is `v3.5.1`, and `default` and `render` set nothing.
+`nerd_version` is `v3.5.1`, `nerd_url` is the GitHub release's
+`https://github.com/ryanoasis/nerd-fonts/releases/download/{version}/{name}.tar.xz`,
+and `default` and `render` set nothing.
 
 ```toml
 [features.fonts]
 enabled      = true
 packages     = ["noto-fonts-emoji"]
-nerd_fonts   = ["JetBrainsMono"]
+nerd_fonts   = ["JetBrainsMono"]        # on Arch, rather ttf-jetbrains-mono-nerd in packages
 nerd_version = "v3.5.1"
+nerd_url     = "https://mirror.example.org/nerd-fonts/{version}/{name}.tar.xz"
 
 [features.fonts.default]
 monospace = "JetBrainsMono Nerd Font"   # also sans_serif, serif, emoji
@@ -263,12 +266,16 @@ Arch only (`platforms/arch/features/fonts.py`): `packages` are Arch's
 names. Off by default. Its packages are `fontconfig`, `packages`, and
 `curl` when there are Nerd Fonts; then `apply()`:
 
-- Each of `nerd_fonts` whose `~/.local/share/fonts/nerd-fonts/<name>/.version`
-  is not `nerd_version`: `<name>.tar.xz` of that release of
-  ryanoasis/nerd-fonts downloaded with curl, retried, into that directory
-  in place of what is there, unpacked, and the release written to
-  `.version`. Another `nerd_version` downloads them again; a font taken
-  out of the list stays. A dry run downloads nothing.
+- Each of `nerd_fonts`: its URL is `nerd_url` with `{name}` the font and
+  `{version}` `nerd_version`. Unless
+  `~/.local/share/fonts/nerd-fonts/<name>/.source` holds that URL, the
+  archive is downloaded with curl, retried, into that directory in place
+  of what is there, unpacked by `tar -xf` (any compression tar knows),
+  and the URL written to `.source`. Another version or URL downloads it
+  again; a font taken out of the list stays. A dry run downloads nothing.
+  On Arch the Nerd Fonts are packages too (`ttf-jetbrains-mono-nerd`), so
+  pacman keeps them current; the download is for fonts or platforms
+  without one.
 - Any downloaded: `fc-cache` of `~/.local/share/fonts/nerd-fonts` as the
   user. The packages' fonts are cached by fontconfig's own pacman hook.
 - `~/.config/fontconfig/conf.d/50-dotfiles.conf` from its template under
@@ -280,7 +287,8 @@ names. Off by default. Its packages are `fontconfig`, `packages`, and
   `60-latin.conf` preferences, so ours come first.
 
 `Fonts.rules`: `packages` and `nerd_fonts` names, `nerd_version` a
-`vX.Y.Z` tag, the families without `<`, `>` or `&`, `hinting` and
+tag, `nerd_url` an `https://` URL with `{name}` and no placeholder but it
+and `{version}`, the families without `<`, `>` or `&`, `hinting` and
 `subpixel` from the names above; `Fonts.types` gives `default` and
 `render` their keys, none with a default.
 
@@ -414,7 +422,7 @@ tests/test_apply.py                            test_real_features_are_consistent
   nothing the second time; nothing set: no `[user]`, the config created
   with the include alone.
 - fonts: a Nerd Font downloaded, unpacked and cached once, again for
-  another release, not in a dry run; `curl` among the packages only with
+  another version or URL, not in a dry run; `curl` among the packages only with
   Nerd Fonts; the fontconfig file with only what is set, `hinting = none`
   without a `hintstyle`.
 - zsh: one clone, the snippet with the plugins chosen, the source line on

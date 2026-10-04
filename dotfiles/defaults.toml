@@ -64,7 +64,7 @@ enabled = false
 name    = ""
 email   = ""
 
-# fonts: font packages; Nerd Fonts from their GitHub release, each in
+# fonts: font packages; Nerd Fonts downloaded from nerd_url, each in
 # ~/.local/share/fonts/nerd-fonts/<name>, fc-cache after; and
 # ~/.config/fontconfig/conf.d/50-dotfiles.conf: the families preferred
 # and how glyphs are drawn. What is not set stays fontconfig's own.
@@ -72,7 +72,10 @@ email   = ""
 enabled      = false
 packages     = []        # from the repositories, else the AUR, e.g. ["noto-fonts-emoji"]
 nerd_fonts   = []        # the release's archives, e.g. ["JetBrainsMono", "FiraCode"]
-nerd_version = "v3.5.1"  # their release; another downloads them again
+nerd_version = "v3.5.1"  # their release
+# Where each comes from: {name} one of nerd_fonts, {version} nerd_version; a
+# tar archive, any compression. Another URL, or version, downloads them again.
+nerd_url     = "https://github.com/ryanoasis/nerd-fonts/releases/download/{version}/{name}.tar.xz"
 
 [features.fonts.default]  # the family preferred for each generic one
 # monospace  = "JetBrainsMono Nerd Font"

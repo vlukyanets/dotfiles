@@ -9,17 +9,16 @@ from dotfiles.feature import Feature
 from dotfiles.render import template
 from dotfiles.retry import retrying
 
-_RELEASE = "https://github.com/ryanoasis/nerd-fonts/releases/download"
 _NERD = ".local/share/fonts/nerd-fonts"
 _CONF = "~/.config/fontconfig/conf.d/50-dotfiles.conf"
-_STAMP = ".version"  # the release a font's directory holds
+_STAMP = ".source"  # the URL a font's directory holds
 _HINTING = ("none", "slight", "medium", "full")
 _SUBPIXEL = ("rgb", "bgr", "vrgb", "vbgr", "none")
 _FAMILY = (lambda v: re.fullmatch(r"[^<>&\n]+", v), "a font family, e.g. JetBrainsMono Nerd Font")
 
 
 class Fonts(Feature):
-    """The packages, each Nerd Font of the release once, and our fontconfig file."""
+    """The packages, each Nerd Font from its URL once, and our fontconfig file."""
 
     rules: ClassVar[dict[str, tuple]] = {
         "packages": (
@@ -30,9 +29,12 @@ class Fonts(Feature):
             lambda v: all(re.fullmatch(r"[A-Za-z0-9_-]+", f) for f in v),
             'names of the release\'s archives, e.g. "JetBrainsMono"',
         ),
-        "nerd_version": (
-            lambda v: re.fullmatch(r"v\d+\.\d+\.\d+", v),
-            'a release tag, e.g. "v3.5.1"',
+        "nerd_version": (lambda v: re.fullmatch(r"[A-Za-z0-9._-]+", v), 'a tag, e.g. "v3.5.1"'),
+        "nerd_url": (
+            lambda v: (
+                re.fullmatch(r"https://[^\s{}]*(\{(name|version)\}[^\s{}]*)*", v) and "{name}" in v
+            ),
+            "an https URL of a tar archive with {name}, and {version} if it has one",
         ),
         "default.monospace": _FAMILY,
         "default.sans_serif": _FAMILY,
@@ -58,36 +60,39 @@ class Fonts(Feature):
         return ["fontconfig", *self.settings["packages"], *curl]
 
     def apply(self) -> None:
-        """Each Nerd Font not of the release downloaded, fc-cache after; our fontconfig file."""
-        system, home = self.system, Path.home()
-        version = self.settings["nerd_version"]
+        """Each Nerd Font not from its URL downloaded, fc-cache after; our fontconfig file."""
+        system, home, settings = self.system, Path.home(), self.settings
         nerd = system.files.path(home / _NERD)
-        fresh = [n for n in self.settings["nerd_fonts"] if not _holds(nerd / n, version)]
+        urls = {
+            n: settings["nerd_url"].format(name=n, version=settings["nerd_version"])
+            for n in settings["nerd_fonts"]
+        }
+        fresh = [n for n, url in urls.items() if not _holds(nerd / n, url)]
         for name in fresh:
-            self._download(name, version, nerd / name)
+            self._download(name, urls[name], nerd / name)
         if fresh:  # the packages' fonts pacman's fontconfig hook caches itself
             system.shell.run("fc-cache", str(nerd))
         text = template(_CONF, fonts=self.settings)
         system.files.ensure(home / _CONF.removeprefix("~/"), text)
 
-    def _download(self, name: str, version: str, dst: Path) -> None:
-        """NAME's archive of VERSION unpacked into DST in place of what is there."""
+    def _download(self, name: str, url: str, dst: Path) -> None:
+        """NAME's archive at URL unpacked into DST in place of what is there."""
         system = self.system
         if not system.shell.dry_run:
-            archive = dst / f"{name}.tar.xz"
+            archive = dst / ".download"
             for attempt in retrying(system.report):
                 with attempt:
-                    shutil.rmtree(dst, ignore_errors=True)  # an older release, a half download
+                    shutil.rmtree(dst, ignore_errors=True)  # another source, a half download
                     dst.mkdir(parents=True)
-                    url = f"{_RELEASE}/{version}/{name}.tar.xz"
                     system.shell.run("curl", "-fsSL", "--output", str(archive), url)
-            system.shell.run("tar", "-xJf", str(archive), "-C", str(dst))
+            # No -J: tar finds the compression from the archive itself.
+            system.shell.run("tar", "-xf", str(archive), "-C", str(dst))
             archive.unlink(missing_ok=True)
-            (dst / _STAMP).write_text(f"{version}\n")
-        system.report.changed(f"Nerd Font {name} {version} into {dst}")
+            (dst / _STAMP).write_text(f"{url}\n")
+        system.report.changed(f"Nerd Font {name} from {url}")
 
 
-def _holds(dst: Path, version: str) -> bool:
-    """DST holds a Nerd Font of VERSION."""
+def _holds(dst: Path, url: str) -> bool:
+    """DST holds the font downloaded from URL."""
     stamp = dst / _STAMP
-    return stamp.is_file() and stamp.read_text().strip() == version
+    return stamp.is_file() and stamp.read_text().strip() == url

@@ -337,22 +337,24 @@ def test_fonts_downloads_each_nerd_font_once_and_caches(machine, capsys):
     fonts = home(".local/share/fonts/nerd-fonts")
     curl = next(c for c in machine.calls if c[0] == "curl")
     assert curl[-1] == f"{NERD}/v3.5.1/JetBrainsMono.tar.xz"
-    assert nerd_calls(machine) == [["curl", "-fsSL"], ["tar", "-xJf"], ["fc-cache", str(fonts)]]
-    assert (fonts / "JetBrainsMono/.version").read_text() == "v3.5.1\n"
-    assert "-> Nerd Font JetBrainsMono v3.5.1 into " in capsys.readouterr().out
+    assert nerd_calls(machine) == [["curl", "-fsSL"], ["tar", "-xf"], ["fc-cache", str(fonts)]]
+    assert (fonts / "JetBrainsMono/.source").read_text() == f"{curl[-1]}\n"
+    assert f"-> Nerd Font JetBrainsMono from {curl[-1]}\n" in capsys.readouterr().out
     machine.calls.clear()
     apply("fonts", defaults(fonts={"nerd_fonts": ["JetBrainsMono"]}))
     assert capsys.readouterr().out == ""
     assert machine.calls == []
 
 
-def test_fonts_another_release_downloads_again(machine):
+def test_fonts_another_release_or_url_downloads_again(machine):
     apply("fonts", defaults(fonts={"nerd_fonts": ["JetBrainsMono"]}))
-    machine.calls.clear()
-    apply("fonts", defaults(fonts={"nerd_fonts": ["JetBrainsMono"], "nerd_version": "v3.6.0"}))
-    assert next(c for c in machine.calls if c[0] == "curl")[-1].endswith(
-        "/v3.6.0/JetBrainsMono.tar.xz"
-    )
+    for changed, url in [
+        ({"nerd_version": "v3.6.0"}, f"{NERD}/v3.6.0/JetBrainsMono.tar.xz"),
+        ({"nerd_url": "https://example.org/{name}.zst"}, "https://example.org/JetBrainsMono.zst"),
+    ]:
+        machine.calls.clear()
+        apply("fonts", defaults(fonts={"nerd_fonts": ["JetBrainsMono"], **changed}))
+        assert next(c for c in machine.calls if c[0] == "curl")[-1] == url
 
 
 def test_fonts_dry_run_downloads_nothing(machine, capsys):
@@ -360,7 +362,7 @@ def test_fonts_dry_run_downloads_nothing(machine, capsys):
     apply("fonts", defaults(fonts={"nerd_fonts": ["FiraCode"]}))
     assert nerd_calls(machine) == []
     assert not home(".local/share/fonts").exists()
-    assert "-> Nerd Font FiraCode v3.5.1 into " in capsys.readouterr().out
+    assert f"-> Nerd Font FiraCode from {NERD}/v3.5.1/FiraCode.tar.xz\n" in capsys.readouterr().out
 
 
 def test_fonts_packages():

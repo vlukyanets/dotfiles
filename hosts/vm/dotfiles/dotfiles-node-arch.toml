@@ -41,8 +41,7 @@ name = "agnoster"
 
 [features.fonts]
 enabled = true
-packages = ["noto-fonts-emoji"]
-nerd_fonts = ["JetBrainsMono"]
+packages = ["ttf-jetbrains-mono-nerd", "noto-fonts-emoji"]
 
 [features.fonts.default]
 monospace = "JetBrainsMono Nerd Font"
