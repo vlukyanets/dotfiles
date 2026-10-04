@@ -8,8 +8,8 @@ depends on `packages` and `render`.
 Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
-`packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile`, `git`, `zsh` and
-`command_not_found`.
+`packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile`, `git`, `fonts`,
+`zsh` and `command_not_found`.
 
 ## Structure
 
@@ -237,6 +237,61 @@ Every Linux (`platforms/linux/features/git.py`), off by default, on in
 `Git.rules`: `name` without `"`, `\` or a newline, which would need
 escaping; `email` empty or one `@` between non-blanks.
 
+## `fonts` — fonts and fontconfig
+
+An example; by default `packages` and `nerd_fonts` are empty,
+`nerd_version` is `v3.5.1`, `nerd_url` is the GitHub release's
+`https://github.com/ryanoasis/nerd-fonts/releases/download/{version}/{name}.tar.xz`,
+and `default` and `render` set nothing.
+
+```toml
+[features.fonts]
+enabled      = true
+packages     = ["noto-fonts-emoji"]
+nerd_fonts   = ["JetBrainsMono"]        # on Arch, rather ttf-jetbrains-mono-nerd in packages
+nerd_version = "v3.5.1"
+nerd_url     = "https://mirror.example.org/nerd-fonts/{version}/{name}.tar.xz"
+
+[features.fonts.default]
+monospace = "JetBrainsMono Nerd Font"   # also sans_serif, serif, emoji
+emoji     = "Noto Color Emoji"
+
+[features.fonts.render]
+antialias = true
+hinting   = "slight"                    # none, slight, medium, full
+subpixel  = "rgb"                       # rgb, bgr, vrgb, vbgr, none
+```
+
+Arch only (`platforms/arch/features/fonts.py`): `packages` are Arch's
+names. Off by default. Its packages are `fontconfig`, `packages`, and
+`curl` when there are Nerd Fonts; then `apply()`:
+
+- Each of `nerd_fonts`: its URL is `nerd_url` with `{name}` the font and
+  `{version}` `nerd_version`. Unless
+  `~/.local/share/fonts/nerd-fonts/<name>/.source` holds that URL, the
+  archive is downloaded with curl, retried, into that directory in place
+  of what is there, unpacked by `tar -xf` (any compression tar knows),
+  and the URL written to `.source`. Another version or URL downloads it
+  again; a font taken out of the list stays. A dry run downloads nothing.
+  On Arch the Nerd Fonts are packages too (`ttf-jetbrains-mono-nerd`), so
+  pacman keeps them current; the download is for fonts or platforms
+  without one.
+- Any downloaded: `fc-cache` of `~/.local/share/fonts/nerd-fonts` as the
+  user. The packages' fonts are cached by fontconfig's own pacman hook.
+- `~/.config/fontconfig/conf.d/50-dotfiles.conf` from its template under
+  `home/`: an `<alias>` preferring each family of `default` for its generic
+  one (`sans_serif` is `sans-serif`), and one `<match target="font">`
+  with `antialias`, `hinting` (`none` turns it off, the others are its
+  `hintstyle`) and `subpixel` (`rgba`), each only when set. Fontconfig
+  reads `~/.config/fontconfig/conf.d` at `50-user.conf`, before its
+  `60-latin.conf` preferences, so ours come first.
+
+`Fonts.rules`: `packages` and `nerd_fonts` names, `nerd_version` a
+tag, `nerd_url` an `https://` URL with `{name}` and no placeholder but it
+and `{version}`, the families without `<`, `>` or `&`, `hinting` and
+`subpixel` from the names above; `Fonts.types` gives `default` and
+`render` their keys, none with a default.
+
 ## `zsh` — zsh and oh-my-zsh
 
 An example; by default `shell` is `/usr/bin/zsh`, `plugins` and `extras`
@@ -325,6 +380,8 @@ system/etc/modprobe.d/nobeep.conf.j2           its template
 dotfiles/platforms/arch/features/pkgfile.py    Pkgfile: timer, first download
 dotfiles/platforms/linux/features/git.py       Git: our gitconfig, its include
 home/.config/git/dotfiles.gitconfig.j2         its template
+dotfiles/platforms/arch/features/fonts.py      Fonts: Nerd Fonts, fc-cache, fontconfig
+home/.config/fontconfig/conf.d/50-dotfiles.conf.j2  its template
 dotfiles/platforms/arch/features/zsh.py        Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
 home/.config/zsh/dotfiles.zsh.j2               its template
 dotfiles/platforms/arch/features/command_not_found.py  CommandNotFound: pkgfile's hook for zsh
@@ -364,6 +421,10 @@ tests/test_apply.py                            test_real_features_are_consistent
 - git: `[user]` with both set, the include on top of an existing config,
   nothing the second time; nothing set: no `[user]`, the config created
   with the include alone.
+- fonts: a Nerd Font downloaded, unpacked and cached once, again for
+  another version or URL, not in a dry run; `curl` among the packages only with
+  Nerd Fonts; the fontconfig file with only what is set, `hinting = none`
+  without a `hintstyle`.
 - zsh: one clone, the snippet with the plugins chosen, the source line on
   top of an existing `~/.zshrc` or alone in a new one, `chsh` and its
   notice; nothing the second time; a dry run clones nothing and leaves a
