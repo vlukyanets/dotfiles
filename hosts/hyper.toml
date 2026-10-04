@@ -1,4 +1,4 @@
-extends = ["laptop"]
+extends = ["laptop", "arch"]
 
 [features.git]
 name  = "Valentin Lukyanets"

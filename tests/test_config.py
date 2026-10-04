@@ -245,6 +245,7 @@ def test_real_profiles():
     assert [w for w, _ in chain("hyper", Layout.root)] == [
         "profiles/base.toml",
         "profiles/laptop.toml",
+        "profiles/arch.toml",
         "hosts/hyper.toml",
     ]
     assert [w for w, _ in chain("echo-server", Layout.root)] == [

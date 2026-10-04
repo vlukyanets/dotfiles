@@ -6,11 +6,11 @@ ZSH_THEME="{{ zsh.theme.name }}"
 plugins=({{ zsh.plugins | join(" ") }})
 source "$ZSH/oh-my-zsh.sh"
 {% if "zsh-autosuggestions" in zsh.extras %}
-source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+source {{ extras_dir }}/zsh-autosuggestions/zsh-autosuggestions.zsh
 {% endif %}
 # What other features add, e.g. command_not_found's hook.
 for f in ~/.config/zsh/dotfiles.d/*.zsh(N); do source "$f"; done
 {% if "zsh-syntax-highlighting" in zsh.extras %}
 # Last: it wraps the widgets defined before it.
-source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+source {{ extras_dir }}/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 {% endif %}

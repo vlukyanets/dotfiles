@@ -1,4 +1,4 @@
-extends = ["vm"]
+extends = ["vm", "arch"]
 
 [features.git]
 name = "Dotfiles Node Arch"
