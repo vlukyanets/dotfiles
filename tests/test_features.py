@@ -12,6 +12,7 @@ from dotfiles.layout import Layout
 from dotfiles.platforms.arch import ArchLinuxOs
 from dotfiles.platforms.arch._pacman import Pacman
 from dotfiles.platforms.arch.features.packaging import _jobs
+from dotfiles.platforms.debian import DebianOs
 
 
 def defaults(**features) -> dict:
@@ -527,6 +528,21 @@ def test_git_with_nothing_set_writes_no_user(machine):
     apply("git")
     assert "[user]" not in home(".config/git/dotfiles.gitconfig").read_text()
     assert home(".config/git/config").read_text() == f"{GIT_INCLUDE}\n"
+
+
+def test_zsh_on_debian_sources_the_extras_from_debians_paths(machine, monkeypatch):
+    login_shell(monkeypatch, "/usr/bin/zsh")
+    cfg = defaults(zsh={"extras": ["zsh-autosuggestions", "zsh-syntax-highlighting"]})
+    classes(DebianOs)["zsh"](cfg["features"]["zsh"], DebianOs(engine.current())).apply()
+    sources = [
+        line
+        for line in home(".config/zsh/dotfiles.zsh").read_text().splitlines()
+        if line.startswith("source /")
+    ]
+    assert sources == [
+        "source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh",
+        "source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh",
+    ]
 
 
 THEME_REPO = "https://example.org/someone/mytheme.git"

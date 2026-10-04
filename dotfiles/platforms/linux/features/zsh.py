@@ -1,4 +1,4 @@
-"""zsh on Arch: oh-my-zsh in ~/.oh-my-zsh, loaded from the top of ~/.zshrc; zsh the login shell."""
+"""zsh on every Linux: oh-my-zsh in ~/.oh-my-zsh, loaded from the top of ~/.zshrc; zsh the login shell."""
 
 import os
 import pwd
@@ -22,6 +22,9 @@ _NAME = r"[A-Za-z0-9._-]+"
 
 class Zsh(Feature):
     """zsh, oh-my-zsh with its theme and plugins, the extras from the repositories."""
+
+    # Where the extras' packages put <extra>/<extra>.zsh: Arch's and Void's; Debian's differs.
+    extras_dir: ClassVar[str] = "/usr/share/zsh/plugins"
 
     rules: ClassVar[dict[str, tuple]] = {
         "theme.name": (
@@ -61,7 +64,7 @@ class Zsh(Feature):
             dst = omz / "custom" / "themes" / clone
             if not self._cloned(dst, theme["repo"], theme["branch"]):
                 self._clone(theme["repo"], dst, f"theme {clone}", theme["branch"])
-        text = template(_SNIPPET, zsh=settings)
+        text = template(_SNIPPET, zsh=settings, extras_dir=self.extras_dir)
         system.files.ensure(home / _SNIPPET.removeprefix("~/"), text)
         # At the top: the rest of ~/.zshrc stays the user's, and overrides ours.
         system.files.line(home / ".zshrc", f"^{re.escape(_SOURCE)}$", _SOURCE, before=".")

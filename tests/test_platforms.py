@@ -14,6 +14,7 @@ from dotfiles.engine import Failed
 from dotfiles.errors import ConfigError
 from dotfiles.platforms import discovery
 from dotfiles.platforms.arch import ArchLinuxOs
+from dotfiles.platforms.debian import DebianOs
 from dotfiles.platforms.discovery import detect
 
 
@@ -353,6 +354,80 @@ def test_detect(monkeypatch):
     release(ID="fedora")
     with pytest.raises(ConfigError, match="^no platform for fedora$"):
         detect(engine.current())
+    release(ID="debian")
+    assert type(detect(engine.current())) is DebianOs
     release(ID="linuxmint", ID_LIKE="ubuntu debian")
-    with pytest.raises(ConfigError, match="^no platform for linuxmint or ubuntu or debian$"):
+    assert type(detect(engine.current())) is DebianOs
+    release(ID="rocky", ID_LIKE="rhel centos fedora")
+    with pytest.raises(ConfigError, match="^no platform for rocky or rhel or centos or fedora$"):
         detect(engine.current())
+
+
+@pytest.fixture
+def debian(monkeypatch) -> DebianOs:
+    return DebianOs(engine.current())
+
+
+APT = ["apt-get", "-q", "-y"]
+DPKG = ["dpkg-query", "-W", "-f=${Package} ${db:Status-Status}\n"]
+
+
+def candidate(system, name: str, version: str = "1.0-1") -> None:
+    system.answers[("apt-cache", "policy", name)] = (0, f"{name}:\n  Candidate: {version}\n")
+
+
+def test_debian_missing(fake, debian):
+    fake.answers[(*DPKG, "zsh", "curl", "vim", "nope")] = (
+        1,
+        "zsh not-installed\ncurl installed\nvim config-files\n",
+    )
+    assert debian.manager.missing(["zsh", "curl", "vim", "nope"]) == ["zsh", "vim", "nope"]
+    assert debian.manager.missing([]) == []
+
+
+def test_debian_install_updates_then_installs_in_one_transaction_as_root(fake, debian, monkeypatch):
+    monkeypatch.setenv("SUDO_CMD", "sudo")
+    candidate(fake, "zsh")
+    candidate(fake, "tmux")
+    debian.manager.install(["zsh", "tmux"])
+    assert [c for c in fake.calls if c[0] == "sudo"] == [
+        ["sudo", *APT, "update"],
+        ["sudo", *APT, "install", "--download-only", "zsh", "tmux"],
+        ["sudo", *APT, "install", "zsh", "tmux"],
+    ]
+
+
+def test_debian_install_leaves_what_the_repositories_lack(fake, debian, monkeypatch):
+    monkeypatch.setenv("SUDO_CMD", "")
+    candidate(fake, "zsh")
+    candidate(fake, "zsh-completions", "(none)")
+    assert debian.manager.install(["zsh", "zsh-completions", "nope"]) == ["zsh-completions", "nope"]
+    assert fake.calls[-1] == [*APT, "install", "zsh"]
+
+
+def test_debian_install_removes_what_it_replaces(fake, debian, monkeypatch, capsys):
+    monkeypatch.setenv("SUDO_CMD", "")
+    fake.answers[(*DPKG, "rustc")] = (0, "rustc installed\n")
+    fake.answers[(*DPKG, "cargo")] = (1, "")
+    debian.manager.install([], ["rustc", "cargo"])
+    assert [c for c in fake.calls if c[0] == "apt-get"] == [
+        [*APT, "update"],
+        [*APT, "remove", "rustc"],
+    ]
+    assert capsys.readouterr().out == "-> removed rustc, its replacement follows\n"
+
+
+def test_debian_depends_walks_the_graph(fake, debian):
+    zsh = "zsh\n  Depends: zsh-common\n  PreDepends: libc6\n |Depends: mawk\n  Depends: <awk>\n"
+    fake.answers[("apt-cache", "depends", "-i", "zsh", "nope")] = (0, zsh)
+    fake.answers[("apt-cache", "depends", "-i", "zsh")] = (0, zsh)
+    fake.answers[("apt-cache", "depends", "-i", "awk", "libc6", "mawk", "zsh-common")] = (
+        0,
+        "libc6\n  Depends: libgcc-s1\nzsh-common\n",
+    )
+    fake.answers[("apt-cache", "depends", "-i", "libgcc-s1")] = (0, "libgcc-s1\n")
+    assert debian.manager.direct(["zsh", "nope"]) == {
+        "zsh": {"zsh-common", "libc6", "mawk", "awk"},
+        "nope": set(),
+    }
+    assert debian.manager.depends(["zsh"])["zsh"] >= {"libgcc-s1", "zsh-common"}

@@ -47,9 +47,11 @@ master and every PR; uv is pinned there by version and sha256.
   nothing with the others: its `OperatingSystem` subclass (`ArchLinuxOs`
   in `arch/_os.py`, with the os-release `id` it runs on, `detect` in
   `platforms/discovery.py` matches ID then ID_LIKE), its package manager
-  (`arch/_pacman.py`: `Pacman`) and its `features/`. The one base is
-  `linux/` (`LinuxOs`: systemd, sysctl, groups, gsettings, and features for
-  every Linux); a platform runs Linux's feature where it has none of that name.
+  (`arch/_pacman.py`: `Pacman`; `debian/_apt.py`: `Apt`) and its
+  `features/`. The one base is `linux/` (`LinuxOs`: systemd, sysctl,
+  groups, gsettings, and features for every Linux); a platform runs
+  Linux's feature where it has none of that name, or subclasses it to
+  change a detail (`debian/features/zsh.py`).
 - Features: `platforms/<name>/features/<feature>.py`, one `Feature`
   subclass each, named after the module (`packaging` → `Packaging`), built
   with its table `features.<feature>` as `self.settings` and the platform

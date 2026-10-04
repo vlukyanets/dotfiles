@@ -1,22 +1,23 @@
 # dotfiles
 
-Takes an Arch Linux machine from a fresh install to a configured one. A
-machine is a short TOML file that inherits from profiles; features are
-Python classes that check the live system and change only what differs,
-writing files from Jinja2 templates. Work in progress: today it resolves
-host configuration and runs `dotfiles apply` on Arch: packages from the
-repositories and every feature of `dotfiles/defaults.toml`, one module
-each per platform in `dotfiles/platforms/<name>/features/`. Today there
+Takes an Arch Linux or Debian machine from a fresh install to a
+configured one. A machine is a short TOML file that inherits from
+profiles; features are Python classes that check the live system and
+change only what differs, writing files from Jinja2 templates. Work in
+progress: today it resolves host configuration and runs `dotfiles apply`
+on Arch and Debian: packages from the repositories and every feature of
+`dotfiles/defaults.toml`, one module each per platform in
+`dotfiles/platforms/<name>/features/`. Today there
 are `packaging` (pacman and makepkg drop-ins), `reflector` (the
-mirrorlist on a timer), `rustup` (cargo and rustc), `paru` (the AUR
-helper), `no_beep` (no PC speaker) and `zsh` (zsh with oh-my-zsh, the
-login shell). See the [capability map](docs/spec/CAPABILITY-MAP.md).
+mirrorlist on a timer) and `paru` (the AUR helper) on Arch, and on both
+`rustup` (cargo and rustc), `no_beep` (no PC speaker) and `zsh` (zsh with
+oh-my-zsh, the login shell). See the [capability map](docs/spec/CAPABILITY-MAP.md).
 
 ## How a host is described
 
 ```
 dotfiles/defaults.toml  every key, its type and its default
-profiles/<name>.toml    base, server, laptop, vm
+profiles/<name>.toml    base, arch, server, laptop, vm
 hosts/<hostname>.toml   one file per machine
 ~/.config/dotfiles/config.toml
                         this machine's resolved config, written by `dotfiles init`

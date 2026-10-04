@@ -120,7 +120,7 @@ on_boot_sec        = "15min"
 ```
 
 Arch only (`platforms/arch/features/reflector.py`), off by default, on in
-`profiles/base.toml`. Its package is `reflector`; then `apply()`:
+`profiles/arch.toml`. Its package is `reflector`; then `apply()`:
 
 - `/etc/xdg/reflector/reflector.conf` (`root:root` 644), the arguments
   `reflector.service` reads, one per line: `--save /etc/pacman.d/mirrorlist`,
@@ -148,9 +148,11 @@ enabled   = true
 toolchain = "stable"  # beta, nightly, "1.85.0", "nightly-2026-09-01"
 ```
 
-Arch only (`platforms/arch/features/rustup.py`), off by default, on in
-`profiles/base.toml`. Its package is `rustup`, replacing `rust`, which
-conflicts with it; then `rustup default TOOLCHAIN`, retried, which
+Every Linux (`platforms/linux/features/rustup.py`), off by default, on in
+`profiles/base.toml`. Its package is `rustup`; on Arch
+(`platforms/arch/features/rustup.py`, a subclass) it replaces `rust`,
+which conflicts with it, and on Debian apt removes `rustc` and `cargo`
+itself; then `rustup default TOOLCHAIN`, retried, which
 downloads it when missing: cargo runs only with a default toolchain. Not
 while it is the default already: `rustup default` prints it with the host
 (`stable-x86_64-unknown-linux-gnu`), taken from `Default host:` of
@@ -167,7 +169,7 @@ enabled = true
 ```
 
 Arch only (`platforms/arch/features/paru.py`), off by default, on in
-`profiles/base.toml`. No settings, no packages: requires `packaging`, so
+`profiles/arch.toml`. No settings, no packages: requires `packaging`, so
 makepkg builds with its `MAKEFLAGS` and `OPTIONS`, and `rustup`, for
 cargo.
 
@@ -204,7 +206,7 @@ enabled = true
 ```
 
 Arch only (`platforms/arch/features/pkgfile.py`), off by default, on in
-`profiles/base.toml`. No settings; its package is `pkgfile`; then `apply()`:
+`profiles/arch.toml`. No settings; its package is `pkgfile`; then `apply()`:
 
 - `ensure_service("pkgfile-update.timer")`: the database refreshed daily.
 - No `*.files` in `/var/cache/pkgfile`: `pkgfile --update` as root at
@@ -311,12 +313,16 @@ repo   = "https://example.org/someone/mytheme.git"
 branch = ""                                      # the repo's default
 ```
 
-Arch only (`platforms/arch/features/zsh.py`): the extras' paths are
-Arch's. Off by default, on in `profiles/base.toml`. Of the user's files it
-writes two only: `~/.config/zsh/dotfiles.zsh`, and one line of
-`~/.zshrc`. Whatever a theme or a plugin needs besides, its own settings
-files included, the user sets up in `~/.zshrc`. Its packages are `zsh`,
-`git` and the extras; then `apply()`:
+Every Linux (`platforms/linux/features/zsh.py`): the extras' scripts are
+`<extras_dir>/<extra>/<extra>.zsh`, `extras_dir` being
+`/usr/share/zsh/plugins` (Arch, Void) or `/usr/share` on Debian
+(`platforms/debian/features/zsh.py`, a subclass); Debian has no
+zsh-completions, so asking for it there fails at the install. Off by
+default, on in `profiles/base.toml`. Of the user's files it writes two
+only: `~/.config/zsh/dotfiles.zsh`, and one line of `~/.zshrc`. Whatever
+a theme or a plugin needs besides, its own settings files included, the
+user sets up in `~/.zshrc`. Its packages are `zsh`, `git` and the
+extras; then `apply()`:
 
 - `~/.oh-my-zsh/oh-my-zsh.sh` missing: `git clone --depth 1` of oh-my-zsh
   there as the user, retried, a directory cut off halfway removed first.
@@ -357,7 +363,7 @@ enabled = true
 ```
 
 Arch only (`platforms/arch/features/command_not_found.py`), off by
-default, on in `profiles/base.toml`. Requires `pkgfile`, whose database and
+default, on in `profiles/arch.toml`. Requires `pkgfile`, whose database and
 handler it uses, and `zsh`, whose snippet loads it. No settings, no
 packages: `apply()` writes `~/.config/zsh/dotfiles.d/command-not-found.zsh`,
 which sources `/usr/share/doc/pkgfile/command-not-found.zsh`. A command
@@ -373,7 +379,8 @@ system/etc/makepkg.conf.d/dotfiles.conf.j2
 dotfiles/platforms/arch/features/reflector.py  Reflector: rules, config, timer, refresh
 system/etc/xdg/reflector/reflector.conf.j2     its templates
 system/etc/systemd/system/reflector.timer.d/override.conf.j2
-dotfiles/platforms/arch/features/rustup.py     Rustup: rustup for rust, its default toolchain
+dotfiles/platforms/linux/features/rustup.py    Rustup: rustup, its default toolchain
+dotfiles/platforms/arch/features/rustup.py     Rustup: Linux's, in place of rust
 dotfiles/platforms/arch/features/paru.py       Paru: built from the AUR while it does not run
 dotfiles/platforms/linux/features/no_beep.py   NoBeep: blacklist, unload
 system/etc/modprobe.d/nobeep.conf.j2           its template
@@ -382,7 +389,8 @@ dotfiles/platforms/linux/features/git.py       Git: our gitconfig, its include
 home/.config/git/dotfiles.gitconfig.j2         its template
 dotfiles/platforms/arch/features/fonts.py      Fonts: Nerd Fonts, fc-cache, fontconfig
 home/.config/fontconfig/conf.d/50-dotfiles.conf.j2  its template
-dotfiles/platforms/arch/features/zsh.py        Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
+dotfiles/platforms/linux/features/zsh.py       Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
+dotfiles/platforms/debian/features/zsh.py      Zsh: Linux's, with Debian's extras_dir
 home/.config/zsh/dotfiles.zsh.j2               its template
 dotfiles/platforms/arch/features/command_not_found.py  CommandNotFound: pkgfile's hook for zsh
 home/.config/zsh/dotfiles.d/command-not-found.zsh.j2  its template
@@ -433,6 +441,7 @@ tests/test_apply.py                            test_real_features_are_consistent
   origin cloned again, `--branch` passed; a built-in theme clones nothing;
   a repo's theme without `<dir>/` fails. Another `shell` set: `chsh -s`
   with it; one that is not there fails before `chsh`, in a dry run too.
+  On Debian the extras are sourced from `/usr/share/<extra>/`.
 - command_not_found: the hook sourcing pkgfile's handler, nothing the
   second time.
 - `test_real_features_are_consistent`: every schema feature has a module

@@ -49,12 +49,15 @@ dotfiles/platforms/linux/features/     features every Linux runs the same, the f
 dotfiles/platforms/arch/_os.py         ArchLinuxOs(LinuxOs), id "arch", with Pacman
 dotfiles/platforms/arch/_pacman.py     Pacman(PackageManager)
 dotfiles/platforms/arch/features/      Arch's features, one per file
+dotfiles/platforms/debian/_os.py       DebianOs(LinuxOs), id "debian", with Apt
+dotfiles/platforms/debian/_apt.py      Apt(PackageManager)
+dotfiles/platforms/debian/features/    Debian's features, one per file
 dotfiles/feature.py                    Feature; classes(platform), every(), checks()
 dotfiles/plan.py                       Step, steps(), requirements(), order(), cycles()
 dotfiles/apply.py                      the runner, check()
 dotfiles/errors.py                     ConfigError, raised by every layer
 tests/test_engine.py                   Shell, Files, Report, retries
-tests/test_platforms.py                LinuxOs and Pacman against a fake shell
+tests/test_platforms.py                LinuxOs, Pacman and Apt against a fake shell
 tests/test_apply.py                    plan and runner with a fake platform and fake features
 ```
 
@@ -258,7 +261,26 @@ class Pacman(PackageManager):  # arch/_pacman.py
 class ArchLinuxOs(LinuxOs):  # arch/_os.py
     id = "arch"
     manager_class = Pacman
+
+
+class Apt(PackageManager):  # debian/_apt.py
+    ...  # missing: dpkg-query -W; install: update, remove, policy, install --download-only, install;
+    # direct: apt-cache depends -i; upgrade: update, full-upgrade
+
+
+class DebianOs(LinuxOs):  # debian/_os.py: Ubuntu and Mint too, by ID_LIKE
+    id = "debian"
+    manager_class = Apt
 ```
+
+`Apt` runs `apt-get -q -y` as root with only `PATH` and
+`DEBIAN_FRONTEND=noninteractive` in its environment, so debconf asks
+nothing. `apt-get update` is the first step of `install()`, not
+`setup()`: an apply with nothing to install, and a dry run, need no
+root. A name without a candidate in `apt-cache policy` is left for
+`build()`, which fails: Debian has nothing like the AUR. `direct()` counts
+every alternative of a dependency and a virtual package by its name; the
+graph only orders the features, so a dependency too many costs nothing.
 
 - `detect(machine)` reads `/etc/os-release`: the platform is the
   concrete `OperatingSystem` subclass whose `id` is ID, else the first of
@@ -468,8 +490,12 @@ class Locale(Feature):  # platforms/linux/features/locale.py: glibc is always th
   checks from a dict and records every call. No stub scripts, no shell.
 - Platforms: `LinuxOs.ensure_*` like the `Files` methods; `Pacman`
   against canned `pacman -T` / `pacman -Si` output: missing, one install
-  call with every name, the transitive graph. `detect()` against fake
-  os-release files: ID, ID_LIKE, none.
+  call with every name, the transitive graph. `Apt` against canned
+  `dpkg-query` / `apt-cache` output: not installed and config-files are
+  missing, update then one download and one install as root, what has no
+  candidate left, a replaced package removed, the graph through
+  Pre-Depends, alternatives and virtual names. `detect()` against fake
+  os-release files: ID, ID_LIKE (Mint is Debian), none.
 - Features: a platform's own module of a name wins over its base's, the
   base's runs where the platform has none; the feature reaches the
   platform as `system`; a module without the class of its name → an error.

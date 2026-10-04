@@ -1,0 +1,14 @@
+# What every Arch host gets besides base: features only Arch has.
+extends = ["base"]
+
+[features.reflector]
+enabled = true
+
+[features.paru]
+enabled = true
+
+[features.pkgfile]
+enabled = true
+
+[features.command_not_found]
+enabled = true

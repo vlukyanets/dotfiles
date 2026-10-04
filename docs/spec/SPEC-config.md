@@ -170,9 +170,9 @@ dotfiles/config.py       load, chain, validate, merge — pure functions over di
 dotfiles/layout.py       Layout(root): a checkout's paths (this one by default), named() a host or profile, host_names(); local_config(), shown()
 dotfiles/errors.py       ConfigError, for every layer
 dotfiles/defaults.toml   schema
-profiles/                base, server, laptop, vm
+profiles/                base, arch (Arch-only features), server, laptop, vm
 hosts/                   hyper (extends laptop), echo-server (extends server),
-                         vm/dotfiles/dotfiles-node-{arch,debian,voidlinux} (extend vm; test VMs)
+                         vm/dotfiles/dotfiles-node-{arch,deb,void} (extend vm; test VMs)
 tests/test_config.py     unit tests on tmp_path fixtures + checks on the real data
 tests/test_cli.py        the commands: which config they read, their errors
 docs/spec/               capability map, module specs

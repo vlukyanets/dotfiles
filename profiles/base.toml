@@ -1,25 +1,13 @@
-# What every host gets. Values that depend on where or what the machine is
-# belong to the host.
-
-[features.reflector]
-enabled = true
+# What every host gets, on any platform; profiles/arch.toml adds Arch's
+# own. Values that depend on where or what the machine is belong to the host.
 
 [features.rustup]
-enabled = true
-
-[features.paru]
 enabled = true
 
 [features.no_beep]
 enabled = true
 
-[features.pkgfile]
-enabled = true
-
 [features.zsh]
-enabled = true
-
-[features.command_not_found]
 enabled = true
 
 [features.git]
