@@ -9,7 +9,7 @@ Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
 `packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile`, `git`, `fonts`,
-`zsh` and `command_not_found`.
+`zsh`, `command_not_found` and `locale`.
 
 ## Structure
 
@@ -244,6 +244,48 @@ Every Linux (`platforms/linux/features/git.py`), off by default, on in
 `Git.rules`: `name` without `"`, `\` or a newline, which would need
 escaping; `email` empty or one `@` between non-blanks.
 
+## `locale` — locales, LANG, the console, the timezone
+
+An example; by default `en_US.UTF-8`, the `us` keymap, no font, `UTC`.
+
+```toml
+[features.locale]
+enabled  = true
+lang     = "en_US.UTF-8"
+locales  = ["en_US.UTF-8 UTF-8"]
+timezone = "Europe/Kyiv"
+
+[features.locale.console]
+keymap   = "us"
+font     = "ter-v20n"
+packages = ["terminus-font"]
+```
+
+Every systemd Linux (`platforms/linux/features/locale.py`), off by
+default, on in `profiles/base.toml` with `Europe/Kyiv`; off on the Void node, which has no
+module of its own yet. Its packages are `console.packages` (Debian:
+`locales`, which ships `locale-gen`); then `apply()`, the timezone first:
+
+- `/usr/share/zoneinfo/<timezone>` missing: it fails before any change.
+- Each line of `locales` uncommented in `/etc/locale.gen` (`#`, then
+  blanks), or added at its end; `locale-gen` as root only when one was.
+  Lines not listed are left as they are.
+- `LANG=<lang>` in `/etc/locale.conf` (`root:root` 644), from
+  `system/etc/locale.conf.j2`; Debian reads `/etc/default/locale`, from
+  `system/etc/default/locale.j2`.
+- `KEYMAP=` and, when set, `FONT=` in `/etc/vconsole.conf`, from
+  `system/etc/vconsole.conf.j2`; when it changed,
+  `systemd-vconsole-setup.service` restarted, its failure ignored (no
+  console: a container). A font with no file in
+  `/usr/share/kbd/consolefonts` is a notice. Debian writes nothing:
+  console-setup reads `/etc/default/keyboard` and
+  `/etc/default/console-setup`, so a keymap other than `us` or a font is
+  a notice naming `dpkg-reconfigure`.
+- `/etc/localtime` a symlink to the zone's file.
+
+`Locale.rules`: `timezone` a name of word characters, `+` and `-` in
+`/`-separated parts, so it stays under `/usr/share/zoneinfo`.
+
 ## `fonts` — fonts and fontconfig
 
 An example; by default `packages` and `nerd_fonts` are empty,
@@ -393,6 +435,11 @@ system/etc/modprobe.d/nobeep.conf.j2           its template
 dotfiles/platforms/arch/features/pkgfile.py    Pkgfile: timer, first download
 dotfiles/platforms/linux/features/git.py       Git: our gitconfig, its include
 home/.config/git/dotfiles.gitconfig.j2         its template
+dotfiles/platforms/linux/features/locale.py    Locale: rules, locale-gen, LANG, console, timezone
+dotfiles/platforms/debian/features/locale.py   Locale: Linux's, LANG in /etc/default/locale, no console
+system/etc/locale.conf.j2                      its templates
+system/etc/default/locale.j2
+system/etc/vconsole.conf.j2
 dotfiles/platforms/arch/features/fonts.py      Fonts: Nerd Fonts, fc-cache, fontconfig
 home/.config/fontconfig/conf.d/50-dotfiles.conf.j2  its template
 dotfiles/platforms/linux/features/zsh.py       Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
@@ -437,6 +484,13 @@ tests/test_apply.py                            test_real_features_are_consistent
 - git: `[user]` with both set, the include on top of an existing config,
   nothing the second time; nothing set: no `[user]`, the config created
   with the include alone.
+- locale: the line uncommented, `locale-gen`, LANG, KEYMAP, the console
+  set up and the zone linked, nothing the second time; `FONT=` with a
+  font, a missing one a notice; a failed console setup is no error; an
+  unknown zone fails before any change; the packages are the console's on
+  Arch and `locales` on Debian; on Debian LANG in `/etc/default/locale`, no
+  `vconsole.conf`, a console asked for a notice. `test_config`: a
+  `timezone` with `..`, a leading `/` or an empty part is refused.
 - fonts: a Nerd Font downloaded, unpacked and cached once, again for
   another version or URL, not in a dry run; `curl` among the packages only with
   Nerd Fonts; the fontconfig file with only what is set, `hinting = none`

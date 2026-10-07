@@ -516,10 +516,15 @@ def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
     for table in cfg["features"].values():
         table["enabled"] = True
     cfg["features"]["packaging"]["pacman"]["flags"] = ["Color"]  # it writes only what is set
-    # Every package counts as installed: zsh's among them.
+    # Every package counts as installed: zsh's among them, and tzdata's zone.
     zsh = engine.current().files.path("/usr/bin/zsh")
     zsh.parent.mkdir(parents=True)
     zsh.touch(mode=0o755)
+    zone = engine.current().files.path(
+        f"/usr/share/zoneinfo/{cfg['features']['locale']['timezone']}"
+    )
+    zone.parent.mkdir(parents=True)
+    zone.touch()
     assert apply("hyper", dry_run=True, cfg=cfg) == 0
     out = capsys.readouterr().out
     assert "-> /etc/pacman.conf.d/options.conf (missing)\n" in out
@@ -528,4 +533,8 @@ def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
         "usr",
         "usr/bin",
         "usr/bin/zsh",
+        "usr/share",
+        "usr/share/zoneinfo",
+        "usr/share/zoneinfo/Europe",
+        "usr/share/zoneinfo/Europe/Kyiv",
     ]

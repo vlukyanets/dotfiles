@@ -643,3 +643,67 @@ def test_zsh_dry_run_clones_nothing(machine, monkeypatch, capsys):
     assert machine.calls == []
     assert leftover.exists()
     assert "-> oh-my-zsh cloned into " in capsys.readouterr().out
+
+
+VCONSOLE_SETUP = ["systemctl", "restart", "systemd-vconsole-setup.service"]
+
+
+def zone(name: str) -> None:
+    write(f"/usr/share/zoneinfo/{name}", "")
+
+
+def test_locale_generates_writes_and_links_once(machine, capsys):
+    write("/etc/locale.gen", "# en_US.UTF-8 UTF-8\n#ru_RU.UTF-8 UTF-8\n")
+    zone("Europe/Kyiv")
+    cfg = defaults(locale={"timezone": "Europe/Kyiv"})
+    apply("locale", cfg)
+    locale_gen = engine.current().files.path("/etc/locale.gen").read_text()
+    assert locale_gen == "en_US.UTF-8 UTF-8\n#ru_RU.UTF-8 UTF-8\n"
+    assert ["locale-gen"] in machine.calls
+    assert settings("/etc/locale.conf") == ["LANG=en_US.UTF-8"]
+    assert settings("/etc/vconsole.conf") == ["KEYMAP=us"]
+    assert VCONSOLE_SETUP in machine.calls
+    localtime = engine.current().files.path("/etc/localtime")
+    assert os.readlink(localtime) == "/usr/share/zoneinfo/Europe/Kyiv"
+    capsys.readouterr()
+    machine.calls.clear()
+    apply("locale", cfg)
+    assert capsys.readouterr().out == ""
+    assert machine.calls == []
+
+
+def test_locale_console_font_writes_it_and_a_missing_one_is_a_notice(machine, capsys):
+    zone("UTC")
+    apply("locale", defaults(locale={"console": {"font": "ter-v20n"}}))
+    assert settings("/etc/vconsole.conf") == ["KEYMAP=us", "FONT=ter-v20n"]
+    assert "console font ter-v20n is not in /usr/share/kbd/consolefonts" in capsys.readouterr().err
+
+
+def test_locale_without_a_console_is_no_error(machine):
+    zone("UTC")
+    machine.answers[tuple(VCONSOLE_SETUP)] = (1, "")
+    apply("locale")
+    assert settings("/etc/vconsole.conf") == ["KEYMAP=us"]
+
+
+def test_locale_unknown_timezone_fails_before_any_change(machine):
+    with pytest.raises(engine.Failed, match="Nowhere/Town: no such timezone"):
+        apply("locale", defaults(locale={"timezone": "Nowhere/Town"}))
+    assert not engine.current().files.path("/etc/locale.conf").exists()
+    assert machine.calls == []
+
+
+def test_locale_packages_are_the_console_fonts_on_arch_and_locales_on_debian():
+    cfg = defaults(locale={"console": {"packages": ["terminus-font"]}})["features"]["locale"]
+    assert classes(ArchLinuxOs)["locale"](cfg, None).packages() == ["terminus-font"]
+    assert classes(DebianOs)["locale"](cfg, None).packages() == ["locales"]
+
+
+def test_locale_on_debian_writes_lang_where_debian_reads_it_and_no_console(machine, capsys):
+    zone("UTC")
+    cfg = defaults(locale={"console": {"font": "ter-v20n"}})
+    classes(DebianOs)["locale"](cfg["features"]["locale"], DebianOs(engine.current())).apply()
+    assert settings("/etc/default/locale") == ["LANG=en_US.UTF-8"]
+    assert not engine.current().files.path("/etc/vconsole.conf").exists()
+    assert VCONSOLE_SETUP not in machine.calls
+    assert "features.locale.console is not applied on Debian" in capsys.readouterr().err

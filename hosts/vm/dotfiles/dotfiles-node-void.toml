@@ -3,3 +3,7 @@ extends = ["vm"]
 # Off on this VM for now.
 [features.rustup]
 enabled = false
+
+# Linux's module only, and Void is not systemd: no Void module yet.
+[features.locale]
+enabled = false

@@ -105,6 +105,14 @@ def test_values_the_type_cannot_check(tmp_path, makepkg, error):
     assert str(e.value) == error
 
 
+@pytest.mark.parametrize("timezone", ["../../etc/passwd", "/etc/passwd", "Europe/"])
+def test_locale_timezone_is_a_name_under_zoneinfo(tmp_path, timezone):
+    write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
+    write(tmp_path, "hosts/h.toml", f'[features.locale]\ntimezone = "{timezone}"\n')
+    with pytest.raises(ConfigError, match="timezone: must be a name like"):
+        resolve("h", tmp_path, checks=feature.checks())
+
+
 def test_a_key_without_default_is_there_only_when_set(tmp_path):
     write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
     write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = true\n")
