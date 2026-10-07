@@ -13,8 +13,9 @@ feature of `dotfiles/defaults.toml`, one module each per platform in
 `command_not_found` (its hook in zsh) and `fonts` (fonts and fontconfig)
 on Arch, and on all `rustup` (cargo and rustc), `no_beep` (no PC
 speaker), `git` (the user's name and email), `zsh` (zsh with
-oh-my-zsh, the login shell) and `locale` (locales, LANG, the console,
-the timezone; not on Void yet). See the
+oh-my-zsh, the login shell), `locale` (locales, LANG, the console,
+the timezone) and `timesyncd` (the clock in sync), the last two not on
+Void yet. See the
 [capability map](docs/spec/CAPABILITY-MAP.md).
 
 ## How a host is described

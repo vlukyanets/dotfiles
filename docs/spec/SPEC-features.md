@@ -9,7 +9,7 @@ Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
 `packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile`, `git`, `fonts`,
-`zsh`, `command_not_found` and `locale`.
+`zsh`, `command_not_found`, `locale` and `timesyncd`.
 
 ## Structure
 
@@ -286,6 +286,20 @@ module of its own yet. Its packages are `console.packages` (Debian:
 `Locale.rules`: `timezone` a name of word characters, `+` and `-` in
 `/`-separated parts, so it stays under `/usr/share/zoneinfo`.
 
+## `timesyncd` — the clock in sync
+
+```toml
+[features.timesyncd]
+enabled = true
+```
+
+Every systemd Linux (`platforms/linux/features/timesyncd.py`), off by
+default, on in `profiles/base.toml`, off on the Void node. No settings:
+the servers are the distribution's. Part of systemd on Arch, no
+packages; Debian ships it as `systemd-timesyncd`, for which apt removes
+another time daemon (`chrony`, `ntpsec`). `apply()`:
+`systemd-timesyncd.service` enabled and started.
+
 ## `fonts` — fonts and fontconfig
 
 An example; by default `packages` and `nerd_fonts` are empty,
@@ -440,6 +454,8 @@ dotfiles/platforms/debian/features/locale.py   Locale: Linux's, LANG in /etc/def
 system/etc/locale.conf.j2                      its templates
 system/etc/default/locale.j2
 system/etc/vconsole.conf.j2
+dotfiles/platforms/linux/features/timesyncd.py Timesyncd: the service
+dotfiles/platforms/debian/features/timesyncd.py  Timesyncd: Linux's, with its package
 dotfiles/platforms/arch/features/fonts.py      Fonts: Nerd Fonts, fc-cache, fontconfig
 home/.config/fontconfig/conf.d/50-dotfiles.conf.j2  its template
 dotfiles/platforms/linux/features/zsh.py       Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
@@ -493,6 +509,8 @@ tests/test_apply.py                            test_real_features_are_consistent
   Arch and `locales` on Debian; on Debian LANG in `/etc/default/locale`, no
   `vconsole.conf`, a console asked for a notice. `test_config`: a
   `timezone` with `..`, a leading `/` or an empty part is refused.
+- timesyncd: the service enabled once, nothing while it runs; no package
+  on Arch, `systemd-timesyncd` on Debian.
 - fonts: a Nerd Font downloaded, unpacked and cached once, again for
   another version or URL, not in a dry run; `curl` among the packages only with
   Nerd Fonts; the fontconfig file with only what is set, `hinting = none`

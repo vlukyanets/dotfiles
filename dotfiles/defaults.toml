@@ -64,6 +64,11 @@ enabled = false
 name    = ""
 email   = ""
 
+# timesyncd: the clock kept in sync by systemd-timesyncd.service, enabled
+# and started; its servers are the distribution's.
+[features.timesyncd]
+enabled = false
+
 # locale: the lines of /etc/locale.gen uncommented, locale-gen run when one
 # was not; LANG in /etc/locale.conf (Debian: /etc/default/locale); the
 # console's keymap and font in /etc/vconsole.conf (not on Debian, whose

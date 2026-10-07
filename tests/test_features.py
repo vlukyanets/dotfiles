@@ -728,3 +728,28 @@ def test_locale_on_debian_writes_lang_where_debian_reads_it_and_no_console(machi
     assert not engine.current().files.path("/etc/vconsole.conf").exists()
     assert VCONSOLE_SETUP not in machine.calls
     assert "features.locale.console is not applied on Debian" in capsys.readouterr().err
+
+
+TIMESYNCD = ["systemctl", "enable", "--now", "systemd-timesyncd.service"]
+
+
+def test_timesyncd_enables_the_service_once(machine, capsys):
+    apply("timesyncd")
+    assert machine.calls[-1] == TIMESYNCD
+    assert "systemd-timesyncd.service enabled and started" in capsys.readouterr().out
+    machine.answers.update(
+        {
+            ("systemctl", "is-enabled", "systemd-timesyncd.service"): (0, "enabled"),
+            ("systemctl", "is-active", "systemd-timesyncd.service"): (0, "active"),
+        }
+    )
+    machine.calls.clear()
+    apply("timesyncd")
+    assert capsys.readouterr().out == ""
+    assert TIMESYNCD not in machine.calls
+
+
+def test_timesyncd_is_part_of_systemd_on_arch_and_its_own_package_on_debian():
+    cfg = defaults()["features"]["timesyncd"]
+    assert classes(ArchLinuxOs)["timesyncd"](cfg, None).packages() == []
+    assert classes(DebianOs)["timesyncd"](cfg, None).packages() == ["systemd-timesyncd"]
