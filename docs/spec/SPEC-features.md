@@ -9,7 +9,8 @@ Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
 `packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile`, `git`, `fonts`,
-`zsh`, `command_not_found`, `locale`, `timesyncd`, `swap` and `zram`.
+`zsh`, `command_not_found`, `locale`, `timesyncd`, `swap`, `zram` and
+`oomd`.
 
 ## Structure
 
@@ -374,6 +375,30 @@ sets none, and the kernel's is negative): zram fills first.
 `swappiness` 0 to 200, `watermark_scale_factor` 0 to 3000, the kernel's
 ranges.
 
+## `oomd` — earlier OOM kills
+
+```toml
+[features.oomd]
+enabled = true
+```
+
+Every systemd Linux (`platforms/linux/features/oomd.py`), off by default,
+on in `profiles/laptop.toml`: on a server or a VM the kernel's OOM killer
+decides. No settings: the limits
+are in its templates. Part of systemd on Arch, no packages; Debian ships
+it as `systemd-oomd`. `apply()`:
+
+- Three drop-ins (`root:root` 644), each from its template:
+  `/etc/systemd/oomd.conf.d/10-dotfiles.conf`, 60% pressure for 20 s
+  instead of the stock 30 s; `/etc/systemd/system/-.slice.d/10-oomd.conf`,
+  `ManagedOOMSwap=kill`: the largest swap user dies once swap is 90%
+  full; `/etc/systemd/system/user@.service.d/10-oomd.conf`,
+  `ManagedOOMMemoryPressure=kill` at 50%: pressure kills inside user
+  sessions only, never a service.
+- When one changed: `daemon-reload` and `try-restart` of
+  `systemd-oomd.service`, which reads `oomd.conf.d` only when it starts.
+  Then the service enabled and started.
+
 ## `fonts` — fonts and fontconfig
 
 An example; by default `packages` and `nerd_fonts` are empty,
@@ -536,6 +561,11 @@ system/etc/systemd/system/swap-swapfile.swap.j2
 dotfiles/platforms/linux/features/zram.py      Zram: rules, config, the unit, sysctls
 dotfiles/platforms/debian/features/zram.py     Zram: Linux's, with Debian's package
 system/etc/systemd/zram-generator.conf.j2      its template
+dotfiles/platforms/linux/features/oomd.py      Oomd: drop-ins, restart, the service
+dotfiles/platforms/debian/features/oomd.py     Oomd: Linux's, with its package
+system/etc/systemd/oomd.conf.d/10-dotfiles.conf.j2  its templates
+system/etc/systemd/system/-.slice.d/10-oomd.conf.j2
+system/etc/systemd/system/user@.service.d/10-oomd.conf.j2
 dotfiles/platforms/arch/features/fonts.py      Fonts: Nerd Fonts, fc-cache, fontconfig
 home/.config/fontconfig/conf.d/50-dotfiles.conf.j2  its template
 dotfiles/platforms/linux/features/zsh.py       Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
@@ -611,6 +641,9 @@ tests/test_apply.py                            test_real_features_are_consistent
   `zram-generator` on Arch, `systemd-zram-generator` on Debian.
   `test_config`: a negative `priority`, and `swappiness` or
   `watermark_scale_factor` past the kernel's range, are refused.
+- oomd: the three drop-ins, `daemon-reload`, `try-restart` and the
+  service enabled, nothing the second time; no package on Arch,
+  `systemd-oomd` on Debian.
 - fonts: a Nerd Font downloaded, unpacked and cached once, again for
   another version or URL, not in a dry run; `curl` among the packages only with
   Nerd Fonts; the fontconfig file with only what is set, `hinting = none`

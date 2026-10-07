@@ -991,3 +991,50 @@ def test_zram_generator_is_its_own_package():
     cfg = defaults()["features"]["zram"]
     assert classes(ArchLinuxOs)["zram"](cfg, None).packages() == ["zram-generator"]
     assert classes(DebianOs)["zram"](cfg, None).packages() == ["systemd-zram-generator"]
+
+
+OOMD = "systemd-oomd.service"
+OOMD_DROP_INS = {
+    "/etc/systemd/oomd.conf.d/10-dotfiles.conf": [
+        "[OOM]",
+        "DefaultMemoryPressureLimit=60%",
+        "DefaultMemoryPressureDurationSec=20s",
+    ],
+    "/etc/systemd/system/-.slice.d/10-oomd.conf": ["[Slice]", "ManagedOOMSwap=kill"],
+    "/etc/systemd/system/user@.service.d/10-oomd.conf": [
+        "[Service]",
+        "ManagedOOMMemoryPressure=kill",
+        "ManagedOOMMemoryPressureLimit=50%",
+    ],
+}
+
+
+def test_oomd_writes_its_drop_ins_restarts_and_enables_once(machine, capsys):
+    apply("oomd")
+    for path, lines in OOMD_DROP_INS.items():
+        assert settings(path) == lines
+    calls = [
+        c for c in machine.calls if c[0] == "systemctl" and c[1] not in ("is-enabled", "is-active")
+    ]
+    assert calls == [
+        ["systemctl", "daemon-reload"],
+        ["systemctl", "try-restart", OOMD],  # oomd.conf.d is read when oomd starts
+        ["systemctl", "enable", "--now", OOMD],
+    ]
+    capsys.readouterr()
+    machine.answers.update(
+        {
+            ("systemctl", "is-enabled", OOMD): (0, "enabled"),
+            ("systemctl", "is-active", OOMD): (0, "active"),
+        }
+    )
+    machine.calls.clear()
+    apply("oomd")
+    assert capsys.readouterr().out == ""
+    assert [c for c in machine.calls if c[1] not in ("is-enabled", "is-active")] == []
+
+
+def test_oomd_is_part_of_systemd_on_arch_and_its_own_package_on_debian():
+    cfg = defaults()["features"]["oomd"]
+    assert classes(ArchLinuxOs)["oomd"](cfg, None).packages() == []
+    assert classes(DebianOs)["oomd"](cfg, None).packages() == ["systemd-oomd"]
