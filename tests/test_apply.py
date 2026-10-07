@@ -509,6 +509,8 @@ def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
     def checks_only(argv, check=False, **kwargs):
         if check:  # run(): a mutation
             pytest.fail(f"ran {argv}")
+        if argv == ["findmnt", "-no", "FSTYPE", "/"]:  # swap's: a btrfs root
+            return subprocess.CompletedProcess(argv, 0, "btrfs\n", "")
         return subprocess.CompletedProcess(argv, 1, "", "")
 
     monkeypatch.setattr(engine.current().shell, "execute", checks_only)

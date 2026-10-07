@@ -14,8 +14,8 @@ feature of `dotfiles/defaults.toml`, one module each per platform in
 on Arch, and on all `rustup` (cargo and rustc), `no_beep` (no PC
 speaker), `git` (the user's name and email), `zsh` (zsh with
 oh-my-zsh, the login shell), `locale` (locales, LANG, the console,
-the timezone) and `timesyncd` (the clock in sync), the last two not on
-Void yet. See the
+the timezone), `timesyncd` (the clock in sync) and `swap` (a swap file
+on btrfs), the last three not on Void yet. See the
 [capability map](docs/spec/CAPABILITY-MAP.md).
 
 ## How a host is described

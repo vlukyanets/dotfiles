@@ -9,7 +9,7 @@ Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
 `packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile`, `git`, `fonts`,
-`zsh`, `command_not_found`, `locale` and `timesyncd`.
+`zsh`, `command_not_found`, `locale`, `timesyncd` and `swap`.
 
 ## Structure
 
@@ -300,6 +300,39 @@ packages; Debian ships it as `systemd-timesyncd`, for which apt removes
 another time daemon (`chrony`, `ntpsec`). `apply()`:
 `systemd-timesyncd.service` enabled and started.
 
+## `swap` — a swap file on btrfs
+
+```toml
+[features.swap]
+enabled = true
+size    = "20g"
+```
+
+Every systemd Linux (`platforms/linux/features/swap.py`), off by default,
+on in `profiles/laptop.toml`; `size` is the host's. Its package is
+`btrfs-progs`; then `apply()`, which fails before any change while `size`
+is empty or `/` is not btrfs (`findmnt -no FSTYPE /`):
+
+- The subvolume `@swap` at the top of the filesystem: a swap file inside
+  a snapshotted subvolume blocks its snapshots. Listing subvolumes needs
+  root, so only while `swap.mount` is not active: `btrfs subvolume list /`,
+  and without `@swap` the device (`findmnt -no SOURCE /`, the `[/@]`
+  suffix dropped) mounted with `subvolid=5` on a temp dir, `@swap` created,
+  unmounted. A dry run only says it would.
+- `/etc/systemd/system/swap.mount` (`@swap` on `/swap` by the root's UUID,
+  `noatime`) and `swap-swapfile.swap` (`/swap/swapfile`), from their
+  templates; `daemon-reload` when either changed. Units, not fstab: a line
+  of `/etc/fstab` for `/swap` or the file is a notice to remove it.
+- `/swap` created, `swap.mount` enabled and started; the file created by
+  `btrfs filesystem mkswapfile --size <size>` once, while it is not there:
+  another `size` later does not resize it. Then the `.swap` unit enabled
+  and started.
+- No `Priority=`: the kernel gives the file a negative priority, so swap
+  with a priority from 0 up (zram's) fills first, and the disk takes only
+  what does not fit there.
+
+`Swap.rules`: `size` empty or a number with one of `KMGTPE`, either case.
+
 ## `fonts` — fonts and fontconfig
 
 An example; by default `packages` and `nerd_fonts` are empty,
@@ -456,6 +489,9 @@ system/etc/default/locale.j2
 system/etc/vconsole.conf.j2
 dotfiles/platforms/linux/features/timesyncd.py Timesyncd: the service
 dotfiles/platforms/debian/features/timesyncd.py  Timesyncd: Linux's, with its package
+dotfiles/platforms/linux/features/swap.py      Swap: rules, subvolume, units, the file
+system/etc/systemd/system/swap.mount.j2        its templates
+system/etc/systemd/system/swap-swapfile.swap.j2
 dotfiles/platforms/arch/features/fonts.py      Fonts: Nerd Fonts, fc-cache, fontconfig
 home/.config/fontconfig/conf.d/50-dotfiles.conf.j2  its template
 dotfiles/platforms/linux/features/zsh.py       Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
@@ -511,6 +547,12 @@ tests/test_apply.py                            test_real_features_are_consistent
   `timezone` with `..`, a leading `/` or an empty part is refused.
 - timesyncd: the service enabled once, nothing while it runs; no package
   on Arch, `systemd-timesyncd` on Debian.
+- swap: the subvolume created, both units, `daemon-reload`, the file and
+  both units enabled, the `.swap` with no `Priority=`; nothing changed and
+  no command but checks the second time; an existing `@swap` kept; an
+  empty `size` or a root that is not btrfs fails before any change; a
+  line in fstab a notice; a dry run lists no subvolume. `test_config`: a
+  `size` mkswapfile would not take is refused.
 - fonts: a Nerd Font downloaded, unpacked and cached once, again for
   another version or URL, not in a dry run; `curl` among the packages only with
   Nerd Fonts; the fontconfig file with only what is set, `hinting = none`

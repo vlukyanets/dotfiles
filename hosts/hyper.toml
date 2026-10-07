@@ -10,3 +10,6 @@ country = ["Ukraine", "Poland", "Slovakia", "Germany", "Hungary", "Czechia"]
 [features.locale.console]
 font     = "ter-v20n"
 packages = ["terminus-font"]
+
+[features.swap]
+size = "20g"

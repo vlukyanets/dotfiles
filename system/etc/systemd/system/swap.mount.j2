@@ -1,0 +1,13 @@
+# Managed by dotfiles (features.swap) — edit
+# system/etc/systemd/system/swap.mount.j2 in the repo, not this file.
+[Unit]
+Description=btrfs subvolume {{ subvolume }}, for the swap file
+
+[Mount]
+What=UUID={{ uuid }}
+Where={{ mountpoint }}
+Type=btrfs
+Options=noatime,subvol=/{{ subvolume }}
+
+[Install]
+WantedBy=local-fs.target

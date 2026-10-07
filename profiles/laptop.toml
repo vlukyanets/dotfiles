@@ -1,2 +1,5 @@
 # A machine someone sits at.
 extends = ["base"]
+
+[features.swap]
+enabled = true

@@ -69,6 +69,14 @@ email   = ""
 [features.timesyncd]
 enabled = false
 
+# swap: a swap file on its own btrfs subvolume, @swap mounted on /swap (a
+# swap file in a snapshotted subvolume blocks its snapshots), both by
+# systemd units, not fstab. No priority: the kernel gives it a negative
+# one, below zram's. / must be btrfs.
+[features.swap]
+enabled = false
+size    = ""  # btrfs mkswapfile's --size, e.g. "20g"; required when on; only at creation
+
 # locale: the lines of /etc/locale.gen uncommented, locale-gen run when one
 # was not; LANG in /etc/locale.conf (Debian: /etc/default/locale); the
 # console's keymap and font in /etc/vconsole.conf (not on Debian, whose

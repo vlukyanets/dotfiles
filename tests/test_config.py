@@ -113,6 +113,14 @@ def test_locale_timezone_is_a_name_under_zoneinfo(tmp_path, timezone):
         resolve("h", tmp_path, checks=feature.checks())
 
 
+@pytest.mark.parametrize("size", ["20 g", "-1g", "g", "20gb"])
+def test_swap_size_is_one_mkswapfile_takes(tmp_path, size):
+    write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
+    write(tmp_path, "hosts/h.toml", f'[features.swap]\nsize = "{size}"\n')
+    with pytest.raises(ConfigError, match='size: must be a size like "20g"'):
+        resolve("h", tmp_path, checks=feature.checks())
+
+
 def test_a_key_without_default_is_there_only_when_set(tmp_path):
     write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
     write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = true\n")

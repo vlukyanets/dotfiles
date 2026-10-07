@@ -753,3 +753,86 @@ def test_timesyncd_is_part_of_systemd_on_arch_and_its_own_package_on_debian():
     cfg = defaults()["features"]["timesyncd"]
     assert classes(ArchLinuxOs)["timesyncd"](cfg, None).packages() == []
     assert classes(DebianOs)["timesyncd"](cfg, None).packages() == ["systemd-timesyncd"]
+
+
+SWAP_DISK = {
+    ("findmnt", "-no", "FSTYPE", "/"): (0, "btrfs"),
+    ("findmnt", "-no", "UUID", "/"): (0, "0a1b-2c3d"),
+    ("findmnt", "-no", "SOURCE", "/"): (0, "/dev/vda2[/@]"),
+    ("btrfs", "subvolume", "list", "/"): (0, "ID 256 gen 9 top level 5 path @\n"),
+}
+SWAP_UNITS = ("swap.mount", "swap-swapfile.swap")
+
+
+def test_swap_creates_the_subvolume_units_and_file_once(machine, capsys):
+    machine.answers.update(SWAP_DISK)
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert "What=UUID=0a1b-2c3d" in settings("/etc/systemd/system/swap.mount")
+    assert "Options=noatime,subvol=/@swap" in settings("/etc/systemd/system/swap.mount")
+    unit = settings("/etc/systemd/system/swap-swapfile.swap")
+    assert "What=/swap/swapfile" in unit
+    assert not any(line.startswith("Priority=") for line in unit)  # the kernel's: below zram
+    calls = [" ".join(call) for call in machine.calls]
+    assert any(c.startswith("mount -o subvolid=5 /dev/vda2 ") for c in calls)
+    assert any(c.startswith("btrfs subvolume create ") and c.endswith("/@swap") for c in calls)
+    swapfile = engine.current().files.path("/swap/swapfile")
+    assert f"btrfs filesystem mkswapfile --size 4g {swapfile}" in calls
+    assert "systemctl daemon-reload" in calls
+    for unit in SWAP_UNITS:
+        assert f"systemctl enable --now {unit}" in calls
+    assert "-> created /swap/swapfile (4g)" in capsys.readouterr().out
+    swapfile.parent.mkdir()
+    swapfile.touch()
+    for unit in SWAP_UNITS:
+        machine.answers[("systemctl", "is-enabled", unit)] = (0, "enabled")
+        machine.answers[("systemctl", "is-active", unit)] = (0, "active")
+    machine.calls.clear()
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert capsys.readouterr().out == ""
+    assert [c for c in machine.calls if c[0] not in ("findmnt", "systemctl")] == []
+    assert [c for c in machine.calls if c[:2] == ["systemctl", "enable"]] == []
+
+
+def test_swap_keeps_an_existing_subvolume(machine):
+    machine.answers.update(SWAP_DISK)
+    machine.answers[("btrfs", "subvolume", "list", "/")] = (
+        0,
+        "ID 257 gen 9 top level 5 path @swap\n",
+    )
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert not any(c[:3] == ["btrfs", "subvolume", "create"] for c in machine.calls)
+
+
+@pytest.mark.parametrize(
+    ("fstype", "size", "error"),
+    [
+        ("btrfs", "", "features.swap.size is empty"),
+        ("ext4", "4g", "/ is ext4: the swap file lives on a btrfs subvolume"),
+    ],
+)
+def test_swap_fails_before_any_change(machine, fstype, size, error):
+    machine.answers[("findmnt", "-no", "FSTYPE", "/")] = (0, fstype)
+    with pytest.raises(engine.Failed, match=error):
+        apply("swap", defaults(swap={"size": size}))
+    assert not engine.current().files.path("/etc/systemd/system/swap.mount").exists()
+
+
+def test_swap_line_left_in_fstab_is_a_notice(machine, capsys):
+    machine.answers.update(SWAP_DISK)
+    write("/etc/fstab", "UUID=0a1b-2c3d /swap btrfs subvol=/@swap 0 0\n")
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert "/etc/fstab still has a line for /swap" in capsys.readouterr().err
+
+
+def test_swap_dry_run_lists_no_subvolume(machine, capsys):
+    machine.answers.update(SWAP_DISK)
+    engine.current().dry_run = True
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert "-> subvolume @swap, unless it is there (listing needs root)" in capsys.readouterr().out
+    assert not any(c[:2] == ["btrfs", "subvolume"] for c in machine.calls)
+
+
+def test_swap_needs_btrfs_progs():
+    cfg = defaults()["features"]["swap"]
+    assert classes(ArchLinuxOs)["swap"](cfg, None).packages() == ["btrfs-progs"]
+    assert classes(DebianOs)["swap"](cfg, None).packages() == ["btrfs-progs"]

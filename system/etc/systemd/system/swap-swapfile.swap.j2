@@ -1,0 +1,11 @@
+# Managed by dotfiles (features.swap) — edit
+# system/etc/systemd/system/swap-swapfile.swap.j2 in the repo, not this file.
+# No Priority=: the kernel gives the file a negative one, so zram, from 0 up, fills first.
+[Unit]
+Description=swap file on {{ subvolume }}
+
+[Swap]
+What={{ swapfile }}
+
+[Install]
+WantedBy=swap.target
