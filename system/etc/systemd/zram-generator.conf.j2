@@ -1,0 +1,6 @@
+# Managed by dotfiles (features.zram) — edit
+# system/etc/systemd/zram-generator.conf.j2 in the repo, not this file.
+[zram0]
+zram-size = {{ zram.size }}
+compression-algorithm = {{ zram.algorithm }}
+swap-priority = {{ zram.priority }}

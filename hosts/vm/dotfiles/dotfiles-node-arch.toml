@@ -50,3 +50,6 @@ emoji = "Noto Color Emoji"
 [features.fonts.render]
 hinting = "slight"
 subpixel = "rgb"
+
+[features.zram]
+enabled = true

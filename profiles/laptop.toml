@@ -3,3 +3,6 @@ extends = ["base"]
 
 [features.swap]
 enabled = true
+
+[features.zram]
+enabled = true

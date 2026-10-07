@@ -940,3 +940,47 @@ def test_swap_file_recreated_in_a_dry_run_runs_nothing(machine, capsys):
     apply("swap", defaults(swap={"size": "4g"}))
     assert "-> recreated /swap/swapfile (2g -> 4g)\n" in capsys.readouterr().out
     assert swap_mutations(machine) == []
+
+
+ZRAM_UNIT = "systemd-zram-setup@zram0.service"
+
+
+def test_zram_writes_its_config_and_restarts_only_on_a_change(machine, capsys):
+    apply("zram")
+    assert settings("/etc/systemd/zram-generator.conf") == [
+        "[zram0]",
+        "zram-size = min(ram / 2, 4096)",
+        "compression-algorithm = zstd",
+        "swap-priority = 100",
+    ]
+    reload = machine.calls.index(["systemctl", "daemon-reload"])
+    assert machine.calls[reload + 1] == ["systemctl", "restart", ZRAM_UNIT]
+    assert not engine.current().files.path("/etc/sysctl.d/99-dotfiles.conf").exists()
+    capsys.readouterr()
+    machine.answers.update(
+        {
+            ("systemctl", "is-enabled", ZRAM_UNIT): (0, "generated"),
+            ("systemctl", "is-active", ZRAM_UNIT): (0, "active"),
+        }
+    )
+    machine.calls.clear()
+    apply("zram")
+    assert capsys.readouterr().out == ""
+    assert [c for c in machine.calls if c[1] not in ("is-enabled", "is-active")] == []
+
+
+def test_zram_sets_the_sysctls_asked_for(machine):
+    machine.answers[("sysctl", "-n", "vm.page-cluster")] = (0, "3")
+    apply("zram", defaults(zram={"swappiness": 100, "watermark_scale_factor": 125}))
+    assert settings("/etc/sysctl.d/99-dotfiles.conf") == [
+        "vm.swappiness = 100",
+        "vm.page-cluster = 0",
+        "vm.watermark_scale_factor = 125",
+    ]
+    assert ["sysctl", "-qw", "vm.page-cluster=0"] in machine.calls
+
+
+def test_zram_generator_is_its_own_package():
+    cfg = defaults()["features"]["zram"]
+    assert classes(ArchLinuxOs)["zram"](cfg, None).packages() == ["zram-generator"]
+    assert classes(DebianOs)["zram"](cfg, None).packages() == ["systemd-zram-generator"]

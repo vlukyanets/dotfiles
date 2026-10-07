@@ -9,7 +9,7 @@ Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
 the schema says, through the engine: a check first, a change only when the
 check fails, root only through `shell.as_root`. Today there are
 `packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile`, `git`, `fonts`,
-`zsh`, `command_not_found`, `locale`, `timesyncd` and `swap`.
+`zsh`, `command_not_found`, `locale`, `timesyncd`, `swap` and `zram`.
 
 ## Structure
 
@@ -337,6 +337,40 @@ is empty or `/` is not btrfs (`findmnt -no FSTYPE /`):
 
 `Swap.rules`: `size` empty or a number with one of `KMGTPE`, either case.
 
+## `zram` — compressed swap in RAM
+
+An example; by default `swappiness` and `watermark_scale_factor` are 0,
+the kernel's.
+
+```toml
+[features.zram]
+enabled                = true
+size                   = "min(ram / 2, 4096)"
+algorithm              = "zstd"
+priority               = 100
+swappiness             = 100
+watermark_scale_factor = 125
+```
+
+Every systemd Linux (`platforms/linux/features/zram.py`), off by default,
+on in `profiles/laptop.toml` and on the arch and deb nodes. Its package
+is `zram-generator` (Debian: `systemd-zram-generator`); then `apply()`:
+
+- `/etc/systemd/zram-generator.conf` from its template: `[zram0]` with
+  `zram-size`, `compression-algorithm` and `swap-priority`; when it
+  changed, `daemon-reload` and `systemd-zram-setup@zram0.service`
+  restarted, so zram0 takes it now. Then that unit on: it is the
+  generator's, `generated`, so started, never enabled.
+- `swappiness` set: `vm.swappiness` and `vm.page-cluster = 0` (one page
+  per swap-in: read-ahead pays on a disk, not in RAM) through
+  `ensure_sysctl`. `watermark_scale_factor` set: that sysctl too. 0
+  writes neither.
+
+`Zram.rules`: `priority` 0 to 32767, so above the swap file's (`swap`
+sets none, and the kernel's is negative): zram fills first.
+`swappiness` 0 to 200, `watermark_scale_factor` 0 to 3000, the kernel's
+ranges.
+
 ## `fonts` — fonts and fontconfig
 
 An example; by default `packages` and `nerd_fonts` are empty,
@@ -496,6 +530,9 @@ dotfiles/platforms/debian/features/timesyncd.py  Timesyncd: Linux's, with its pa
 dotfiles/platforms/linux/features/swap.py      Swap: rules, subvolume, units, the file
 system/etc/systemd/system/swap.mount.j2        its templates
 system/etc/systemd/system/swap-swapfile.swap.j2
+dotfiles/platforms/linux/features/zram.py      Zram: rules, config, the unit, sysctls
+dotfiles/platforms/debian/features/zram.py     Zram: Linux's, with Debian's package
+system/etc/systemd/zram-generator.conf.j2      its template
 dotfiles/platforms/arch/features/fonts.py      Fonts: Nerd Fonts, fc-cache, fontconfig
 home/.config/fontconfig/conf.d/50-dotfiles.conf.j2  its template
 dotfiles/platforms/linux/features/zsh.py       Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
@@ -564,6 +601,12 @@ tests/test_apply.py                            test_real_features_are_consistent
   empty `size` or a root that is not btrfs fails before any change; a
   line in fstab a notice; a dry run lists no subvolume. `test_config`: a
   `size` mkswapfile would not take is refused.
+- zram: the config, `daemon-reload` and a restart of the unit, no
+  sysctl by default; nothing but checks the second time, the unit
+  `generated`; the sysctls of `swappiness` and `watermark_scale_factor`
+  when set; `zram-generator` on Arch, `systemd-zram-generator` on Debian.
+  `test_config`: a negative `priority`, and `swappiness` or
+  `watermark_scale_factor` past the kernel's range, are refused.
 - fonts: a Nerd Font downloaded, unpacked and cached once, again for
   another version or URL, not in a dry run; `curl` among the packages only with
   Nerd Fonts; the fontconfig file with only what is set, `hinting = none`

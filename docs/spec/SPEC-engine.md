@@ -312,8 +312,9 @@ unit: a feature that needs a service gets a Void module, with runit's
   lists those classes; none → `apply` fails: `error: no platform for fedora`.
 - The `ensure_*` methods check first and return whether they changed, like `files`:
   - `ensure_service`: `is-enabled` and `is-active` first; `enabled` or
-    `static`/`alias`/`indirect` units that are not active get `start`,
-    anything else `enable --now`. `user=True` uses `--user` and no root.
+    `static`/`alias`/`indirect`/`generated` units that are not active get
+    `start` (systemd refuses to enable a generator's unit), anything else
+    `enable --now`. `user=True` uses `--user` and no root.
   - `ensure_sysctl`: `files.line` on `/etc/sysctl.d/99-dotfiles.conf`,
     then live through `sysctl -qw` when `sysctl -n` differs.
   - `ensure_gsetting`: VALUE in GVariant text form; nothing without
