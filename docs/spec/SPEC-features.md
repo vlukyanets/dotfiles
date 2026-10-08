@@ -359,7 +359,10 @@ is `zram-generator` (Debian: `systemd-zram-generator`); then `apply()`:
 - `/etc/systemd/zram-generator.conf` from its template: `[zram0]` with
   `zram-size`, `compression-algorithm` and `swap-priority`; when it
   changed, `daemon-reload` and `systemd-zram-setup@zram0.service`
-  restarted, so zram0 takes it now. Then that unit on: it is the
+  restarted, so zram0 takes it now. The restart's stop is a swapoff of
+  zram0: with no RAM free for its pages systemd cancels it and zram0 runs
+  on as it was, a notice that it keeps its old settings until a reboot,
+  when the generator reads the config. Then that unit on: it is the
   generator's, `generated`, so started, never enabled.
 - `swappiness` set: `vm.swappiness` and `vm.page-cluster = 0` (one page
   per swap-in: read-ahead pays on a disk, not in RAM) through
@@ -604,7 +607,8 @@ tests/test_apply.py                            test_real_features_are_consistent
 - zram: the config, `daemon-reload` and a restart of the unit, no
   sysctl by default; nothing but checks the second time, the unit
   `generated`; the sysctls of `swappiness` and `watermark_scale_factor`
-  when set; `zram-generator` on Arch, `systemd-zram-generator` on Debian.
+  when set; a failed restart a notice, the sysctls still set;
+  `zram-generator` on Arch, `systemd-zram-generator` on Debian.
   `test_config`: a negative `priority`, and `swappiness` or
   `watermark_scale_factor` past the kernel's range, are refused.
 - fonts: a Nerd Font downloaded, unpacked and cached once, again for

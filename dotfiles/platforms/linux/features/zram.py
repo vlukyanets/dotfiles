@@ -1,5 +1,6 @@
 """zram on every Linux: compressed swap in RAM by zram-generator, and the vm sysctls that suit it."""
 
+import subprocess
 from typing import ClassVar
 
 from dotfiles.feature import Feature
@@ -27,9 +28,18 @@ class Zram(Feature):
         """The config, zram0 set up again when it changed; the unit on; the sysctls asked for."""
         system, zram = self.system, self.settings
         if system.files.ensure(_CONF, template(_CONF, zram=zram), owner="root:root"):
-            with system.shell.as_root():
-                system.shell.run("systemctl", "daemon-reload")
-                system.shell.run("systemctl", "restart", _UNIT)
+            try:
+                with system.shell.as_root():
+                    system.shell.run("systemctl", "daemon-reload")
+                    system.shell.run("systemctl", "restart", _UNIT)
+            except subprocess.CalledProcessError:
+                # Its stop is a swapoff of zram0: with no RAM free for those pages systemd
+                # cancels the restart, and zram0 runs on as it was; the generator reads the
+                # config at boot.
+                system.report.notice(
+                    f"zram0 keeps its old settings until a reboot: restarting {_UNIT} failed"
+                    " (swapoff of zram0 needs free RAM)"
+                )
         system.ensure_service(_UNIT)
         if zram["swappiness"]:
             system.ensure_sysctl("vm.swappiness", zram["swappiness"])

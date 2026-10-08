@@ -980,6 +980,13 @@ def test_zram_sets_the_sysctls_asked_for(machine):
     assert ["sysctl", "-qw", "vm.page-cluster=0"] in machine.calls
 
 
+def test_zram_failed_restart_is_a_notice_and_the_sysctls_still_set(machine, capsys):
+    machine.answers[("systemctl", "restart", ZRAM_UNIT)] = (1, "")  # swapoff of zram0 failed
+    apply("zram", defaults(zram={"swappiness": 100}))
+    assert "zram0 keeps its old settings until a reboot: restarting" in capsys.readouterr().err
+    assert ["sysctl", "-qw", "vm.swappiness=100"] in machine.calls
+
+
 def test_zram_generator_is_its_own_package():
     cfg = defaults()["features"]["zram"]
     assert classes(ArchLinuxOs)["zram"](cfg, None).packages() == ["zram-generator"]
