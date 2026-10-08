@@ -1,0 +1,6 @@
+# Managed by dotfiles (features.oomd) — edit
+# system/etc/systemd/system/user@.service.d/10-oomd.conf.j2 in the repo, not this file.
+# Pressure kills in user sessions only: a runaway browser or build, never a service.
+[Service]
+ManagedOOMMemoryPressure=kill
+ManagedOOMMemoryPressureLimit=50%

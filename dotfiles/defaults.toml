@@ -87,6 +87,12 @@ priority               = 100  # swap-priority, 0 to 32767: above the swap file's
 swappiness             = 0    # vm.swappiness 1 to 200, vm.page-cluster 0 with it; 0: the kernel's
 watermark_scale_factor = 0    # vm.watermark_scale_factor 1 to 3000; 0: the kernel's
 
+# oomd: systemd-oomd on, killing earlier than its stock limits: a user
+# session past 50% memory pressure for 20 s, and the largest swap user
+# once swap is 90% full, before the kernel's OOM killer stalls the machine.
+[features.oomd]
+enabled = false
+
 # locale: the lines of /etc/locale.gen uncommented, locale-gen run when one
 # was not; LANG in /etc/locale.conf (Debian: /etc/default/locale); the
 # console's keymap and font in /etc/vconsole.conf (not on Debian, whose

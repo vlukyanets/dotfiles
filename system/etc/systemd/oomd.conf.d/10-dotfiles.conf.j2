@@ -1,0 +1,7 @@
+# Managed by dotfiles (features.oomd) — edit
+# system/etc/systemd/oomd.conf.d/10-dotfiles.conf.j2 in the repo, not this file.
+# 20 s of more than 60% pressure, not the stock 30 s: on a desktop, the
+# difference between a stalled session and one killed tab.
+[OOM]
+DefaultMemoryPressureLimit=60%
+DefaultMemoryPressureDurationSec=20s
