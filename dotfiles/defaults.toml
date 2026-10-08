@@ -64,6 +64,34 @@ enabled = false
 name    = ""
 email   = ""
 
+# timesyncd: the clock kept in sync by systemd-timesyncd.service, enabled
+# and started; its servers are the distribution's.
+[features.timesyncd]
+enabled = false
+
+# swap: a swap file on its own btrfs subvolume, @swap mounted on /swap (a
+# swap file in a snapshotted subvolume blocks its snapshots), both by
+# systemd units, not fstab. No priority: the kernel gives it a negative
+# one, below zram's. / must be btrfs.
+[features.swap]
+enabled = false
+size    = ""  # btrfs mkswapfile's --size, e.g. "20g"; required when on; another one recreates the file
+
+# locale: the lines of /etc/locale.gen uncommented, locale-gen run when one
+# was not; LANG in /etc/locale.conf (Debian: /etc/default/locale); the
+# console's keymap and font in /etc/vconsole.conf (not on Debian, whose
+# console-setup reads its own files); /etc/localtime linked to the timezone.
+[features.locale]
+enabled  = false
+lang     = "en_US.UTF-8"          # LANG
+locales  = ["en_US.UTF-8 UTF-8"]  # lines of /etc/locale.gen
+timezone = "UTC"                  # a file under /usr/share/zoneinfo, e.g. "Europe/Kyiv"
+
+[features.locale.console]
+keymap   = "us"
+font     = ""  # a file in /usr/share/kbd/consolefonts, e.g. "ter-v20n"; empty: the kernel's
+packages = []  # what ships it, e.g. ["terminus-font"]
+
 # fonts: font packages; Nerd Fonts downloaded from nerd_url, each in
 # ~/.local/share/fonts/nerd-fonts/<name>, fc-cache after; and
 # ~/.config/fontconfig/conf.d/50-dotfiles.conf: the families preferred

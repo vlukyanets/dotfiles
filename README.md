@@ -12,8 +12,10 @@ feature of `dotfiles/defaults.toml`, one module each per platform in
 `paru` (the AUR helper), `pkgfile` (which package has a file),
 `command_not_found` (its hook in zsh) and `fonts` (fonts and fontconfig)
 on Arch, and on all `rustup` (cargo and rustc), `no_beep` (no PC
-speaker), `git` (the user's name and email) and `zsh` (zsh with
-oh-my-zsh, the login shell). See the
+speaker), `git` (the user's name and email), `zsh` (zsh with
+oh-my-zsh, the login shell), `locale` (locales, LANG, the console,
+the timezone), `timesyncd` (the clock in sync) and `swap` (a swap file
+on btrfs), the last three not on Void yet. See the
 [capability map](docs/spec/CAPABILITY-MAP.md).
 
 ## How a host is described

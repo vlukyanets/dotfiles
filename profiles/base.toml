@@ -12,3 +12,10 @@ enabled = true
 
 [features.git]
 enabled = true
+
+[features.locale]
+enabled  = true
+timezone = "Europe/Kyiv"
+
+[features.timesyncd]
+enabled = true

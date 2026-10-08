@@ -1,5 +1,6 @@
 import os
 import pwd
+import subprocess
 import tomllib
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,6 +14,7 @@ from dotfiles.platforms.arch import ArchLinuxOs
 from dotfiles.platforms.arch._pacman import Pacman
 from dotfiles.platforms.arch.features.packaging import _jobs
 from dotfiles.platforms.debian import DebianOs
+from dotfiles.platforms.linux.features.swap import _bytes, _shown
 from dotfiles.platforms.void import VoidOs
 
 
@@ -643,3 +645,298 @@ def test_zsh_dry_run_clones_nothing(machine, monkeypatch, capsys):
     assert machine.calls == []
     assert leftover.exists()
     assert "-> oh-my-zsh cloned into " in capsys.readouterr().out
+
+
+VCONSOLE_SETUP = ["systemctl", "restart", "systemd-vconsole-setup.service"]
+
+
+def zone(name: str) -> None:
+    write(f"/usr/share/zoneinfo/{name}", "")
+
+
+def test_locale_generates_writes_and_links_once(machine, capsys):
+    write("/etc/locale.gen", "# en_US.UTF-8 UTF-8\n#ru_RU.UTF-8 UTF-8\n")
+    zone("Europe/Kyiv")
+    cfg = defaults(locale={"timezone": "Europe/Kyiv"})
+    apply("locale", cfg)
+    locale_gen = engine.current().files.path("/etc/locale.gen").read_text()
+    assert locale_gen == "en_US.UTF-8 UTF-8\n#ru_RU.UTF-8 UTF-8\n"
+    assert ["locale-gen"] in machine.calls
+    assert settings("/etc/locale.conf") == ["LANG=en_US.UTF-8"]
+    assert settings("/etc/vconsole.conf") == ["KEYMAP=us"]
+    assert VCONSOLE_SETUP in machine.calls
+    localtime = engine.current().files.path("/etc/localtime")
+    assert os.readlink(localtime) == "/usr/share/zoneinfo/Europe/Kyiv"
+    capsys.readouterr()
+    machine.calls.clear()
+    apply("locale", cfg)
+    assert capsys.readouterr().out == ""
+    assert machine.calls == []
+
+
+def test_locale_console_font_writes_it_and_a_missing_one_is_a_notice(machine, capsys):
+    zone("UTC")
+    apply("locale", defaults(locale={"console": {"font": "ter-v20n"}}))
+    assert settings("/etc/vconsole.conf") == ["KEYMAP=us", "FONT=ter-v20n"]
+    assert "console font ter-v20n is not in /usr/share/kbd/consolefonts" in capsys.readouterr().err
+
+
+def test_locale_without_a_console_is_no_error(machine):
+    zone("UTC")
+    machine.answers[tuple(VCONSOLE_SETUP)] = (1, "")
+    apply("locale")
+    assert settings("/etc/vconsole.conf") == ["KEYMAP=us"]
+
+
+def test_locale_unknown_timezone_fails_before_any_change(machine):
+    with pytest.raises(engine.Failed, match="Nowhere/Town: no such timezone"):
+        apply("locale", defaults(locale={"timezone": "Nowhere/Town"}))
+    assert not engine.current().files.path("/etc/locale.conf").exists()
+    assert machine.calls == []
+
+
+def test_locale_packages_are_the_console_fonts_on_arch_and_locales_on_debian():
+    cfg = defaults(locale={"console": {"packages": ["terminus-font"]}})["features"]["locale"]
+    assert classes(ArchLinuxOs)["locale"](cfg, None).packages() == ["terminus-font"]
+    assert classes(DebianOs)["locale"](cfg, None).packages() == ["locales"]
+
+
+def test_locale_not_in_locale_gen_is_added_at_its_end(machine):
+    write("/etc/locale.gen", "#en_US.UTF-8 UTF-8\n")
+    zone("UTC")
+    apply("locale", defaults(locale={"locales": ["en_US.UTF-8 UTF-8", "uk_UA.UTF-8 UTF-8"]}))
+    locale_gen = engine.current().files.path("/etc/locale.gen").read_text()
+    assert locale_gen == "en_US.UTF-8 UTF-8\nuk_UA.UTF-8 UTF-8\n"
+    assert ["locale-gen"] in machine.calls
+
+
+def test_locale_another_lang_rewrites_only_locale_conf(machine, capsys):
+    write("/etc/locale.gen", "en_US.UTF-8 UTF-8\n")
+    zone("UTC")
+    apply("locale")
+    capsys.readouterr()
+    machine.calls.clear()
+    apply("locale", defaults(locale={"lang": "C.UTF-8"}))
+    assert settings("/etc/locale.conf") == ["LANG=C.UTF-8"]
+    assert capsys.readouterr().out == "-> /etc/locale.conf (content differs)\n"
+    assert [c for c in machine.calls if c[0] != "install"] == []
+
+
+def test_locale_on_debian_writes_lang_where_debian_reads_it_and_no_console(machine, capsys):
+    zone("UTC")
+    cfg = defaults(locale={"console": {"font": "ter-v20n"}})
+    classes(DebianOs)["locale"](cfg["features"]["locale"], DebianOs(engine.current())).apply()
+    assert settings("/etc/default/locale") == ["LANG=en_US.UTF-8"]
+    assert not engine.current().files.path("/etc/vconsole.conf").exists()
+    assert VCONSOLE_SETUP not in machine.calls
+    assert "features.locale.console is not applied on Debian" in capsys.readouterr().err
+
+
+TIMESYNCD = ["systemctl", "enable", "--now", "systemd-timesyncd.service"]
+
+
+def test_timesyncd_enables_the_service_once(machine, capsys):
+    apply("timesyncd")
+    assert machine.calls[-1] == TIMESYNCD
+    assert "systemd-timesyncd.service enabled and started" in capsys.readouterr().out
+    machine.answers.update(
+        {
+            ("systemctl", "is-enabled", "systemd-timesyncd.service"): (0, "enabled"),
+            ("systemctl", "is-active", "systemd-timesyncd.service"): (0, "active"),
+        }
+    )
+    machine.calls.clear()
+    apply("timesyncd")
+    assert capsys.readouterr().out == ""
+    assert TIMESYNCD not in machine.calls
+
+
+def test_timesyncd_is_part_of_systemd_on_arch_and_its_own_package_on_debian():
+    cfg = defaults()["features"]["timesyncd"]
+    assert classes(ArchLinuxOs)["timesyncd"](cfg, None).packages() == []
+    assert classes(DebianOs)["timesyncd"](cfg, None).packages() == ["systemd-timesyncd"]
+
+
+SWAP_DISK = {
+    ("findmnt", "-no", "FSTYPE", "/"): (0, "btrfs"),
+    ("findmnt", "-no", "UUID", "/"): (0, "0a1b-2c3d"),
+    ("findmnt", "-no", "SOURCE", "/"): (0, "/dev/vda2[/@]"),
+    ("btrfs", "subvolume", "list", "/"): (0, "ID 256 gen 9 top level 5 path @\n"),
+}
+SWAP_UNITS = ("swap.mount", "swap-swapfile.swap")
+
+
+def test_swap_creates_the_subvolume_units_and_file_once(machine, capsys):
+    machine.answers.update(SWAP_DISK)
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert "What=UUID=0a1b-2c3d" in settings("/etc/systemd/system/swap.mount")
+    assert "Options=noatime,subvol=/@swap" in settings("/etc/systemd/system/swap.mount")
+    unit = settings("/etc/systemd/system/swap-swapfile.swap")
+    assert "What=/swap/swapfile" in unit
+    assert not any(line.startswith("Priority=") for line in unit)  # the kernel's: below zram
+    calls = [" ".join(call) for call in machine.calls]
+    assert any(c.startswith("mount -o subvolid=5 /dev/vda2 ") for c in calls)
+    assert any(c.startswith("btrfs subvolume create ") and c.endswith("/@swap") for c in calls)
+    swapfile = engine.current().files.path("/swap/swapfile")
+    assert f"btrfs filesystem mkswapfile --size 4g {swapfile}" in calls
+    assert "systemctl daemon-reload" in calls
+    for unit in SWAP_UNITS:
+        assert f"systemctl enable --now {unit}" in calls
+    assert "-> created /swap/swapfile (4g)" in capsys.readouterr().out
+    swapfile.parent.mkdir()
+    swapfile.touch()
+    os.truncate(swapfile, 4 * 1024**3)  # what mkswapfile made; sparse here
+    for unit in SWAP_UNITS:
+        machine.answers[("systemctl", "is-enabled", unit)] = (0, "enabled")
+        machine.answers[("systemctl", "is-active", unit)] = (0, "active")
+    machine.calls.clear()
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert capsys.readouterr().out == ""
+    assert [c for c in machine.calls if c[0] not in ("findmnt", "systemctl")] == []
+    assert [c for c in machine.calls if c[:2] == ["systemctl", "enable"]] == []
+
+
+def test_swap_keeps_an_existing_subvolume(machine):
+    machine.answers.update(SWAP_DISK)
+    machine.answers[("btrfs", "subvolume", "list", "/")] = (
+        0,
+        "ID 257 gen 9 top level 5 path @swap\n",
+    )
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert not any(c[:3] == ["btrfs", "subvolume", "create"] for c in machine.calls)
+
+
+@pytest.mark.parametrize(
+    ("fstype", "size", "error"),
+    [
+        ("btrfs", "", "features.swap.size is empty"),
+        ("ext4", "4g", "/ is ext4: the swap file lives on a btrfs subvolume"),
+    ],
+)
+def test_swap_fails_before_any_change(machine, fstype, size, error):
+    machine.answers[("findmnt", "-no", "FSTYPE", "/")] = (0, fstype)
+    with pytest.raises(engine.Failed, match=error):
+        apply("swap", defaults(swap={"size": size}))
+    assert not engine.current().files.path("/etc/systemd/system/swap.mount").exists()
+
+
+def test_swap_line_left_in_fstab_is_a_notice(machine, capsys):
+    machine.answers.update(SWAP_DISK)
+    write("/etc/fstab", "UUID=0a1b-2c3d /swap btrfs subvol=/@swap 0 0\n")
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert "/etc/fstab still has a line for /swap" in capsys.readouterr().err
+
+
+def test_swap_dry_run_lists_no_subvolume(machine, capsys):
+    machine.answers.update(SWAP_DISK)
+    engine.current().dry_run = True
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert "-> subvolume @swap, unless it is there (listing needs root)" in capsys.readouterr().out
+    assert not any(c[:2] == ["btrfs", "subvolume"] for c in machine.calls)
+
+
+def test_swap_needs_btrfs_progs():
+    cfg = defaults()["features"]["swap"]
+    assert classes(ArchLinuxOs)["swap"](cfg, None).packages() == ["btrfs-progs"]
+    assert classes(DebianOs)["swap"](cfg, None).packages() == ["btrfs-progs"]
+
+
+def swap_in_use(machine, capsys, size: str, have: int | None = None) -> Path:
+    """A swap file of HAVE bytes (SIZE's), made with SIZE, its units on: swap already ran."""
+    machine.answers.update(SWAP_DISK)
+    for unit in SWAP_UNITS:
+        machine.answers[("systemctl", "is-enabled", unit)] = (0, "enabled")
+        machine.answers[("systemctl", "is-active", unit)] = (0, "active")
+    swapfile = engine.current().files.path("/swap/swapfile")
+    swapfile.parent.mkdir(parents=True)
+    swapfile.touch()
+    os.truncate(swapfile, _bytes(size) if have is None else have)  # sparse: no disk used
+    apply("swap", defaults(swap={"size": size}))
+    capsys.readouterr()
+    machine.calls.clear()
+    return swapfile
+
+
+def swap_mutations(machine) -> list[list[str]]:
+    return [
+        c
+        for c in machine.calls
+        if c[0] != "findmnt" and c[1:2] not in (["is-enabled"], ["is-active"])
+    ]
+
+
+@pytest.mark.parametrize(
+    ("size", "n"), [("4096", 4096), ("1k", 1024), ("2G", 2 * 1024**3), ("1t", 1024**4)]
+)
+def test_swap_size_in_bytes(size, n):
+    assert _bytes(size) == n
+
+
+@pytest.mark.parametrize(
+    ("n", "shown"),
+    [(2 * 1024**3, "2g"), (1536 * 1024**2, "1536m"), (1024**4, "1t"), (1000, "1000")],
+)
+def test_swap_size_shown_in_its_largest_whole_unit(n, shown):
+    assert _shown(n) == shown
+
+
+def test_swap_file_within_a_page_of_the_size_is_left_alone(machine, capsys):
+    page = os.sysconf("SC_PAGE_SIZE")
+    swap_in_use(machine, capsys, str(page + 1), have=page)  # mkswapfile makes whole pages
+    apply("swap", defaults(swap={"size": str(page + 1)}))
+    assert capsys.readouterr().out == ""
+    assert swap_mutations(machine) == []
+
+
+def test_swap_file_recreated_is_turned_on_again(machine, capsys):
+    swap_in_use(machine, capsys, "2g")
+    machine.answers[("systemctl", "is-active", "swap-swapfile.swap")] = (3, "inactive")  # stopped
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert swap_mutations(machine)[-1] == ["systemctl", "start", "swap-swapfile.swap"]
+
+
+def test_swap_file_mkswapfile_failing_after_rm_fails_the_feature(machine, capsys):
+    swapfile = swap_in_use(machine, capsys, "2g")
+    mkswapfile = ("btrfs", "filesystem", "mkswapfile", "--size", "4g", str(swapfile))
+    machine.answers[mkswapfile] = (1, "")  # no room for 4g
+    with pytest.raises(subprocess.CalledProcessError):
+        apply("swap", defaults(swap={"size": "4g"}))
+    # Swap stays off, no file: the next apply creates one, as on a new host.
+    assert swap_mutations(machine)[-2:] == [["rm", "-f", str(swapfile)], list(mkswapfile)]
+    assert "recreated" not in capsys.readouterr().out
+
+
+def test_swap_file_of_the_size_set_is_left_alone(machine, capsys):
+    swap_in_use(machine, capsys, "4g")
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert capsys.readouterr().out == ""
+    assert swap_mutations(machine) == []
+
+
+def test_swap_file_of_another_size_is_recreated(machine, capsys):
+    swapfile = swap_in_use(machine, capsys, "2g")
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert swap_mutations(machine) == [
+        ["systemctl", "stop", "swap-swapfile.swap"],
+        ["rm", "-f", str(swapfile)],
+        ["btrfs", "filesystem", "mkswapfile", "--size", "4g", str(swapfile)],
+    ]
+    assert "-> recreated /swap/swapfile (2g -> 4g)\n" in capsys.readouterr().out
+
+
+def test_swap_file_kept_while_swapoff_fails_is_a_notice(machine, capsys):
+    swap_in_use(machine, capsys, "2g")
+    machine.answers[("systemctl", "stop", "swap-swapfile.swap")] = (1, "")
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert swap_mutations(machine) == [["systemctl", "stop", "swap-swapfile.swap"]]
+    out, err = capsys.readouterr()
+    assert "recreated" not in out
+    assert "/swap/swapfile is 2g, not 4g: swapoff failed" in err
+
+
+def test_swap_file_recreated_in_a_dry_run_runs_nothing(machine, capsys):
+    swap_in_use(machine, capsys, "2g")
+    engine.current().dry_run = True
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert "-> recreated /swap/swapfile (2g -> 4g)\n" in capsys.readouterr().out
+    assert swap_mutations(machine) == []
