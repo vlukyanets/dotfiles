@@ -13,3 +13,7 @@ packages = ["terminus-font"]
 
 [features.swap]
 size = "20g"
+
+[features.zram]
+swappiness             = 100
+watermark_scale_factor = 125

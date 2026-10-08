@@ -77,6 +77,16 @@ enabled = false
 enabled = false
 size    = ""  # btrfs mkswapfile's --size, e.g. "20g"; required when on; another one recreates the file
 
+# zram: compressed swap in RAM, set up by zram-generator from
+# /etc/systemd/zram-generator.conf, with the vm sysctls that suit it.
+[features.zram]
+enabled                = false
+size                   = "min(ram / 2, 4096)"  # zram-generator's zram-size, in MiB
+algorithm              = "zstd"                # compression-algorithm
+priority               = 100  # swap-priority, 0 to 32767: above the swap file's, which is negative
+swappiness             = 0    # vm.swappiness 1 to 200, vm.page-cluster 0 with it; 0: the kernel's
+watermark_scale_factor = 0    # vm.watermark_scale_factor 1 to 3000; 0: the kernel's
+
 # locale: the lines of /etc/locale.gen uncommented, locale-gen run when one
 # was not; LANG in /etc/locale.conf (Debian: /etc/default/locale); the
 # console's keymap and font in /etc/vconsole.conf (not on Debian, whose

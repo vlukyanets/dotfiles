@@ -18,7 +18,7 @@ class LinuxOs(OperatingSystem):
         scope = ["--user"] if user else []
         enabled = self.shell.output("systemctl", *scope, "is-enabled", unit) or ""
         active = self.shell.output("systemctl", *scope, "is-active", unit) or ""
-        if enabled in ("enabled", "static", "alias", "indirect"):
+        if enabled in ("enabled", "static", "alias", "indirect", "generated"):
             if active == "active":
                 return False
             verb = ["start"]

@@ -3,3 +3,6 @@ extends = ["vm"]
 # Off on this VM for now.
 [features.rustup]
 enabled = false
+
+[features.zram]
+enabled = true

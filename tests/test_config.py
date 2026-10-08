@@ -121,6 +121,21 @@ def test_swap_size_is_one_mkswapfile_takes(tmp_path, size):
         resolve("h", tmp_path, checks=feature.checks())
 
 
+@pytest.mark.parametrize(
+    ("setting", "error"),
+    [
+        ("priority = -1", "priority: must be 0 to 32767, above the swap file's"),
+        ("swappiness = 201", "swappiness: must be 0 to 200"),
+        ("watermark_scale_factor = 3001", "watermark_scale_factor: must be 0 to 3000"),
+    ],
+)
+def test_zram_numbers_in_their_ranges(tmp_path, setting, error):
+    write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
+    write(tmp_path, "hosts/h.toml", f"[features.zram]\n{setting}\n")
+    with pytest.raises(ConfigError, match=error):
+        resolve("h", tmp_path, checks=feature.checks())
+
+
 def test_a_key_without_default_is_there_only_when_set(tmp_path):
     write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
     write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = true\n")

@@ -38,6 +38,7 @@ def arch() -> ArchLinuxOs:
         ("", "", ["enable", "--now"]),  # not installed yet
         ("enabled", "failed", ["start"]),
         ("static", "inactive", ["start"]),
+        ("generated", "inactive", ["start"]),  # a generator's: enable refuses it
     ],
 )
 def test_ensure_service(system, arch, capsys, enabled, active, call):
