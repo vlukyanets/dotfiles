@@ -485,7 +485,9 @@ tests/test_apply.py                            test_real_features_are_consistent
   nothing the second time; nothing set: no `[user]`, the config created
   with the include alone.
 - locale: the line uncommented, `locale-gen`, LANG, KEYMAP, the console
-  set up and the zone linked, nothing the second time; `FONT=` with a
+  set up and the zone linked, nothing the second time; a locale missing
+  from `locale.gen` added at its end; another `lang` rewrites
+  `locale.conf` alone, no `locale-gen`; `FONT=` with a
   font, a missing one a notice; a failed console setup is no error; an
   unknown zone fails before any change; the packages are the console's on
   Arch and `locales` on Debian; on Debian LANG in `/etc/default/locale`, no

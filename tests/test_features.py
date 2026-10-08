@@ -699,6 +699,27 @@ def test_locale_packages_are_the_console_fonts_on_arch_and_locales_on_debian():
     assert classes(DebianOs)["locale"](cfg, None).packages() == ["locales"]
 
 
+def test_locale_not_in_locale_gen_is_added_at_its_end(machine):
+    write("/etc/locale.gen", "#en_US.UTF-8 UTF-8\n")
+    zone("UTC")
+    apply("locale", defaults(locale={"locales": ["en_US.UTF-8 UTF-8", "uk_UA.UTF-8 UTF-8"]}))
+    locale_gen = engine.current().files.path("/etc/locale.gen").read_text()
+    assert locale_gen == "en_US.UTF-8 UTF-8\nuk_UA.UTF-8 UTF-8\n"
+    assert ["locale-gen"] in machine.calls
+
+
+def test_locale_another_lang_rewrites_only_locale_conf(machine, capsys):
+    write("/etc/locale.gen", "en_US.UTF-8 UTF-8\n")
+    zone("UTC")
+    apply("locale")
+    capsys.readouterr()
+    machine.calls.clear()
+    apply("locale", defaults(locale={"lang": "C.UTF-8"}))
+    assert settings("/etc/locale.conf") == ["LANG=C.UTF-8"]
+    assert capsys.readouterr().out == "-> /etc/locale.conf (content differs)\n"
+    assert [c for c in machine.calls if c[0] != "install"] == []
+
+
 def test_locale_on_debian_writes_lang_where_debian_reads_it_and_no_console(machine, capsys):
     zone("UTC")
     cfg = defaults(locale={"console": {"font": "ter-v20n"}})
