@@ -10,7 +10,7 @@ feature of `dotfiles/defaults.toml`, one module each per platform in
 `dotfiles/platforms/<name>/features/`. Today there are `packaging`
 (pacman and makepkg drop-ins), `reflector` (the mirrorlist on a timer),
 `paru` (the AUR helper), `pkgfile` (which package has a file),
-`command_not_found` (its hook in zsh) and `fonts` (fonts and fontconfig)
+`command_not_found` (its hook in zsh, bash or both) and `fonts` (fonts and fontconfig)
 on Arch, and on all `rustup` (cargo and rustc), `no_beep` (no PC
 speaker), `git` (the user's name and email), `zsh` (zsh with
 oh-my-zsh, the login shell), `locale` (locales, LANG, the console,
