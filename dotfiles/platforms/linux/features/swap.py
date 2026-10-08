@@ -1,5 +1,6 @@
 """swap on every Linux: a swap file on its own btrfs subvolume, mounted and on by systemd units."""
 
+import os
 import re
 import subprocess
 import tempfile
@@ -17,10 +18,30 @@ _SWAPFILE = f"{_MOUNTPOINT}/swapfile"
 _MOUNT = "swap.mount"
 _SWAP = "swap-swapfile.swap"
 _UNITS = "/etc/systemd/system"
+_SIZES = "KMGTPE"  # mkswapfile's suffixes, each 1024 times the one before
+
+
+def _bytes(size: str) -> int:
+    """SIZE as mkswapfile takes it, in bytes: "4g" -> 4294967296."""
+    digits, unit = re.fullmatch(rf"(\d+)([{_SIZES}]?)", size, re.IGNORECASE).groups()
+    return int(digits) * 1024 ** (_SIZES.index(unit.upper()) + 1 if unit else 0)
+
+
+def _pages(n: int) -> int:
+    """N bytes down to whole pages: a swap file uses no more, however it was made."""
+    return n // os.sysconf("SC_PAGE_SIZE")
+
+
+def _shown(n: int) -> str:
+    """N bytes in the largest suffix that divides them: 2147483648 -> "2g"."""
+    for power in range(len(_SIZES), 0, -1):
+        if n % 1024**power == 0:
+            return f"{n // 1024**power}{_SIZES[power - 1].lower()}"
+    return str(n)
 
 
 class Swap(Feature):
-    """@swap mounted on /swap, the swap file in it created once and on; units, not fstab."""
+    """@swap mounted on /swap, the swap file in it of the size set and on; units, not fstab."""
 
     rules: ClassVar[dict[str, tuple]] = {
         "size": (lambda v: v == "" or re.fullmatch(r"\d+[KMGTPEkmgtpe]?", v), 'a size like "20g"'),
@@ -31,7 +52,7 @@ class Swap(Feature):
         return ["btrfs-progs"]
 
     def apply(self) -> None:
-        """The subvolume, the units, the file, each once; checks first, so a wrong host changes nothing."""
+        """The subvolume, the units, the file of its size; checks first, so a wrong host changes nothing."""
         system = self.system
         files, shell = system.files, system.shell
         size = self.settings["size"]
@@ -59,13 +80,13 @@ class Swap(Feature):
             if not mountpoint.is_dir():
                 shell.run("mkdir", "-p", str(mountpoint))
         system.ensure_service(_MOUNT)
-        if not files.path(_SWAPFILE).exists():
+        swapfile = files.path(_SWAPFILE)
+        if not swapfile.exists():
             with shell.as_root():
-                shell.run(
-                    "btrfs", "filesystem", "mkswapfile", "--size", size, str(files.path(_SWAPFILE)),
-                    stdout=subprocess.DEVNULL,
-                )  # fmt: skip
+                self._mkswapfile(size)
             system.report.changed(f"created {_SWAPFILE} ({size})")
+        elif _pages(have := swapfile.stat().st_size) != _pages(_bytes(size)):
+            self._recreate(size, have)
         system.ensure_service(_SWAP)
         fstab = files.path("/etc/fstab")
         if fstab.exists() and re.search(
@@ -75,6 +96,31 @@ class Swap(Feature):
                 f"/etc/fstab still has a line for {_MOUNTPOINT} or {_SWAPFILE}:"
                 " the systemd units own both now, remove it"
             )
+
+    def _mkswapfile(self, size: str) -> None:
+        """The swap file made, SIZE bytes, by btrfs: no holes, no copy-on-write."""
+        self.system.shell.run(
+            "btrfs", "filesystem", "mkswapfile", "--size", size, str(self.system.files.path(_SWAPFILE)),
+            stdout=subprocess.DEVNULL,
+        )  # fmt: skip
+
+    def _recreate(self, size: str, have: int) -> None:
+        """The swap file, HAVE bytes, made again with SIZE; left as it is while swapoff fails."""
+        system = self.system
+        shell = system.shell
+        try:
+            with shell.as_root():
+                shell.run("systemctl", "stop", _SWAP)  # swapoff: its pages go back to RAM
+        except subprocess.CalledProcessError:
+            system.report.notice(
+                f"{_SWAPFILE} is {_shown(have)}, not {size}: swapoff failed, its pages need"
+                " free RAM; free some or reboot, the next apply recreates it"
+            )
+            return
+        with shell.as_root():
+            shell.run("rm", "-f", str(system.files.path(_SWAPFILE)))
+            self._mkswapfile(size)
+        system.report.changed(f"recreated {_SWAPFILE} ({_shown(have)} -> {size})")
 
     def _subvolume(self) -> None:
         """@swap at the top of the root filesystem, unless it is there."""

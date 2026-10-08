@@ -324,9 +324,13 @@ is empty or `/` is not btrfs (`findmnt -no FSTYPE /`):
   templates; `daemon-reload` when either changed. Units, not fstab: a line
   of `/etc/fstab` for `/swap` or the file is a notice to remove it.
 - `/swap` created, `swap.mount` enabled and started; the file created by
-  `btrfs filesystem mkswapfile --size <size>` once, while it is not there:
-  another `size` later does not resize it. Then the `.swap` unit enabled
-  and started.
+  `btrfs filesystem mkswapfile --size <size>` while it is not there. One
+  of another size (`stat`, no root; both in whole pages) is made again:
+  the `.swap` unit stopped (swapoff), the file removed and made with
+  `size`, `recreated /swap/swapfile (2g -> 4g)`. A failed swapoff (its
+  pages find no free RAM) leaves the file, a notice to free memory or
+  reboot; the next apply tries again. Then the `.swap` unit enabled and
+  started.
 - No `Priority=`: the kernel gives the file a negative priority, so swap
   with a priority from 0 up (zram's) fills first, and the disk takes only
   what does not fit there.
@@ -549,7 +553,10 @@ tests/test_apply.py                            test_real_features_are_consistent
   on Arch, `systemd-timesyncd` on Debian.
 - swap: the subvolume created, both units, `daemon-reload`, the file and
   both units enabled, the `.swap` with no `Priority=`; nothing changed and
-  no command but checks the second time; an existing `@swap` kept; an
+  no command but checks the second time; a file of the size set left
+  alone, one of another size stopped, removed and made again, kept with a
+  notice while swapoff fails, only reported in a dry run; an existing
+  `@swap` kept; an
   empty `size` or a root that is not btrfs fails before any change; a
   line in fstab a notice; a dry run lists no subvolume. `test_config`: a
   `size` mkswapfile would not take is refused.

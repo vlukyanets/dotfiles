@@ -783,6 +783,7 @@ def test_swap_creates_the_subvolume_units_and_file_once(machine, capsys):
     assert "-> created /swap/swapfile (4g)" in capsys.readouterr().out
     swapfile.parent.mkdir()
     swapfile.touch()
+    os.truncate(swapfile, 4 * 1024**3)  # what mkswapfile made; sparse here
     for unit in SWAP_UNITS:
         machine.answers[("systemctl", "is-enabled", unit)] = (0, "enabled")
         machine.answers[("systemctl", "is-active", unit)] = (0, "active")
@@ -836,3 +837,63 @@ def test_swap_needs_btrfs_progs():
     cfg = defaults()["features"]["swap"]
     assert classes(ArchLinuxOs)["swap"](cfg, None).packages() == ["btrfs-progs"]
     assert classes(DebianOs)["swap"](cfg, None).packages() == ["btrfs-progs"]
+
+
+def swap_in_use(machine, capsys, size: str) -> Path:
+    """A swap file made with SIZE, its units written and on: a host where swap already ran."""
+    machine.answers.update(SWAP_DISK)
+    for unit in SWAP_UNITS:
+        machine.answers[("systemctl", "is-enabled", unit)] = (0, "enabled")
+        machine.answers[("systemctl", "is-active", unit)] = (0, "active")
+    swapfile = engine.current().files.path("/swap/swapfile")
+    swapfile.parent.mkdir(parents=True)
+    swapfile.touch()
+    os.truncate(swapfile, int(size[:-1]) * 1024**3)  # sparse: no disk used
+    apply("swap", defaults(swap={"size": size}))
+    capsys.readouterr()
+    machine.calls.clear()
+    return swapfile
+
+
+def swap_mutations(machine) -> list[list[str]]:
+    return [
+        c
+        for c in machine.calls
+        if c[0] != "findmnt" and c[1:2] not in (["is-enabled"], ["is-active"])
+    ]
+
+
+def test_swap_file_of_the_size_set_is_left_alone(machine, capsys):
+    swap_in_use(machine, capsys, "4g")
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert capsys.readouterr().out == ""
+    assert swap_mutations(machine) == []
+
+
+def test_swap_file_of_another_size_is_recreated(machine, capsys):
+    swapfile = swap_in_use(machine, capsys, "2g")
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert swap_mutations(machine) == [
+        ["systemctl", "stop", "swap-swapfile.swap"],
+        ["rm", "-f", str(swapfile)],
+        ["btrfs", "filesystem", "mkswapfile", "--size", "4g", str(swapfile)],
+    ]
+    assert "-> recreated /swap/swapfile (2g -> 4g)\n" in capsys.readouterr().out
+
+
+def test_swap_file_kept_while_swapoff_fails_is_a_notice(machine, capsys):
+    swap_in_use(machine, capsys, "2g")
+    machine.answers[("systemctl", "stop", "swap-swapfile.swap")] = (1, "")
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert swap_mutations(machine) == [["systemctl", "stop", "swap-swapfile.swap"]]
+    out, err = capsys.readouterr()
+    assert "recreated" not in out
+    assert "/swap/swapfile is 2g, not 4g: swapoff failed" in err
+
+
+def test_swap_file_recreated_in_a_dry_run_runs_nothing(machine, capsys):
+    swap_in_use(machine, capsys, "2g")
+    engine.current().dry_run = True
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert "-> recreated /swap/swapfile (2g -> 4g)\n" in capsys.readouterr().out
+    assert swap_mutations(machine) == []

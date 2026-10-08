@@ -75,7 +75,7 @@ enabled = false
 # one, below zram's. / must be btrfs.
 [features.swap]
 enabled = false
-size    = ""  # btrfs mkswapfile's --size, e.g. "20g"; required when on; only at creation
+size    = ""  # btrfs mkswapfile's --size, e.g. "20g"; required when on; another one recreates the file
 
 # locale: the lines of /etc/locale.gen uncommented, locale-gen run when one
 # was not; LANG in /etc/locale.conf (Debian: /etc/default/locale); the
