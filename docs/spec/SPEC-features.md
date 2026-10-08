@@ -555,7 +555,11 @@ tests/test_apply.py                            test_real_features_are_consistent
   both units enabled, the `.swap` with no `Priority=`; nothing changed and
   no command but checks the second time; a file of the size set left
   alone, one of another size stopped, removed and made again, kept with a
-  notice while swapoff fails, only reported in a dry run; an existing
+  notice while swapoff fails, only reported in a dry run, its unit
+  started again; within a page of the size left alone (no recreating on
+  every apply); `mkswapfile` failing after `rm` fails the feature, swap
+  off, the next apply creating the file anew; `size` in bytes and the
+  shown size for each suffix; an existing
   `@swap` kept; an
   empty `size` or a root that is not btrfs fails before any change; a
   line in fstab a notice; a dry run lists no subvolume. `test_config`: a

@@ -1,5 +1,6 @@
 import os
 import pwd
+import subprocess
 import tomllib
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,6 +14,7 @@ from dotfiles.platforms.arch import ArchLinuxOs
 from dotfiles.platforms.arch._pacman import Pacman
 from dotfiles.platforms.arch.features.packaging import _jobs
 from dotfiles.platforms.debian import DebianOs
+from dotfiles.platforms.linux.features.swap import _bytes, _shown
 from dotfiles.platforms.void import VoidOs
 
 
@@ -839,8 +841,8 @@ def test_swap_needs_btrfs_progs():
     assert classes(DebianOs)["swap"](cfg, None).packages() == ["btrfs-progs"]
 
 
-def swap_in_use(machine, capsys, size: str) -> Path:
-    """A swap file made with SIZE, its units written and on: a host where swap already ran."""
+def swap_in_use(machine, capsys, size: str, have: int | None = None) -> Path:
+    """A swap file of HAVE bytes (SIZE's), made with SIZE, its units on: swap already ran."""
     machine.answers.update(SWAP_DISK)
     for unit in SWAP_UNITS:
         machine.answers[("systemctl", "is-enabled", unit)] = (0, "enabled")
@@ -848,7 +850,7 @@ def swap_in_use(machine, capsys, size: str) -> Path:
     swapfile = engine.current().files.path("/swap/swapfile")
     swapfile.parent.mkdir(parents=True)
     swapfile.touch()
-    os.truncate(swapfile, int(size[:-1]) * 1024**3)  # sparse: no disk used
+    os.truncate(swapfile, _bytes(size) if have is None else have)  # sparse: no disk used
     apply("swap", defaults(swap={"size": size}))
     capsys.readouterr()
     machine.calls.clear()
@@ -861,6 +863,47 @@ def swap_mutations(machine) -> list[list[str]]:
         for c in machine.calls
         if c[0] != "findmnt" and c[1:2] not in (["is-enabled"], ["is-active"])
     ]
+
+
+@pytest.mark.parametrize(
+    ("size", "n"), [("4096", 4096), ("1k", 1024), ("2G", 2 * 1024**3), ("1t", 1024**4)]
+)
+def test_swap_size_in_bytes(size, n):
+    assert _bytes(size) == n
+
+
+@pytest.mark.parametrize(
+    ("n", "shown"),
+    [(2 * 1024**3, "2g"), (1536 * 1024**2, "1536m"), (1024**4, "1t"), (1000, "1000")],
+)
+def test_swap_size_shown_in_its_largest_whole_unit(n, shown):
+    assert _shown(n) == shown
+
+
+def test_swap_file_within_a_page_of_the_size_is_left_alone(machine, capsys):
+    page = os.sysconf("SC_PAGE_SIZE")
+    swap_in_use(machine, capsys, str(page + 1), have=page)  # mkswapfile makes whole pages
+    apply("swap", defaults(swap={"size": str(page + 1)}))
+    assert capsys.readouterr().out == ""
+    assert swap_mutations(machine) == []
+
+
+def test_swap_file_recreated_is_turned_on_again(machine, capsys):
+    swap_in_use(machine, capsys, "2g")
+    machine.answers[("systemctl", "is-active", "swap-swapfile.swap")] = (3, "inactive")  # stopped
+    apply("swap", defaults(swap={"size": "4g"}))
+    assert swap_mutations(machine)[-1] == ["systemctl", "start", "swap-swapfile.swap"]
+
+
+def test_swap_file_mkswapfile_failing_after_rm_fails_the_feature(machine, capsys):
+    swapfile = swap_in_use(machine, capsys, "2g")
+    mkswapfile = ("btrfs", "filesystem", "mkswapfile", "--size", "4g", str(swapfile))
+    machine.answers[mkswapfile] = (1, "")  # no room for 4g
+    with pytest.raises(subprocess.CalledProcessError):
+        apply("swap", defaults(swap={"size": "4g"}))
+    # Swap stays off, no file: the next apply creates one, as on a new host.
+    assert swap_mutations(machine)[-2:] == [["rm", "-f", str(swapfile)], list(mkswapfile)]
+    assert "recreated" not in capsys.readouterr().out
 
 
 def test_swap_file_of_the_size_set_is_left_alone(machine, capsys):
