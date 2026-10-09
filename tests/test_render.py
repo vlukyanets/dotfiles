@@ -1,8 +1,11 @@
+import re
 import shutil
+import tomllib
 from pathlib import Path
 
 import pytest
 
+from dotfiles import feature
 from dotfiles.apply import check
 from dotfiles.errors import ConfigError
 from dotfiles.layout import Layout
@@ -56,3 +59,16 @@ def test_merge_over():
         "b": 2,
     }
     assert merge_over({"a": 1}, {"a": {"x": 0}}) == {"a": 1}
+
+
+def test_templates_name_keys_the_schema_has():
+    schema = tomllib.loads(Layout().defaults.read_text())
+    types = feature.checks().types  # keys with no default: packaging.pacman.multilib
+    for path in sorted([*Layout().system.rglob("*.j2"), *Layout().home.rglob("*.j2")]):
+        for key in re.findall(r"\bfeatures\.[a-z_.]*[a-z_]", path.read_text()):
+            if key in types:
+                continue
+            found = schema
+            for part in key.split("."):
+                assert isinstance(found, dict) and part in found, f"{path}: {key}: no such key"
+                found = found[part]
