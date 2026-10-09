@@ -699,9 +699,13 @@ tests/test_apply.py                                           test_real_features
   no file sets unmet, a key that is not a boolean and an unknown `op`
   refused, a disabled owner reported, the requiring feature run after
   its owner and failed with it, a cycle through an owner found.
-- `before_packages` (`test_apply`): run before the install and its
-  packages installed after it; requiring a feature without the flag
-  refused; its failure blocks what runs after it, not the install.
+- `before_packages` (`test_apply`): run before the install, its
+  packages in their own transaction before the others' (`installs ==
+  [["tool"], ["app"]]`), its AUR packages built before the others'
+  transaction, `depends()` asked only after both; requiring a feature
+  without the flag refused; its failure, or its transaction's, blocks
+  what runs after it, not the other install; a dry run prints both
+  `packages:` lines.
 
 ## Boundaries
 

@@ -452,23 +452,35 @@ class Docker(Feature):  # platforms/arch/features/containers/docker.py
    class, then `system.manager.setup()`, on every apply (it checks first;
    the base one does nothing, and `Pacman` has none of its own).
 2. **Features before packages.** The features whose class sets
-   `before_packages = True`, in their order: what makes packages
-   installable, a repository (`packaging`'s multilib) before the install
-   that needs it, so a fresh machine needs one apply, not two. Such a
-   feature's `apply()` must not need its own packages, which the next
-   phase installs, and it cannot require a feature without the flag,
-   which runs later: `packaging: before_packages, so it cannot require X`,
-   from `steps()`. Its failure blocks what runs after it, as in phase 4;
-   the install still runs. What the install leaves of its packages for
-   the AUR is built at its place in phase 4.
-3. **Packages.** The packages of every enabled feature that applies here,
-   together: `manager.missing(...)`, and when something is missing, one
+   `before_packages = True`, in their order: what the other packages
+   stand on. A repository (`packaging`'s multilib) before the install
+   that needs it; a provider from the AUR (`hardware.graphics`'s
+   `lib32-nvidia-580xx-utils`) before a package that depends on what it
+   provides (steam's `lib32-vulkan-driver`), which `--noconfirm` would
+   otherwise fill with the repositories' default. So a fresh machine
+   needs one apply, not two. Such a feature's `apply()` must not need its
+   own packages, which the next phase installs, and it cannot require a
+   feature without the flag, which runs later: `packaging:
+   before_packages, so it cannot require X`, from `steps()`. Its failure
+   blocks what runs after it, as in phase 5; the rest goes on.
+3. **Their packages.** The packages of the features of phase 2 that did
+   not fail, as phase 4 installs the others: one line `-> packages: a b
+   (missing)`, one transaction with their `replaces()` removed first,
+   then what it returns, not in the repositories, built at once, each
+   feature's under its own name and in phase 2's order, a failure its
+   own. Neither phase asks `manager.depends(...)`: its cache, kept for
+   the apply, would hold a package of a repository phase 2 adds (steam,
+   of multilib) as needing nothing. A failed transaction fails the
+   features whose packages are missing after it (`packages missing:
+   …`); phase 4 runs either way.
+4. **Packages.** The packages of every other enabled feature that
+   applies here, together: `manager.missing(...)`, and when something is missing, one
    line `-> packages: a b c (missing)` and `manager.install(...)` in one
    transaction, whose order is the package manager's, what the features
    `replaces()` removed first. What install() returns, not in the
    repositories, is built at its feature's turn. Nothing missing →
    nothing printed, no root.
-4. **Features, in order;** each first gets the packages install() left,
+5. **Features, in order;** each first gets the packages install() left,
    built with `manager.build(...)` (the AUR on Arch), a failure its own.
    Feature A runs before feature B when B
    requires A, or when a package of B needs a package that A has and B
@@ -482,7 +494,7 @@ class Docker(Feature):  # platforms/arch/features/containers/docker.py
    glvnd → graphics → glvnd`, and the features after them are not run as
    after any failure.
    Each runs as `Docker(settings, system).apply()` does.
-5. **Notices.**
+6. **Notices.**
 
 stdout is line-buffered, so `->` lines and the output of child commands appear in
 order.
@@ -626,9 +638,12 @@ class Locale(Feature):  # platforms/linux/features/system/locale.py: glibc is al
    truly common lives in `linux/`, the one base, as helpers on `LinuxOs`
    and fallback features.
 3. **Package names are per platform**, never mapped.
-4. **All packages in one transaction**, before any feature runs but the
-   few that make packages installable (`before_packages`): one check, one
-   sudo, and the package manager orders the installation.
+4. **Packages in two transactions at most**, in order: the packages of
+   the features the others' stand on (`before_packages`), then all the
+   rest, before any other feature runs. Not every package can be
+   installed in one pass (a repository added, a provider from the AUR),
+   and two keep one check and one sudo each; the package manager orders
+   each.
 5. **A failed feature blocks only what builds on it**, in the package
    graph or by requirement; the rest of the apply goes on.
 6. **`files` and `ensure_*` return whether they changed something**; the engine only
