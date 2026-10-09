@@ -1095,3 +1095,23 @@ def test_oomd_is_part_of_systemd_on_arch_and_its_own_package_on_debian():
 
 def test_packaging_runs_before_the_package_install():
     assert classes(ArchLinuxOs)["packaging"].before_packages
+
+
+def _dkms():
+    """Arch's system.dkms on the test machine."""
+    return classes(ArchLinuxOs)["system.dkms"]({"enabled": True}, ArchLinuxOs(engine.current()))
+
+
+def test_dkms_installs_the_headers_of_every_kernel():
+    write("/usr/lib/modules/7.2.9-arch1-1/pkgbase", "linux\n")
+    write("/usr/lib/modules/6.18.55-1-lts/pkgbase", "\nlinux-lts\n\n")
+    write("/usr/lib/modules/6.1.0-extramodules/version", "")  # no pkgbase: not a kernel
+    assert _dkms().packages() == ["dkms", "linux-headers", "linux-lts-headers"]
+    assert classes(ArchLinuxOs)["system.dkms"].before_packages
+
+
+def test_dkms_without_a_kernel_installs_dkms_alone_and_says_so():
+    dkms = _dkms()
+    assert dkms.packages() == ["dkms"]
+    dkms.apply()
+    assert any("no kernel" in n for n in engine.current().report.notices)

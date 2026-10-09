@@ -94,6 +94,13 @@ watermark_scale_factor = 0    # vm.watermark_scale_factor 1 to 3000; 0: the kern
 [features.system.oomd]
 enabled = false
 
+# system.dkms: dkms and the headers of every installed kernel, each one's
+# package read from /usr/lib/modules/*/pkgbase, so DKMS builds a module
+# (hardware.graphics's NVIDIA driver) for each. Runs before the other
+# packages, as hardware.graphics does.
+[features.system.dkms]
+enabled = false
+
 # system.locale: the lines of /etc/locale.gen uncommented, locale-gen run when one
 # was not; LANG in /etc/locale.conf (Debian: /etc/default/locale); the
 # console's keymap and font in /etc/vconsole.conf (not on Debian, whose
