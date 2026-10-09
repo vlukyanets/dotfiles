@@ -11,7 +11,7 @@ from dotfiles import apply as runner
 from dotfiles import config, engine
 from dotfiles.apply import apply
 from dotfiles.errors import ConfigError
-from dotfiles.feature import classes, table
+from dotfiles.feature import Setting, classes, table
 from dotfiles.layout import Layout
 from dotfiles.plan import Step, cycles, order, steps
 from dotfiles.platforms import discovery
@@ -22,7 +22,7 @@ from dotfiles.platforms.operating_system import OperatingSystem
 from dotfiles.platforms.package_manager import PackageManager
 from dotfiles.platforms.void import VoidOs
 
-HEAD = "from dotfiles.engine import defer, die\nfrom dotfiles.feature import Feature\n\n\n"
+HEAD = "from dotfiles.engine import defer, die\nfrom dotfiles.feature import Feature, Setting\n\n\n"
 
 
 class FakeManager(PackageManager):
@@ -88,7 +88,7 @@ def feature(
     apply: str = "pass",
     packages: list[str] | None = None,
     replaces: list[str] | None = None,
-    requires: list[str] | None = None,
+    requires: list | None = None,
 ) -> str:
     body = f"class {cls}(Feature):\n    def apply(self):\n        {apply}\n\n"
     body += f"    def packages(self):\n        return {packages or []!r}\n"
@@ -512,6 +512,82 @@ def test_a_requirement_left_off_is_a_config_error(root, system, tmp_path, monkey
     cfg["features"]["off"]["enabled"] = True
     with pytest.raises(ConfigError, match="^on: requires nope, which is not a feature$"):
         runner.requirements(cfg)
+
+
+_SETTINGS_SCHEMA = """\
+[features.own]
+flag = false
+name = "x"
+[features.own.sub]
+on = true
+[features.g.need]
+enabled = true
+[features.off]
+enabled = false
+flag = true
+"""
+
+
+def _with_a_setting(root, tmp_path, monkeypatch, own_apply, own_requires, need_requires):
+    """Features own (no enabled; unset: a boolean with no default), g.need and off."""
+    (root / "dotfiles/defaults.toml").write_text(_SETTINGS_SCHEMA)
+    own = feature("Own", own_apply, requires=own_requires)
+    own += "    types: ClassVar = {'unset': (bool,)}\n"
+    make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "own": "from typing import ClassVar\n\n" + own,
+            "g/need": feature("Need", 'print("need ran")', requires=need_requires),
+            "off": feature("Off"),
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("setting", "error"),
+    [
+        (Setting("own.sub.on", True), None),
+        (Setting("own.flag", False), None),
+        (Setting("own.flag", True), r"^g\.need: requires features\.own\.flag = true$"),
+        (Setting("own.sub.on", False), r"^g\.need: requires features\.own\.sub\.on = false$"),
+        (Setting("own.unset", True), r"^g\.need: requires features\.own\.unset = true$"),
+        *(
+            (
+                Setting(key, True),
+                rf"^g\.need: requires features\.{re.escape(key)}, which is not a boolean setting$",
+            )
+            for key in ("own.name", "own.sub", "g.need", "nope.x", "own.nope")
+        ),
+        (Setting("own.flag", False, "less"), r"^g\.need: requires own\.flag: unknown op less$"),
+        (Setting("own.flag", 1), r"^g\.need: requires own\.flag: value must be true or false$"),
+        (Setting("off.flag", True), r"^g\.need: requires features\.off\.enabled = true$"),
+    ],
+)
+def test_a_setting_requirement(root, system, tmp_path, monkeypatch, capsys, setting, error):
+    _with_a_setting(root, tmp_path, monkeypatch, 'print("own ran")', [], [setting])
+    if error is None:
+        assert apply("h", root) == 0
+        # g.need sorts first by name: only its owner's edge runs own before it.
+        assert capsys.readouterr().out == "own ran\nneed ran\nnothing to change\n"
+    else:
+        with pytest.raises(ConfigError, match=error):
+            apply("h", root)
+
+
+def test_a_setting_requirement_runs_after_its_owner_and_fails_with_it(
+    root, system, tmp_path, monkeypatch, capsys
+):
+    _with_a_setting(root, tmp_path, monkeypatch, 'die("broken")', [], [Setting("own.flag", False)])
+    assert apply("h", root) == 1
+    assert capsys.readouterr() == ("", "error: own: broken\nerror: g.need: not run, own failed\n")
+
+
+def test_a_cycle_through_a_setting_s_owner_is_a_config_error(root, system, tmp_path, monkeypatch):
+    _with_a_setting(root, tmp_path, monkeypatch, "pass", ["g.need"], [Setting("own.flag", False)])
+    msg = r"^g\.need → own → g\.need: each requires the next, so none can run first$"
+    with pytest.raises(ConfigError, match=msg):
+        apply("h", root)
 
 
 def test_packages_that_did_not_install_block_their_features(
