@@ -33,6 +33,9 @@ class Feature:
     # Keys and their types where no default says it: several types, the
     # default's first, or none in the schema, so absent unless a file sets it.
     types: ClassVar[dict[str, tuple[type, ...]]] = {}
+    # Runs before the package install, to make packages installable (a repository): its
+    # apply() cannot need its own packages, and it requires only features that set it too.
+    before_packages: ClassVar[bool] = False
 
     def __init__(self, settings: dict, system: OperatingSystem):
         """The feature with SETTINGS, its features.<name> of the resolved config, on SYSTEM."""

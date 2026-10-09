@@ -49,7 +49,18 @@ def _found(cfg: dict, system: OperatingSystem) -> list[Step]:
 def _problems(cfg: dict, found: list[Step]) -> list[str]:
     """What is wrong with the requirements of FOUND: unmet or cyclic, one line each."""
     requires = {step.name: step.requires for step in found}
-    return _unmet(cfg, requires) + _unmet_settings(cfg, found) + _circles(requires)
+    return _unmet(cfg, requires) + _unmet_settings(cfg, found) + _early(found) + _circles(requires)
+
+
+def _early(found: list[Step]) -> list[str]:
+    """Each feature before packages that requires one running later, one line each."""
+    later = {step.name for step in found if not step.feature.before_packages}
+    return [
+        f"{step.name}: before_packages, so it cannot require {name}"
+        for step in sorted(found)
+        if step.feature.before_packages
+        for name in sorted(step.requires & later)
+    ]
 
 
 _ABSENT = object()  # a key no file sets

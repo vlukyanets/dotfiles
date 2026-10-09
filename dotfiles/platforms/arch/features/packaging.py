@@ -29,6 +29,9 @@ _PACMAN_FLAGS = (
 class Packaging(Feature):
     """pacman-contrib if asked, no requirements; the drop-ins and multilib."""
 
+    # Before the install, so a package of multilib (steam, lib32-*) is found in the same apply.
+    before_packages: ClassVar[bool] = True
+
     rules: ClassVar[dict[str, tuple]] = {
         "pacman.parallel_downloads": (lambda v: v >= 1, "1 or more"),
         "pacman.flags": (
