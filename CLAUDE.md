@@ -64,7 +64,8 @@ master and every PR; uv is pinned there by version and sha256.
   types of keys without a default its `types`. It declares its packages (`packages()`: the
   repositories, else the AUR, built as the user at its turn and installed
   as root, `arch/_aur.py`), the ones they replace (`replaces()`) and the features it
-  needs (`requires()`: enabled, or check fails; run first), then does the
+  needs (`requires()`: enabled, or check fails; run first), by name or as a
+  `feature.Setting("packaging.pacman.multilib", True)` of theirs, then does the
   rest in `apply()`. The name gates it; the order comes from the package
   graph and those requirements (`dotfiles/plan.py`; `dotfiles/apply.py`
   runs it). Nothing else is

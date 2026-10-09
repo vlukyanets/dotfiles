@@ -2,12 +2,23 @@
 
 import importlib
 import pkgutil
-from typing import ClassVar
+from typing import ClassVar, NamedTuple
 
 from dotfiles.config import Checks
 from dotfiles.errors import ConfigError
 from dotfiles.platforms import discovery
 from dotfiles.platforms.operating_system import OperatingSystem
+
+
+class Setting(NamedTuple):
+    """A setting another feature owns that a feature requires: KEY, under features., OP VALUE.
+
+    For now VALUE is true or false and OP only "equal"; a key no file sets equals neither.
+    """
+
+    key: str
+    value: bool
+    op: str = "equal"
 
 
 class Feature:
@@ -36,8 +47,8 @@ class Feature:
         """Installed packages its packages() replace, removed just before the install."""
         return []
 
-    def requires(self) -> list[str]:
-        """Features it needs: enabled, or check fails; they run first."""
+    def requires(self) -> list[str | Setting]:
+        """Features it needs, or settings of theirs: met, or check fails; they run first."""
         return []
 
     def apply(self) -> None:

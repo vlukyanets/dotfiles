@@ -4,7 +4,7 @@ from typing import NamedTuple
 
 from dotfiles import engine
 from dotfiles.errors import ConfigError
-from dotfiles.feature import Feature, classes, table
+from dotfiles.feature import Feature, Setting, classes, table
 from dotfiles.platforms import discovery
 from dotfiles.platforms.operating_system import OperatingSystem
 
@@ -17,25 +17,72 @@ class Step(NamedTuple):
     packages: frozenset[str]
     replaces: frozenset[str]
     requires: frozenset[str] = frozenset()  # features that must be on, and run first
+    settings: frozenset[Setting] = frozenset()  # their owners are among requires
+
+
+def _owner(key: str, names) -> str | None:
+    """The feature of NAMES whose setting KEY is: the longest dotted part before it."""
+    parts = key.split(".")
+    return next(
+        (o for i in range(len(parts) - 1, 0, -1) if (o := ".".join(parts[:i])) in names), None
+    )
 
 
 def _found(cfg: dict, system: OperatingSystem) -> list[Step]:
     """A Step per feature of SYSTEM's platform that CFG does not disable."""
     found = []
-    for name, cls in classes(type(system)).items():
+    known = classes(type(system))
+    for name, cls in known.items():
         settings = table(cfg["features"], name) or {}
         if not settings.get("enabled", True):  # no `enabled`: always on
             continue
         feature = cls(settings, system)
         packages, replaces = frozenset(feature.packages()), frozenset(feature.replaces())
-        found.append(Step(name, feature, packages, replaces, frozenset(feature.requires())))
+        wanted = feature.requires()
+        needs = frozenset(r for r in wanted if isinstance(r, Setting))
+        names = {r for r in wanted if not isinstance(r, Setting)}
+        names |= {o for s in needs if (o := _owner(s.key, known))}
+        found.append(Step(name, feature, packages, replaces, frozenset(names), needs))
     return found
 
 
 def _problems(cfg: dict, found: list[Step]) -> list[str]:
     """What is wrong with the requirements of FOUND: unmet or cyclic, one line each."""
     requires = {step.name: step.requires for step in found}
-    return _unmet(cfg, requires) + _circles(requires)
+    return _unmet(cfg, requires) + _unmet_settings(cfg, found) + _circles(requires)
+
+
+_ABSENT = object()  # a key no file sets
+
+
+def _unmet_settings(cfg: dict, found: list[Step]) -> list[str]:
+    """What each Setting of FOUND asks that CFG does not have, one line each."""
+    running = {step.name: step for step in found}
+    problems = []
+    for step in sorted(found):
+        for setting in sorted(step.settings):
+            key, where = setting.key, f"{step.name}: requires"
+            if setting.op != "equal":
+                problems.append(f"{where} {key}: unknown op {setting.op}")
+                continue
+            if type(setting.value) is not bool:
+                problems.append(f"{where} {key}: value must be true or false")
+                continue
+            owner = _owner(key, step.requires)
+            if owner is not None and owner not in running:
+                continue  # off: said by _unmet already
+            value, boolean = _ABSENT, False
+            if owner is not None:
+                path, _, leaf = key.removeprefix(f"{owner}.").rpartition(".")
+                holder = table(cfg["features"], f"{owner}.{path}" if path else owner)
+                value = holder.get(leaf, _ABSENT) if holder is not None else _ABSENT
+                types = running[owner].feature.types.get(key.removeprefix(f"{owner}."), ())
+                boolean = type(value) is bool or (value is _ABSENT and bool in types)
+            if not boolean:
+                problems.append(f"{where} features.{key}, which is not a boolean setting")
+            elif value != setting.value or value is _ABSENT:
+                problems.append(f"{where} features.{key} = {str(setting.value).lower()}")
+    return problems
 
 
 def steps(cfg: dict, system: OperatingSystem) -> list[Step]:
