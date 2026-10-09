@@ -123,8 +123,13 @@ class Apply:
             self.failed.update(cycle)  # features are cut so they never need each other
             _error(", ".join(cycle), f"not run, they need each other: {circle(cycle)}")
         for step, after in ordered:
-            if not step.feature.before_packages:  # those ran before the install
+            if not step.feature.before_packages:
                 self._run(step, after)
+            elif step.name not in self.failed and (later := sorted(step.packages & self.later)):
+                # It ran before the install: what that left for the AUR is built now.
+                with self._guard(step.name):
+                    self.system.manager.build(later)
+                    self.later -= set(later)
 
     def _early(self) -> None:
         """The features before packages, ordered by their requirements alone.

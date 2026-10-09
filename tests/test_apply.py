@@ -658,6 +658,21 @@ def test_a_failure_before_packages_blocks_what_runs_after_it_not_the_install(
     assert system.installs == [["app", "x"]]
 
 
+def test_an_aur_package_of_a_feature_before_packages_is_built_after_the_install(
+    root, system, tmp_path, monkeypatch, capsys
+):
+    (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
+    early = feature("Early", 'print("early ran")', ["repo", "aurpkg"])
+    late = feature("Late", 'print(f"late saw {self.system.manager.builds}")', requires=["early"])
+    make_package(tmp_path, monkeypatch, {"early": _early(early), "late": late})
+    system.aur = {"aurpkg"}
+    assert apply("h", root) == 0
+    assert system.builds == [["aurpkg"]]
+    assert capsys.readouterr().out == (
+        "early ran\n-> packages: aurpkg repo (missing)\nlate saw [['aurpkg']]\n"
+    )
+
+
 def test_a_dry_run_runs_a_feature_before_packages(root, system, tmp_path, monkeypatch, capsys):
     (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
     early = feature("Early", 'self.system.report.changed("early change")', ["tool"])
