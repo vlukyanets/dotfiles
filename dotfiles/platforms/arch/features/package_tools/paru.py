@@ -8,7 +8,7 @@ class Paru(Feature):
 
     def requires(self) -> list[str]:
         """packaging: makepkg builds with its MAKEFLAGS and OPTIONS; rustup: cargo."""
-        return ["packaging", "rustup"]
+        return ["packaging", "development.rustup"]
 
     def apply(self) -> None:
         """paru built and installed unless it runs."""

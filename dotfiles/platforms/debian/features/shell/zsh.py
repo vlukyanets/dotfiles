@@ -2,7 +2,7 @@
 
 from typing import ClassVar
 
-from dotfiles.platforms.linux.features import zsh
+from dotfiles.platforms.linux.features.shell import zsh
 
 
 class Zsh(zsh.Zsh):

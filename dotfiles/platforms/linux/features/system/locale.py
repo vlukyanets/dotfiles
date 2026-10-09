@@ -66,7 +66,7 @@ class Locale(Feature):
         if font and not any(system.files.path(_FONTS).glob(f"{font}.*")):
             system.report.notice(
                 f"console font {font} is not in {_FONTS}: the console keeps the kernel's;"
-                " check features.locale.console.packages"
+                " check features.system.locale.console.packages"
             )
         try:
             with system.shell.as_root():

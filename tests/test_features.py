@@ -8,33 +8,38 @@ from types import SimpleNamespace
 import pytest
 
 from dotfiles import engine
-from dotfiles.feature import classes
+from dotfiles.feature import classes, table
 from dotfiles.layout import Layout
 from dotfiles.platforms.arch import ArchLinuxOs
 from dotfiles.platforms.arch._pacman import Pacman
 from dotfiles.platforms.arch.features.packaging import _jobs
 from dotfiles.platforms.debian import DebianOs
-from dotfiles.platforms.linux.features.swap import _bytes, _shown
+from dotfiles.platforms.linux.features.system.swap import _bytes, _shown
 from dotfiles.platforms.void import VoidOs
+
+# Each feature's full name by its leaf: swap -> system.swap, for the helpers below.
+_NAMES = {
+    name.rpartition(".")[2]: name for os in (ArchLinuxOs, DebianOs, VoidOs) for name in classes(os)
+}
 
 
 def defaults(**features) -> dict:
-    """The schema's config with FEATURES' settings changed, tables merged."""
+    """The schema's config with FEATURES' settings changed, by leaf name, tables merged."""
     cfg = tomllib.loads(Layout().defaults.read_text())
     for name, settings in features.items():
         for key, value in settings.items():
-            table = cfg["features"][name]
+            found = table(cfg["features"], _NAMES[name])
             if isinstance(value, dict):
-                table[key].update(value)
+                found[key].update(value)
             else:
-                table[key] = value
+                found[key] = value
     return cfg
 
 
 def apply(name: str, cfg: dict | None = None) -> None:
-    """Arch's feature NAME applied with CFG."""
-    cfg = cfg or defaults()
-    classes(ArchLinuxOs)[name](cfg["features"][name], ArchLinuxOs(engine.current())).apply()
+    """Arch's feature NAME, its leaf, applied with CFG."""
+    cfg, name = cfg or defaults(), _NAMES[name]
+    classes(ArchLinuxOs)[name](table(cfg["features"], name), ArchLinuxOs(engine.current())).apply()
 
 
 def write(name: str, text: str):
@@ -276,7 +281,9 @@ def test_rustup_on_void_runs_rustup_init_once_then_its_rustup(machine, capsys):
     cfg = defaults(rustup={"toolchain": "beta"})
     rustup = home(".cargo/bin/rustup")  # under the sysroot; it runs as str(real)
     real = Path.home() / ".cargo/bin/rustup"
-    classes(VoidOs)["rustup"](cfg["features"]["rustup"], VoidOs(engine.current())).apply()
+    classes(VoidOs)["development.rustup"](
+        cfg["features"]["development"]["rustup"], VoidOs(engine.current())
+    ).apply()
     assert machine.calls[0] == ["rustup-init", "-y", "--default-toolchain", "beta"]
     assert "-> rustup installed by rustup-init, default beta\n" in capsys.readouterr().out
     rustup.parent.mkdir(parents=True)
@@ -284,7 +291,9 @@ def test_rustup_on_void_runs_rustup_init_once_then_its_rustup(machine, capsys):
     machine.answers[(str(real), "default")] = (0, "beta-x86_64-unknown-linux-gnu (default)")
     machine.answers[(str(real), "show")] = RUSTUP_SHOW
     machine.calls.clear()
-    classes(VoidOs)["rustup"](cfg["features"]["rustup"], VoidOs(engine.current())).apply()
+    classes(VoidOs)["development.rustup"](
+        cfg["features"]["development"]["rustup"], VoidOs(engine.current())
+    ).apply()
     assert [c[0] for c in machine.calls] == [str(real), str(real)]
     assert capsys.readouterr().out == ""
 
@@ -388,7 +397,7 @@ def test_fonts_dry_run_downloads_nothing(machine, capsys):
 
 def test_fonts_packages():
     cfg = defaults(fonts={"packages": ["noto-fonts-emoji"]})
-    fonts = classes(ArchLinuxOs)["fonts"](cfg["features"]["fonts"], None)
+    fonts = classes(ArchLinuxOs)["desktop.fonts"](cfg["features"]["desktop"]["fonts"], None)
     assert fonts.packages() == ["fontconfig", "noto-fonts-emoji"]
     fonts.settings["nerd_fonts"] = ["FiraCode"]
     assert fonts.packages() == ["fontconfig", "noto-fonts-emoji", "curl"]
@@ -536,11 +545,15 @@ def test_command_not_found_for_both_shells_writes_both_hooks(machine):
 
 @pytest.mark.parametrize(
     ("shells", "requires"),
-    [(["zsh"], ["pkgfile", "zsh"]), (["bash"], ["pkgfile"]), (["bash", "zsh"], ["pkgfile", "zsh"])],
+    [
+        (["zsh"], ["package_tools.pkgfile", "shell.zsh"]),
+        (["bash"], ["package_tools.pkgfile"]),
+        (["bash", "zsh"], ["package_tools.pkgfile", "shell.zsh"]),
+    ],
 )
 def test_command_not_found_requires_zsh_only_for_zsh(shells, requires):
-    cfg = defaults(command_not_found={"shells": shells})["features"]["command_not_found"]
-    assert classes(ArchLinuxOs)["command_not_found"](cfg, None).requires() == requires
+    cfg = defaults(command_not_found={"shells": shells})["features"]["shell"]["command_not_found"]
+    assert classes(ArchLinuxOs)["shell.command_not_found"](cfg, None).requires() == requires
 
 
 def test_command_not_found_writes_the_hook_zsh_sources(machine, capsys):
@@ -587,7 +600,9 @@ def test_git_with_nothing_set_writes_no_user(machine):
 def test_zsh_on_debian_sources_the_extras_from_debians_paths(machine, monkeypatch):
     login_shell(monkeypatch, "/usr/bin/zsh")
     cfg = defaults(zsh={"extras": ["zsh-autosuggestions", "zsh-syntax-highlighting"]})
-    classes(DebianOs)["zsh"](cfg["features"]["zsh"], DebianOs(engine.current())).apply()
+    classes(DebianOs)["shell.zsh"](
+        cfg["features"]["shell"]["zsh"], DebianOs(engine.current())
+    ).apply()
     sources = [
         line
         for line in home(".config/zsh/dotfiles.zsh").read_text().splitlines()
@@ -730,9 +745,11 @@ def test_locale_unknown_timezone_fails_before_any_change(machine):
 
 
 def test_locale_packages_are_the_console_fonts_on_arch_and_locales_on_debian():
-    cfg = defaults(locale={"console": {"packages": ["terminus-font"]}})["features"]["locale"]
-    assert classes(ArchLinuxOs)["locale"](cfg, None).packages() == ["terminus-font"]
-    assert classes(DebianOs)["locale"](cfg, None).packages() == ["locales"]
+    cfg = defaults(locale={"console": {"packages": ["terminus-font"]}})["features"]["system"][
+        "locale"
+    ]
+    assert classes(ArchLinuxOs)["system.locale"](cfg, None).packages() == ["terminus-font"]
+    assert classes(DebianOs)["system.locale"](cfg, None).packages() == ["locales"]
 
 
 def test_locale_not_in_locale_gen_is_added_at_its_end(machine):
@@ -759,11 +776,13 @@ def test_locale_another_lang_rewrites_only_locale_conf(machine, capsys):
 def test_locale_on_debian_writes_lang_where_debian_reads_it_and_no_console(machine, capsys):
     zone("UTC")
     cfg = defaults(locale={"console": {"font": "ter-v20n"}})
-    classes(DebianOs)["locale"](cfg["features"]["locale"], DebianOs(engine.current())).apply()
+    classes(DebianOs)["system.locale"](
+        cfg["features"]["system"]["locale"], DebianOs(engine.current())
+    ).apply()
     assert settings("/etc/default/locale") == ["LANG=en_US.UTF-8"]
     assert not engine.current().files.path("/etc/vconsole.conf").exists()
     assert VCONSOLE_SETUP not in machine.calls
-    assert "features.locale.console is not applied on Debian" in capsys.readouterr().err
+    assert "features.system.locale.console is not applied on Debian" in capsys.readouterr().err
 
 
 TIMESYNCD = ["systemctl", "enable", "--now", "systemd-timesyncd.service"]
@@ -786,9 +805,9 @@ def test_timesyncd_enables_the_service_once(machine, capsys):
 
 
 def test_timesyncd_is_part_of_systemd_on_arch_and_its_own_package_on_debian():
-    cfg = defaults()["features"]["timesyncd"]
-    assert classes(ArchLinuxOs)["timesyncd"](cfg, None).packages() == []
-    assert classes(DebianOs)["timesyncd"](cfg, None).packages() == ["systemd-timesyncd"]
+    cfg = defaults()["features"]["system"]["timesyncd"]
+    assert classes(ArchLinuxOs)["system.timesyncd"](cfg, None).packages() == []
+    assert classes(DebianOs)["system.timesyncd"](cfg, None).packages() == ["systemd-timesyncd"]
 
 
 SWAP_DISK = {
@@ -843,7 +862,7 @@ def test_swap_keeps_an_existing_subvolume(machine):
 @pytest.mark.parametrize(
     ("fstype", "size", "error"),
     [
-        ("btrfs", "", "features.swap.size is empty"),
+        ("btrfs", "", "features.system.swap.size is empty"),
         ("ext4", "4g", "/ is ext4: the swap file lives on a btrfs subvolume"),
     ],
 )
@@ -870,9 +889,9 @@ def test_swap_dry_run_lists_no_subvolume(machine, capsys):
 
 
 def test_swap_needs_btrfs_progs():
-    cfg = defaults()["features"]["swap"]
-    assert classes(ArchLinuxOs)["swap"](cfg, None).packages() == ["btrfs-progs"]
-    assert classes(DebianOs)["swap"](cfg, None).packages() == ["btrfs-progs"]
+    cfg = defaults()["features"]["system"]["swap"]
+    assert classes(ArchLinuxOs)["system.swap"](cfg, None).packages() == ["btrfs-progs"]
+    assert classes(DebianOs)["system.swap"](cfg, None).packages() == ["btrfs-progs"]
 
 
 def swap_in_use(machine, capsys, size: str, have: int | None = None) -> Path:
@@ -1022,9 +1041,9 @@ def test_zram_failed_restart_is_a_notice_and_the_sysctls_still_set(machine, caps
 
 
 def test_zram_generator_is_its_own_package():
-    cfg = defaults()["features"]["zram"]
-    assert classes(ArchLinuxOs)["zram"](cfg, None).packages() == ["zram-generator"]
-    assert classes(DebianOs)["zram"](cfg, None).packages() == ["systemd-zram-generator"]
+    cfg = defaults()["features"]["system"]["zram"]
+    assert classes(ArchLinuxOs)["system.zram"](cfg, None).packages() == ["zram-generator"]
+    assert classes(DebianOs)["system.zram"](cfg, None).packages() == ["systemd-zram-generator"]
 
 
 OOMD = "systemd-oomd.service"
@@ -1069,6 +1088,6 @@ def test_oomd_writes_its_drop_ins_restarts_and_enables_once(machine, capsys):
 
 
 def test_oomd_is_part_of_systemd_on_arch_and_its_own_package_on_debian():
-    cfg = defaults()["features"]["oomd"]
-    assert classes(ArchLinuxOs)["oomd"](cfg, None).packages() == []
-    assert classes(DebianOs)["oomd"](cfg, None).packages() == ["systemd-oomd"]
+    cfg = defaults()["features"]["system"]["oomd"]
+    assert classes(ArchLinuxOs)["system.oomd"](cfg, None).packages() == []
+    assert classes(DebianOs)["system.oomd"](cfg, None).packages() == ["systemd-oomd"]

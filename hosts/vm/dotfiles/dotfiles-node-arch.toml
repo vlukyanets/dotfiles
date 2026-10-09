@@ -1,6 +1,6 @@
 extends = ["vm", "arch"]
 
-[features.git]
+[features.development.git]
 name = "Dotfiles Node Arch"
 email = "no.email.arch@hosting.net"
 
@@ -13,7 +13,7 @@ jobs = 1
 packager = "Dotfiles Node Arch <no.email.arch@hosting.net>"
 options = ["!debug"]
 
-[features.reflector]
+[features.package_tools.reflector]
 enabled = true
 country = ["Ukraine", "Poland"]
 protocol = "https"
@@ -25,31 +25,31 @@ download_timeout = 10
 on_calendar = "weekly"
 on_boot_sec = "15min"
 
-[features.rustup]
+[features.development.rustup]
 enabled = true
 toolchain = "stable"
 
-[features.paru]
+[features.package_tools.paru]
 enabled = true
 
-[features.zsh]
+[features.shell.zsh]
 enabled = true
 plugins = ["git"]
 
-[features.zsh.theme]
+[features.shell.zsh.theme]
 name = "agnoster"
 
-[features.fonts]
+[features.desktop.fonts]
 enabled = true
 packages = ["ttf-jetbrains-mono-nerd", "noto-fonts-emoji"]
 
-[features.fonts.default]
+[features.desktop.fonts.default]
 monospace = "JetBrainsMono Nerd Font"
 emoji = "Noto Color Emoji"
 
-[features.fonts.render]
+[features.desktop.fonts.render]
 hinting = "slight"
 subpixel = "rgb"
 
-[features.zram]
+[features.system.zram]
 enabled = true

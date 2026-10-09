@@ -11,14 +11,16 @@ from dotfiles import apply as runner
 from dotfiles import config, engine
 from dotfiles.apply import apply
 from dotfiles.errors import ConfigError
-from dotfiles.feature import classes
+from dotfiles.feature import classes, table
 from dotfiles.layout import Layout
 from dotfiles.plan import Step, cycles, order, steps
 from dotfiles.platforms import discovery
 from dotfiles.platforms.arch import ArchLinuxOs
+from dotfiles.platforms.debian import DebianOs
 from dotfiles.platforms.linux import LinuxOs
 from dotfiles.platforms.operating_system import OperatingSystem
 from dotfiles.platforms.package_manager import PackageManager
+from dotfiles.platforms.void import VoidOs
 
 HEAD = "from dotfiles.engine import defer, die\nfrom dotfiles.feature import Feature\n\n\n"
 
@@ -557,18 +559,31 @@ def test_a_module_holds_the_feature_named_after_it(root, system, tmp_path, monke
         steps({"features": {}}, FakeArch(engine.current()))
 
 
+def _schema_features(tables: dict, prefix: str = ""):
+    """The dotted names of the feature tables of TABLES: those with `enabled`, and packaging."""
+    for key, value in tables.items():
+        if not isinstance(value, dict):
+            continue
+        if "enabled" in value or prefix + key == "packaging":
+            yield prefix + key
+        else:  # a group
+            yield from _schema_features(value, f"{prefix}{key}.")
+
+
 def test_real_features_are_consistent():
     cfg = tomllib.loads(Layout().defaults.read_text())
-    for table in cfg["features"].values():
-        table["enabled"] = True
+    schema = set(_schema_features(cfg["features"]))
+    for name in schema - {"packaging"}:
+        table(cfg["features"], name)["enabled"] = True
+    modules = {name for os in (ArchLinuxOs, DebianOs, VoidOs) for name in classes(os)}
+    # A module without `enabled` in its table is taken for a group, so it is missing here too.
+    assert not modules - schema, f"features not in the schema: {sorted(modules - schema)}"
+    assert not schema - modules, f"features without a module: {sorted(schema - modules)}"
     # packages() only reads files
     found = {s.name: s for s in steps(cfg, ArchLinuxOs(engine.current()))}
-    assert not set(found) - set(cfg["features"]), "features not in the schema"
-    missing = set(cfg["features"]) - set(found)
-    assert not missing, f"features without a module: {sorted(missing)}"
     assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {
-        "command_not_found": ["pkgfile", "zsh"],
-        "paru": ["packaging", "rustup"],
+        "package_tools.paru": ["development.rustup", "packaging"],
+        "shell.command_not_found": ["package_tools.pkgfile", "shell.zsh"],
     }
 
 
@@ -584,15 +599,15 @@ def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
 
     monkeypatch.setattr(engine.current().shell, "execute", checks_only)
     cfg = config.resolve("hyper")
-    for table in cfg["features"].values():
-        table["enabled"] = True
+    for name in set(_schema_features(cfg["features"])) - {"packaging"}:
+        table(cfg["features"], name)["enabled"] = True
     cfg["features"]["packaging"]["pacman"]["flags"] = ["Color"]  # it writes only what is set
     # Every package counts as installed: zsh's among them, and tzdata's zone.
     zsh = engine.current().files.path("/usr/bin/zsh")
     zsh.parent.mkdir(parents=True)
     zsh.touch(mode=0o755)
     zone = engine.current().files.path(
-        f"/usr/share/zoneinfo/{cfg['features']['locale']['timezone']}"
+        f"/usr/share/zoneinfo/{cfg['features']['system']['locale']['timezone']}"
     )
     zone.parent.mkdir(parents=True)
     zone.touch()

@@ -1,12 +1,12 @@
 extends = ["vm"]
 
 # Off on this VM for now.
-[features.rustup]
+[features.development.rustup]
 enabled = false
 
 # Linux's modules only, and Void is not systemd: no Void modules yet.
-[features.locale]
+[features.system.locale]
 enabled = false
 
-[features.timesyncd]
+[features.system.timesyncd]
 enabled = false

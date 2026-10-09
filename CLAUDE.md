@@ -20,8 +20,9 @@ master and every PR; uv is pinned there by version and sha256.
 ## Navigation
 
 - Keys and defaults: `dotfiles/defaults.toml` — the schema; a new key goes here first.
-  A feature is `features.<name>.enabled` plus its settings in the same table;
-  one without `enabled` (`packaging`) always runs.
+  A feature is `features.<group>.<name>.enabled` plus its settings in the
+  same table; one without `enabled` (`packaging`, the one outside a group)
+  always runs. A group is only a name: no `enabled`, no keys of its own.
 - Profiles `profiles/`, machines `hosts/`; one namespace for `extends`. A
   machine runs from `~/.config/dotfiles/config.toml` (`config.init`,
   `layout.local_config`); the CLI (`dotfiles/cli.py`) picks it or a checkout.
@@ -52,10 +53,13 @@ master and every PR; uv is pinned there by version and sha256.
   `features/`. The one base is `linux/` (`LinuxOs`: systemd, sysctl,
   groups, gsettings, and features for every Linux); a platform runs
   Linux's feature where it has none of that name, or subclasses it to
-  change a detail (`debian/features/zsh.py`).
-- Features: `platforms/<name>/features/<feature>.py`, one `Feature`
-  subclass each, named after the module (`packaging` → `Packaging`), built
-  with its table `features.<feature>` as `self.settings` and the platform
+  change a detail (`debian/features/shell/zsh.py`); a module of a name
+  its base has must subclass the base's class, or discovery fails.
+- Features: `platforms/<name>/features/<group>/<feature>.py` (a group is a
+  directory with an empty `__init__.py`), one `Feature` subclass each,
+  named after the module (`zram` → `Zram`), its name the dotted path
+  (`system.zram`), built
+  with its table `features.<group>.<feature>` as `self.settings` and the platform
   as `self.system`; checks the types cannot make are its `rules`, the
   types of keys without a default its `types`. It declares its packages (`packages()`: the
   repositories, else the AUR, built as the user at its turn and installed

@@ -1,21 +1,21 @@
 # What every host gets, on any platform; profiles/arch.toml adds Arch's
 # own. Values that depend on where or what the machine is belong to the host.
 
-[features.rustup]
+[features.development.rustup]
 enabled = true
 
-[features.no_beep]
+[features.system.no_beep]
 enabled = true
 
-[features.zsh]
+[features.shell.zsh]
 enabled = true
 
-[features.git]
+[features.development.git]
 enabled = true
 
-[features.locale]
+[features.system.locale]
 enabled  = true
 timezone = "Europe/Kyiv"
 
-[features.timesyncd]
+[features.system.timesyncd]
 enabled = true
