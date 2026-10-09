@@ -1,6 +1,6 @@
 """oomd on Debian: Linux's, from its own package."""
 
-from dotfiles.platforms.linux.features import oomd
+from dotfiles.platforms.linux.features.system import oomd
 
 
 class Oomd(oomd.Oomd):

@@ -1,11 +1,11 @@
 # A machine someone sits at.
 extends = ["base"]
 
-[features.swap]
+[features.system.swap]
 enabled = true
 
-[features.zram]
+[features.system.zram]
 enabled = true
 
-[features.oomd]
+[features.system.oomd]
 enabled = true

@@ -5,6 +5,7 @@ import pkgutil
 from typing import ClassVar
 
 from dotfiles.config import Checks
+from dotfiles.errors import ConfigError
 from dotfiles.platforms import discovery
 from dotfiles.platforms.operating_system import OperatingSystem
 
@@ -43,31 +44,58 @@ class Feature:
         """What this feature does, once its packages are installed."""
 
 
-def _package(package: str) -> dict[str, type[Feature]]:
-    """Every feature class of PACKAGE by its module's name: packaging -> Packaging."""
+def table(features: dict, name: str) -> dict | None:
+    """The table of feature NAME, dotted, in FEATURES (the config's `features`); None if absent."""
+    found = features
+    for part in name.split("."):
+        found = found.get(part) if isinstance(found, dict) else None
+    return found if isinstance(found, dict) else None
+
+
+def _package(package: str, prefix: str = "") -> dict[str, type[Feature]]:
+    """Every feature class of PACKAGE and its groups by its dotted path: system.zram -> Zram."""
     try:
         found = importlib.import_module(package)
     except ModuleNotFoundError as e:  # a platform without features of its own
         if e.name is None or not (package == e.name or package.startswith(e.name + ".")):
             raise
         return {}
-    return {
-        info.name: discovery.named(
-            importlib.import_module(f"{package}.{info.name}"), info.name, Feature, "feature"
-        )
-        for info in sorted(pkgutil.iter_modules(found.__path__))
-        if not info.name.startswith("_")  # a module its features share
-    }
+    classes: dict[str, type[Feature]] = {}
+    for info in sorted(pkgutil.iter_modules(found.__path__)):
+        if info.name.startswith("_"):  # a module or group its features share
+            continue
+        if info.ispkg:  # a group
+            classes |= _package(f"{package}.{info.name}", f"{prefix}{info.name}.")
+        else:
+            module = importlib.import_module(f"{package}.{info.name}")
+            classes[prefix + info.name] = discovery.named(module, info.name, Feature, "feature")
+    return classes
+
+
+def _where(cls: type) -> str:
+    """CLS's module as a path from platforms/: arch/features/development/rustup.py."""
+    return cls.__module__.removeprefix(f"{discovery.__package__}.").replace(".", "/") + ".py"
 
 
 def classes(platform: type[OperatingSystem]) -> dict[str, type[Feature]]:
-    """PLATFORM's features by name: its own, else the nearest base's (ArchLinuxOs, then LinuxOs)."""
+    """PLATFORM's features by name: its own, else the nearest base's (ArchLinuxOs, then LinuxOs).
+
+    An own module of a name the base has too holds a subclass of the base's class.
+    """
     found: dict[str, type[Feature]] = {}
     for base in reversed(platform.__mro__):
         # arch/_os.py holds ArchLinuxOs: arch/features/ holds its features.
         package = importlib.import_module(base.__module__).__package__
         if issubclass(base, OperatingSystem) and package:
-            found |= _package(f"{package}.features")
+            own = _package(f"{package}.features")
+            for name, cls in own.items():
+                if name in found and not issubclass(cls, found[name]):
+                    platform_name = _where(found[name]).split("/")[0]
+                    raise ConfigError(
+                        f"{_where(cls)}: {cls.__name__} must subclass"
+                        f" {platform_name}'s {found[name].__name__}"
+                    )
+            found |= own
     return found
 
 

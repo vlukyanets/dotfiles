@@ -2,7 +2,7 @@
 
 from typing import ClassVar
 
-from dotfiles.platforms.linux.features import locale
+from dotfiles.platforms.linux.features.system import locale
 
 
 class Locale(locale.Locale):
@@ -19,6 +19,6 @@ class Locale(locale.Locale):
         console = self.settings["console"]
         if console["keymap"] != "us" or console["font"]:  # "us": the schema's default and Debian's
             self.system.report.notice(
-                "features.locale.console is not applied on Debian: set it with"
+                "features.system.locale.console is not applied on Debian: set it with"
                 " `dpkg-reconfigure keyboard-configuration console-setup`"
             )

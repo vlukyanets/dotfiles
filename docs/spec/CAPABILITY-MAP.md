@@ -29,8 +29,9 @@ Build order: `config` → `render`, `engine`, `tooling` → `packages` → `feat
    A fresh machine needs git, python and uv, nothing else: the tool runs
    from the checkout with `uv run dotfiles …`, dependencies from `uv.lock`.
 4. Every apply reconciles live state; a clean apply prints only `nothing to
-   change` and asks for no password. A feature is `features.<name>` with `enabled` and its
-   settings, or without `enabled` if it always runs (`packaging`);
+   change` and asks for no password. A feature is
+   `features.<group>.<name>` with `enabled` and its settings, or without
+   `enabled` if it always runs (`packaging`, the one outside a group);
    `enabled = false` never uninstalls.
 5. Specs live in `docs/spec/`, one `SPEC-<id>.md` per module.
 6. Commits: imperative plain-language subject, optional one-paragraph body,

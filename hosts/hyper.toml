@@ -1,19 +1,19 @@
 extends = ["laptop", "arch"]
 
-[features.git]
+[features.development.git]
 name  = "Valentin Lukyanets"
 email = "valikluks95@gmail.com"
 
-[features.reflector]
+[features.package_tools.reflector]
 country = ["Ukraine", "Poland", "Slovakia", "Germany", "Hungary", "Czechia"]
 
-[features.locale.console]
+[features.system.locale.console]
 font     = "ter-v20n"
 packages = ["terminus-font"]
 
-[features.swap]
+[features.system.swap]
 size = "20g"
 
-[features.zram]
+[features.system.zram]
 swappiness             = 100
 watermark_scale_factor = 125

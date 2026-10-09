@@ -24,7 +24,10 @@ class CommandNotFound(Feature):
 
     def requires(self) -> list[str]:
         """pkgfile: its database and handlers; zsh, for zsh: the snippet that loads the hook."""
-        return ["pkgfile", *(["zsh"] if "zsh" in self.settings["shells"] else [])]
+        return [
+            "package_tools.pkgfile",
+            *(["shell.zsh"] if "zsh" in self.settings["shells"] else []),
+        ]
 
     def apply(self) -> None:
         """The hook of each shell: zsh's file in dotfiles.d, bash's line at the end of ~/.bashrc."""

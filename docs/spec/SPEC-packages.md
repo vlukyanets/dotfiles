@@ -147,9 +147,10 @@ tests/test_apply.py                    replaces reach install, only when somethi
    replacement (`replaces()`) and removed with `pacman -Rdd` just before the
    install, rather than left to pacman's undocumented `--ask` answers.
 3. **No setup in the platform.** pacman and makepkg are the
-   `packaging` feature, the mirrorlist the `reflector` one; the AUR,
-   paru and rustup went with the features that used them, and came back
-   as the `paru` and `rustup` features.
+   `packaging` feature, the mirrorlist the `package_tools.reflector` one;
+   the AUR, paru and rustup went with the features that used them, and
+   came back as the `package_tools.paru` and `development.rustup`
+   features.
 4. **The AUR without an AUR helper.** makepkg builds as the
    user, the root process installs, so nothing but `pacman` asks for
    root and a password is asked at most once. paru, or `makepkg -si`,

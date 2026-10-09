@@ -1,5 +1,5 @@
 extends = ["server"]
 
-[features.git]
+[features.development.git]
 name  = "Valentin Lukyanets"
 email = "valikluks95@gmail.com"

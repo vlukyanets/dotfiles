@@ -1,6 +1,6 @@
 """timesyncd on Debian: Linux's, from its own package."""
 
-from dotfiles.platforms.linux.features import timesyncd
+from dotfiles.platforms.linux.features.system import timesyncd
 
 
 class Timesyncd(timesyncd.Timesyncd):

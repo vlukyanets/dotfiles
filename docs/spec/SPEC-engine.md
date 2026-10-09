@@ -331,11 +331,19 @@ unit: a feature that needs a service gets a Void module, with runit's
 
 ## Features — `dotfiles/feature.py`, `platforms/<name>/features/`
 
-A feature is a class per platform: `platforms/arch/features/docker.py`
-holds Arch's `Docker`, `platforms/debian/features/docker.py` Debian's.
+A feature is a class per platform: `platforms/arch/features/containers/docker.py`
+holds Arch's `Docker`, `platforms/debian/features/containers/docker.py` Debian's.
 They share no code; what is the same on every Linux is one module in
 `platforms/linux/features/`, which a platform runs where it has none of
-that name.
+that name, or subclasses to change a detail.
+
+Features live in groups: a directory under `features/` is a group, with an
+empty `__init__.py`; a module in it is a feature, named by its path with
+dots, `containers/docker.py` → `containers.docker`, whose table is
+`[features.containers.docker]`. A group may hold groups. A group is only
+a name: it has no `enabled` and no keys of its own, so `[features.containers]`
+holds nothing but its features' tables. Only `packaging` stays at the top,
+outside a group.
 
 ```python
 """Docker with the applying user in its group."""
@@ -343,7 +351,7 @@ that name.
 from dotfiles.feature import Feature
 
 
-class Docker(Feature):  # platforms/arch/features/docker.py
+class Docker(Feature):  # platforms/arch/features/containers/docker.py
     def packages(self):
         return ["docker", "docker-buildx", "docker-compose"]
 
@@ -354,9 +362,14 @@ class Docker(Feature):  # platforms/arch/features/docker.py
 
 - `feature.classes(platform)` walks the platform's class hierarchy from
   the base down (`LinuxOs`, then `ArchLinuxOs`), each class's package's
-  `features/`, so the platform's own module of a name wins. Modules
-  starting with `_` are helpers, not features. The runner builds each with
-  `(settings, system)`: `features.docker` of the resolved config and the
+  `features/` and its groups, so the platform's own module of a name wins.
+  Modules and groups starting with `_` are helpers, not features, at any
+  depth. A platform's module of a name its base has too holds a subclass
+  of the base's class (`class Rustup(rustup.Rustup)`): otherwise
+  `feature.classes` raises `ConfigError` (`arch/features/development/rustup.py:
+  Rustup must subclass linux's Rustup`), so a copy cannot drift from what
+  it overrides. The runner builds each with
+  `(settings, system)`: `features.containers.docker` of the resolved config and the
   platform, reaching `ensure_service`, its package manager and the machine
   through `self.system`, and calls `apply()`. A feature sees its own
   table only; the rest of the config does not reach it.
@@ -378,26 +391,50 @@ class Docker(Feature):  # platforms/arch/features/docker.py
   the types are checked.
 - Every platform has its own package names; nothing maps one onto
   another, and a platform may need packages the others do not.
-- The feature's name is its file name: it runs only when
-  `features.<name>.enabled`. A feature whose table has no `enabled`
-  (`packaging`) cannot be turned off and runs always; so does a file whose
-  name is not a feature in the schema, and reads its flags itself
-  (services, tools, apps).
+- The feature's name is its path: it runs only when
+  `features.<group>.<name>.enabled`, its table found by walking the name's
+  parts through the config (`["containers"]["docker"]`). A feature whose
+  table has no `enabled` (`packaging`) cannot be turned off and runs
+  always; so would a module without a table in the schema, which
+  `test_real_features_are_consistent` refuses: every feature but
+  `packaging` has `enabled` in `defaults.toml`.
 - A feature may declare the features it needs on its platform,
   `requires()` (default `[]`), with the reason next to it:
 
   ```python
-  class Paru(Feature):  # platforms/arch/features/paru.py
+  class Paru(Feature):  # platforms/arch/features/package_tools/paru.py
       def requires(self):
-          return ["packaging", "rustup"]  # makepkg's MAKEFLAGS; cargo
+          return ["packaging", "development.rustup"]  # makepkg's MAKEFLAGS; cargo
   ```
 
-  Each must run, enabled or without an `enabled`: otherwise `steps()` raises `ConfigError`, one
-  `paru: requires features.rustup.enabled = true` per requirement
-  (`paru: requires x, which is not a feature` for a name the schema
-  lacks), so `apply` stops before setup. A cycle of requirements is the
-  same kind of error, one line per cycle (`gaming → nvidia → gaming: each
-  requires the next, so none can run first`). `dotfiles check` asks
+  Each must run, enabled or without an `enabled`: otherwise `steps()`
+  raises `ConfigError`, one `package_tools.paru: requires
+  features.development.rustup.enabled = true` per requirement
+  (`package_tools.paru: requires x, which is not a feature` for a name the
+  schema lacks), so `apply` stops before setup. A cycle of requirements is the
+  same kind of error, one line per cycle (`gaming.steam → hardware.nvidia →
+  gaming.steam: each requires the next, so none can run first`).
+- A requirement may also be a setting another feature owns, a
+  `feature.Setting(key, value, op="equal")`; `key` is under `features.`:
+
+  ```python
+  class Steam(Feature):  # platforms/arch/features/gaming/steam.py
+      def requires(self):
+          return [Setting("packaging.pacman.multilib", True)]  # steam is in [multilib]
+  ```
+
+  For now `value` is `true` or `false` and `op` only `"equal"`; anything
+  else is a bug in the feature, `ConfigError` naming it (`unknown op X`,
+  `value must be true or false`). Met when the key is set to `value`: a
+  key no file sets equals neither (multilib unset is pacman.conf's own
+  business, not `false`). Unmet: `gaming.steam: requires
+  features.packaging.pacman.multilib = true`. A key that is not a boolean
+  in the schema (missing, a table, another type, nor a boolean of the
+  owner's `types`): `gaming.steam: requires features.X, which is not a
+  boolean setting`. Its owner is the longest part of `key` that is a
+  feature (`packaging`); it must run, as if it were required by name, and
+  the requirement orders and cycles through it like one.
+- `dotfiles check` asks
   `requires()` of every feature that would run, on every platform
   (`discovery.every`), so a host that breaks one fails check wherever it
   would run. `requires()` reads `self.settings` only, never the machine.
@@ -406,21 +443,31 @@ class Docker(Feature):  # platforms/arch/features/docker.py
   (`packaging`'s makepkg drop-in for paru), a program a feature installs
   in place of a package (cargo from `rustup`), a virtual dependency a
   feature chooses (`jdk` for kotlin). A required feature runs first.
-- Nothing else is declared: no gate, no order but through `requires()`.
+- Nothing else is declared: no gate, no order but through `requires()`
+  and the phase `before_packages` puts a feature in.
 
 ## `dotfiles apply` — `dotfiles/plan.py`, `dotfiles/apply.py`
 
 1. **Platform.** `system = detect(machine)`, an instance of the platform
    class, then `system.manager.setup()`, on every apply (it checks first;
    the base one does nothing, and `Pacman` has none of its own).
-2. **Packages.** The packages of every enabled feature that applies here,
+2. **Features before packages.** The features whose class sets
+   `before_packages = True`, in their order: what makes packages
+   installable, a repository (`packaging`'s multilib) before the install
+   that needs it, so a fresh machine needs one apply, not two. Such a
+   feature's `apply()` must not need its own packages, which the next
+   phase installs, and it cannot require a feature without the flag,
+   which runs later: `packaging: before_packages, so it cannot require X`,
+   from `steps()`. Its failure blocks what runs after it, as in phase 4;
+   the install still runs.
+3. **Packages.** The packages of every enabled feature that applies here,
    together: `manager.missing(...)`, and when something is missing, one
    line `-> packages: a b c (missing)` and `manager.install(...)` in one
    transaction, whose order is the package manager's, what the features
    `replaces()` removed first. What install() returns, not in the
    repositories, is built at its feature's turn. Nothing missing →
    nothing printed, no root.
-3. **Features, in order;** each first gets the packages install() left,
+4. **Features, in order;** each first gets the packages install() left,
    built with `manager.build(...)` (the AUR on Arch), a failure its own.
    Feature A runs before feature B when B
    requires A, or when a package of B needs a package that A has and B
@@ -434,7 +481,7 @@ class Docker(Feature):  # platforms/arch/features/docker.py
    glvnd → graphics → glvnd`, and the features after them are not run as
    after any failure.
    Each runs as `Docker(settings, system).apply()` does.
-4. **Notices.**
+5. **Notices.**
 
 stdout is line-buffered, so `->` lines and the output of child commands appear in
 order.
@@ -492,7 +539,7 @@ implementation, classes where platforms differ; comments explain why;
 messages name the file, unit or key. A feature reads top to bottom:
 
 ```python
-class Locale(Feature):  # platforms/linux/features/locale.py: glibc is always there
+class Locale(Feature):  # platforms/linux/features/system/locale.py: glibc is always there
     def apply(self):
         locale = self.settings
         # A list, not any(generator): every line must be ensured, not just up to the first change.
@@ -552,7 +599,7 @@ class Locale(Feature):  # platforms/linux/features/locale.py: glibc is always th
 
 1. A feature file holds only what it does and, per platform, its
    packages and the features it requires; nothing orders or gates it but
-   its name, the package graph and those requirements.
+   its name, the package graph, those requirements and `before_packages`.
 2. A second platform is one directory in `platforms/`, its class and its
    features; nothing of another platform changes.
 3. On a machine that matches, `dotfiles apply` prints only `nothing to
@@ -578,8 +625,9 @@ class Locale(Feature):  # platforms/linux/features/locale.py: glibc is always th
    truly common lives in `linux/`, the one base, as helpers on `LinuxOs`
    and fallback features.
 3. **Package names are per platform**, never mapped.
-4. **All packages in one transaction**, before any feature runs: one
-   check, one sudo, and the package manager orders the installation.
+4. **All packages in one transaction**, before any feature runs but the
+   few that make packages installable (`before_packages`): one check, one
+   sudo, and the package manager orders the installation.
 5. **A failed feature blocks only what builds on it**, in the package
    graph or by requirement; the rest of the apply goes on.
 6. **`files` and `ensure_*` return whether they changed something**; the engine only

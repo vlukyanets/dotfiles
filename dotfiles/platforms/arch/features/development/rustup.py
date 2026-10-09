@@ -1,6 +1,6 @@
 """rustup on Arch: Linux's, in place of the rust package."""
 
-from dotfiles.platforms.linux.features import rustup
+from dotfiles.platforms.linux.features.development import rustup
 
 
 class Rustup(rustup.Rustup):

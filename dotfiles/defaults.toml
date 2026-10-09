@@ -2,11 +2,10 @@
 #
 # This file is the schema. profiles/*.toml and hosts/*.toml override it, and
 # a key that is not here — or has a different type here — fails naming the
-# file and the key. Every feature is a table under [features] whose
-# `enabled` defaults to false, so a host without a file in hosts/ gets
-# only the features without an `enabled`, which always run. A feature with no settings is one dotted key,
-# `docker.enabled = false`; one with settings has its own [features.<name>]
-# table.
+# file and the key. Every feature is a table [features.<group>.<name>]
+# whose `enabled` defaults to false, so a host without a file in hosts/
+# gets only the features without an `enabled`, which always run. A group
+# holds only its features' tables; packaging is the one outside a group.
 
 # packaging: drop-ins in /etc/pacman.conf.d and /etc/makepkg.conf.d. No
 # `enabled`: pacman itself is always there, so it always runs on Arch.
@@ -25,9 +24,9 @@ contrib = false               # pacman-contrib installed too: paccache, checkupd
 # packager = "Name <email>"   PACKAGER
 # options = ["ccache"]        OPTIONS+=(...), e.g. ["ccache", "!debug"]
 
-# reflector: /etc/pacman.d/mirrorlist refreshed by reflector.timer, and at
+# package_tools.reflector: /etc/pacman.d/mirrorlist refreshed by reflector.timer, and at
 # once when a setting changes.
-[features.reflector]
+[features.package_tools.reflector]
 enabled            = false
 country            = []        # names or codes, e.g. ["Germany", "PL"]; empty: every country
 protocol           = "https"   # https, http, rsync or ftp
@@ -39,49 +38,49 @@ download_timeout   = 5         # seconds
 on_calendar        = "weekly"  # reflector.timer's OnCalendar
 on_boot_sec        = "15min"   # and OnBootSec
 
-# no_beep: the PC speaker's drivers (pcspkr, snd_pcsp) blacklisted in
+# system.no_beep: the PC speaker's drivers (pcspkr, snd_pcsp) blacklisted in
 # /etc/modprobe.d/nobeep.conf, and unloaded when loaded.
-[features.no_beep]
+[features.system.no_beep]
 enabled = false
 
-# pkgfile: `pkgfile <command>` names the package with the file, from a
+# package_tools.pkgfile: `pkgfile <command>` names the package with the file, from a
 # database pkgfile-update.timer refreshes daily, downloaded at once while
 # there is none.
-[features.pkgfile]
+[features.package_tools.pkgfile]
 enabled = false
 
-# command_not_found: a command the shell does not find names the package
+# shell.command_not_found: a command the shell does not find names the package
 # that has it, from pkgfile's handler: for zsh in ~/.config/zsh/dotfiles.d,
 # which zsh's snippet sources; for bash a line at the end of ~/.bashrc.
-# Requires pkgfile, and zsh while zsh is one of `shells`.
-[features.command_not_found]
+# Requires package_tools.pkgfile, and shell.zsh while zsh is one of `shells`.
+[features.shell.command_not_found]
 enabled = false
 shells  = ["zsh"]  # zsh, bash or both
 
-# git: user.name and user.email in ~/.config/git/dotfiles.gitconfig,
+# development.git: user.name and user.email in ~/.config/git/dotfiles.gitconfig,
 # included from the top of ~/.config/git/config; the rest of the config,
 # and ~/.gitconfig, stay the user's and override it. Empty: not written.
-[features.git]
+[features.development.git]
 enabled = false
 name    = ""
 email   = ""
 
-# timesyncd: the clock kept in sync by systemd-timesyncd.service, enabled
+# system.timesyncd: the clock kept in sync by systemd-timesyncd.service, enabled
 # and started; its servers are the distribution's.
-[features.timesyncd]
+[features.system.timesyncd]
 enabled = false
 
-# swap: a swap file on its own btrfs subvolume, @swap mounted on /swap (a
+# system.swap: a swap file on its own btrfs subvolume, @swap mounted on /swap (a
 # swap file in a snapshotted subvolume blocks its snapshots), both by
 # systemd units, not fstab. No priority: the kernel gives it a negative
 # one, below zram's. / must be btrfs.
-[features.swap]
+[features.system.swap]
 enabled = false
 size    = ""  # btrfs mkswapfile's --size, e.g. "20g"; required when on; another one recreates the file
 
-# zram: compressed swap in RAM, set up by zram-generator from
+# system.zram: compressed swap in RAM, set up by zram-generator from
 # /etc/systemd/zram-generator.conf, with the vm sysctls that suit it.
-[features.zram]
+[features.system.zram]
 enabled                = false
 size                   = "min(ram / 2, 4096)"  # zram-generator's zram-size, in MiB
 algorithm              = "zstd"                # compression-algorithm
@@ -89,32 +88,32 @@ priority               = 100  # swap-priority, 0 to 32767: above the swap file's
 swappiness             = 0    # vm.swappiness 1 to 200, vm.page-cluster 0 with it; 0: the kernel's
 watermark_scale_factor = 0    # vm.watermark_scale_factor 1 to 3000; 0: the kernel's
 
-# oomd: systemd-oomd on, killing earlier than its stock limits: a user
+# system.oomd: systemd-oomd on, killing earlier than its stock limits: a user
 # session past 50% memory pressure for 20 s, and the largest swap user
 # once swap is 90% full, before the kernel's OOM killer stalls the machine.
-[features.oomd]
+[features.system.oomd]
 enabled = false
 
-# locale: the lines of /etc/locale.gen uncommented, locale-gen run when one
+# system.locale: the lines of /etc/locale.gen uncommented, locale-gen run when one
 # was not; LANG in /etc/locale.conf (Debian: /etc/default/locale); the
 # console's keymap and font in /etc/vconsole.conf (not on Debian, whose
 # console-setup reads its own files); /etc/localtime linked to the timezone.
-[features.locale]
+[features.system.locale]
 enabled  = false
 lang     = "en_US.UTF-8"          # LANG
 locales  = ["en_US.UTF-8 UTF-8"]  # lines of /etc/locale.gen
 timezone = "UTC"                  # a file under /usr/share/zoneinfo, e.g. "Europe/Kyiv"
 
-[features.locale.console]
+[features.system.locale.console]
 keymap   = "us"
 font     = ""  # a file in /usr/share/kbd/consolefonts, e.g. "ter-v20n"; empty: the kernel's
 packages = []  # what ships it, e.g. ["terminus-font"]
 
-# fonts: font packages; Nerd Fonts downloaded from nerd_url, each in
+# desktop.fonts: font packages; Nerd Fonts downloaded from nerd_url, each in
 # ~/.local/share/fonts/nerd-fonts/<name>, fc-cache after; and
 # ~/.config/fontconfig/conf.d/50-dotfiles.conf: the families preferred
 # and how glyphs are drawn. What is not set stays fontconfig's own.
-[features.fonts]
+[features.desktop.fonts]
 enabled      = false
 packages     = []        # from the repositories, else the AUR, e.g. ["noto-fonts-emoji"]
 nerd_fonts   = []        # the release's archives, e.g. ["JetBrainsMono", "FiraCode"]
@@ -123,21 +122,21 @@ nerd_version = "v3.5.1"  # their release
 # tar archive, any compression. Another URL, or version, downloads them again.
 nerd_url     = "https://github.com/ryanoasis/nerd-fonts/releases/download/{version}/{name}.tar.xz"
 
-[features.fonts.default]  # the family preferred for each generic one
+[features.desktop.fonts.default]  # the family preferred for each generic one
 # monospace  = "JetBrainsMono Nerd Font"
 # sans_serif = "Noto Sans"
 # serif      = "Noto Serif"
 # emoji      = "Noto Color Emoji"
 
-[features.fonts.render]
+[features.desktop.fonts.render]
 # antialias = true        smoothed edges
 # hinting   = "slight"    none, slight, medium or full
 # subpixel  = "rgb"       the LCD's order: rgb, bgr, vrgb, vbgr or none (grayscale)
 
-# zsh: zsh the login shell (chsh), oh-my-zsh cloned into ~/.oh-my-zsh and
+# shell.zsh: zsh the login shell (chsh), oh-my-zsh cloned into ~/.oh-my-zsh and
 # loaded by ~/.config/zsh/dotfiles.zsh, sourced from the top of ~/.zshrc;
 # the rest of ~/.zshrc stays the user's.
-[features.zsh]
+[features.shell.zsh]
 enabled = false
 shell   = "/usr/bin/zsh"  # made the login shell by chsh; listed in /etc/shells
 plugins = []              # oh-my-zsh's own plugins
@@ -148,19 +147,19 @@ extras  = []              # from the repositories
 # whenever its URL or branch differs. Of the user's files zsh writes only
 # ~/.config/zsh/dotfiles.zsh and its line in ~/.zshrc: whatever a theme
 # needs besides is the user's, set up in ~/.zshrc.
-[features.zsh.theme]
+[features.shell.zsh.theme]
 name   = "robbyrussell"
 repo   = ""  # an https git URL; empty: built in
 branch = ""  # empty: the repo's default
 
-# rustup: cargo and rustc from rustup in place of rust, with `toolchain`
+# development.rustup: cargo and rustc from rustup in place of rust, with `toolchain`
 # installed and the default.
-[features.rustup]
+[features.development.rustup]
 enabled   = false
 toolchain = "stable"  # stable, beta, nightly, a version ("1.85.0") or a dated nightly
 
-# paru: the AUR helper, built from the AUR by makepkg as the user and
+# package_tools.paru: the AUR helper, built from the AUR by makepkg as the user and
 # installed by pacman as root, whenever `paru --version` does not run.
-# Requires packaging, for makepkg's flags, and rustup, for cargo.
-[features.paru]
+# Requires packaging, for makepkg's flags, and development.rustup, for cargo.
+[features.package_tools.paru]
 enabled = false

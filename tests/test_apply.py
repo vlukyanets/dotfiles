@@ -11,14 +11,16 @@ from dotfiles import apply as runner
 from dotfiles import config, engine
 from dotfiles.apply import apply
 from dotfiles.errors import ConfigError
-from dotfiles.feature import classes
+from dotfiles.feature import classes, table
 from dotfiles.layout import Layout
 from dotfiles.plan import Step, cycles, order, steps
 from dotfiles.platforms import discovery
 from dotfiles.platforms.arch import ArchLinuxOs
+from dotfiles.platforms.debian import DebianOs
 from dotfiles.platforms.linux import LinuxOs
 from dotfiles.platforms.operating_system import OperatingSystem
 from dotfiles.platforms.package_manager import PackageManager
+from dotfiles.platforms.void import VoidOs
 
 HEAD = "from dotfiles.engine import defer, die\nfrom dotfiles.feature import Feature\n\n\n"
 
@@ -96,13 +98,24 @@ def feature(
 
 
 def make_package(tmp_path, monkeypatch, modules: dict[str, str], name: str = "fakeplat") -> None:
-    """Platform package NAME with a module in features/ per entry: FakeArch's by default."""
+    """Platform package NAME with a module in features/ per entry: FakeArch's by default.
+
+    An entry `group/name` is a module of a group, each group with its __init__.py;
+    one ending in / is only the group.
+    """
     pkg = tmp_path / "pkg" / name
     (pkg / "features").mkdir(parents=True)
     (pkg / "__init__.py").write_text("")
     (pkg / "features/__init__.py").write_text("")
     for module, body in modules.items():
-        (pkg / f"features/{module}.py").write_text(HEAD + body)
+        *groups, leaf = module.split("/")
+        where = pkg / "features"
+        for group in groups:
+            where /= group
+            where.mkdir(exist_ok=True)
+            (where / "__init__.py").write_text("")
+        if leaf:
+            (where / f"{leaf}.py").write_text(HEAD + body)
     monkeypatch.syspath_prepend(str(tmp_path / "pkg"))
     for loaded in [m for m in sys.modules if m.split(".")[0] == name]:
         monkeypatch.delitem(sys.modules, loaded)  # each test imports its own package
@@ -146,25 +159,83 @@ def test_a_feature_without_enabled_always_runs(root, system, tmp_path, monkeypat
         config.resolve("h", root)
 
 
+class _Base(LinuxOs):
+    pass
+
+
+class _Own(_Base):
+    manager_class = FakeManager
+
+
+_Base.__module__, _Own.__module__ = "fakebase", "fakeplat"
+
+
 def test_a_platform_falls_back_to_its_base_for_what_it_lacks(tmp_path, monkeypatch):
-    base = {"tool": feature("Tool", "return 'base'"), "base": feature("Base")}
+    base = {
+        "tool": feature("Tool", "return 'base'"),
+        "base": feature("Base"),
+        "g/x": feature("X", "return 'base x'"),
+    }
     make_package(tmp_path, monkeypatch, base, name="fakebase")
-    make_package(tmp_path, monkeypatch, {"tool": feature("Tool", "return 'own'")})
-
-    class Base(LinuxOs):
-        pass
-
-    class Own(Base):
-        manager_class = FakeManager
-
-    Base.__module__, Own.__module__ = "fakebase", "fakeplat"
-    found = classes(Own)
+    own = "from fakebase.features import tool\n\n\nclass Tool(tool.Tool):\n"
+    own += "    def apply(self):\n        return 'own'\n"
+    make_package(tmp_path, monkeypatch, {"tool": own})
+    found = classes(_Own)
     assert found["tool"].__module__ == "fakeplat.features.tool"
     assert found["base"].__module__ == "fakebase.features.base"
-    tool = found["tool"]({"k": 1}, Own(engine.current()))
+    assert found["g.x"].__module__ == "fakebase.features.g.x"
+    tool = found["tool"]({"k": 1}, _Own(engine.current()))
     assert tool.apply() == "own" and tool.settings == {"k": 1}
     assert tool.system.manager.missing(["x"]) == ["x"]
-    assert classes(Base)["tool"]({}, None).apply() == "base"
+    assert classes(_Base)["tool"]({}, None).apply() == "base"
+
+
+def test_a_feature_in_a_group_is_named_by_its_path(tmp_path, monkeypatch):
+    make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "top": feature("Top"),
+            "system/zram": feature("Zram"),
+            "a/b/deep": feature("Deep"),
+            "apps/system": feature("System"),  # a leaf named like a group
+            "system/_helper": "X = 1\n",
+            "_private/hidden": feature("Hidden"),
+            "empty/": "",
+        },
+    )
+    found = classes(FakeArch)
+    assert sorted(found) == ["a.b.deep", "apps.system", "system.zram", "top"]
+    assert found["system.zram"].__module__ == "fakeplat.features.system.zram"
+
+
+def test_an_override_must_subclass_its_base(tmp_path, monkeypatch):
+    make_package(tmp_path, monkeypatch, {"g/tool": feature("Tool")}, name="fakebase")
+    make_package(tmp_path, monkeypatch, {"g/tool": feature("Tool")})  # a copy, not a subclass
+    msg = r"^fakeplat/features/g/tool\.py: Tool must subclass fakebase's Tool$"
+    with pytest.raises(ConfigError, match=msg):
+        classes(_Own)
+
+
+def test_a_feature_in_a_group_is_gated_by_its_table(root, system, tmp_path, monkeypatch, capsys):
+    (root / "dotfiles/defaults.toml").write_text(
+        "[features.g.on]\nenabled = true\n[features.g.off]\nenabled = false\n"
+        "[features.h.need]\nenabled = true\n"
+    )
+    make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "g/on": feature("On", 'print("on ran")'),
+            "g/off": feature("Off", 'raise AssertionError("a disabled feature ran")'),
+            "h/need": feature("Need", 'print("need ran")', requires=["g.on"]),
+        },
+    )
+    assert apply("h", root) == 0
+    assert capsys.readouterr().out == "on ran\nneed ran\nnothing to change\n"
+    (root / "hosts/h.toml").write_text("[features.g.on]\nenabled = false\n")
+    with pytest.raises(ConfigError, match=r"^h\.need: requires features\.g\.on\.enabled = true$"):
+        apply("h", root)
 
 
 def test_one_install_then_silence(root, system, tmp_path, monkeypatch, capsys):
@@ -488,18 +559,31 @@ def test_a_module_holds_the_feature_named_after_it(root, system, tmp_path, monke
         steps({"features": {}}, FakeArch(engine.current()))
 
 
+def _schema_features(tables: dict, prefix: str = ""):
+    """The dotted names of the feature tables of TABLES: those with `enabled`, and packaging."""
+    for key, value in tables.items():
+        if not isinstance(value, dict):
+            continue
+        if "enabled" in value or prefix + key == "packaging":
+            yield prefix + key
+        else:  # a group
+            yield from _schema_features(value, f"{prefix}{key}.")
+
+
 def test_real_features_are_consistent():
     cfg = tomllib.loads(Layout().defaults.read_text())
-    for table in cfg["features"].values():
-        table["enabled"] = True
+    schema = set(_schema_features(cfg["features"]))
+    for name in schema - {"packaging"}:
+        table(cfg["features"], name)["enabled"] = True
+    modules = {name for os in (ArchLinuxOs, DebianOs, VoidOs) for name in classes(os)}
+    # A module without `enabled` in its table is taken for a group, so it is missing here too.
+    assert not modules - schema, f"features not in the schema: {sorted(modules - schema)}"
+    assert not schema - modules, f"features without a module: {sorted(schema - modules)}"
     # packages() only reads files
     found = {s.name: s for s in steps(cfg, ArchLinuxOs(engine.current()))}
-    assert not set(found) - set(cfg["features"]), "features not in the schema"
-    missing = set(cfg["features"]) - set(found)
-    assert not missing, f"features without a module: {sorted(missing)}"
     assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {
-        "command_not_found": ["pkgfile", "zsh"],
-        "paru": ["packaging", "rustup"],
+        "package_tools.paru": ["development.rustup", "packaging"],
+        "shell.command_not_found": ["package_tools.pkgfile", "shell.zsh"],
     }
 
 
@@ -515,15 +599,15 @@ def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
 
     monkeypatch.setattr(engine.current().shell, "execute", checks_only)
     cfg = config.resolve("hyper")
-    for table in cfg["features"].values():
-        table["enabled"] = True
+    for name in set(_schema_features(cfg["features"])) - {"packaging"}:
+        table(cfg["features"], name)["enabled"] = True
     cfg["features"]["packaging"]["pacman"]["flags"] = ["Color"]  # it writes only what is set
     # Every package counts as installed: zsh's among them, and tzdata's zone.
     zsh = engine.current().files.path("/usr/bin/zsh")
     zsh.parent.mkdir(parents=True)
     zsh.touch(mode=0o755)
     zone = engine.current().files.path(
-        f"/usr/share/zoneinfo/{cfg['features']['locale']['timezone']}"
+        f"/usr/share/zoneinfo/{cfg['features']['system']['locale']['timezone']}"
     )
     zone.parent.mkdir(parents=True)
     zone.touch()

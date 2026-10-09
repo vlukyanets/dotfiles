@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from dotfiles.platforms.linux.features import rustup
+from dotfiles.platforms.linux.features.development import rustup
 from dotfiles.retry import retrying
 
 

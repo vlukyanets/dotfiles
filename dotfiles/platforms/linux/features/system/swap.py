@@ -57,7 +57,7 @@ class Swap(Feature):
         files, shell = system.files, system.shell
         size = self.settings["size"]
         if not size:
-            die('features.swap.size is empty: set it for this host, e.g. "20g"')
+            die('features.system.swap.size is empty: set it for this host, e.g. "20g"')
         fstype = shell.output("findmnt", "-no", "FSTYPE", "/")
         if fstype != "btrfs":
             die(f"/ is {fstype or 'unknown'}: the swap file lives on a btrfs subvolume")

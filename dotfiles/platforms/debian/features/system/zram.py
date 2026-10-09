@@ -1,6 +1,6 @@
 """zram on Debian: Linux's, from Debian's package of the generator."""
 
-from dotfiles.platforms.linux.features import zram
+from dotfiles.platforms.linux.features.system import zram
 
 
 class Zram(zram.Zram):

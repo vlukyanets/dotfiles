@@ -15,7 +15,8 @@ User stories:
   identity and a handful of overrides, not 70 feature flags copied by hand.
 - A second machine like an existing one is `extends = ["hyper"]` plus
   what differs.
-- A typo (`features.nvidai`), a wrong type (`features.reflector.latest = "20"`), an unknown
+- A typo (`features.hardware.nvidai`), a wrong type
+  (`features.package_tools.reflector.latest = "20"`), an unknown
   parent or an inheritance cycle fails with the file and the key path
   named, for every host at once in CI.
 
@@ -40,22 +41,23 @@ hosts/[<dir>/]<name>.toml  partial config + optional extends; folders nest
 A profile or host file:
 
 ```toml
-extends = ["laptop"]           # optional; names of profiles or hosts, merged left to right
+extends = ["laptop"]                 # optional; names of profiles or hosts, merged left to right
 
-[features.reflector]           # a feature: its own table
+[features.package_tools.reflector]  # a feature: its own table, in its group's
 enabled = true
 
-[features.git]                 # enabled in a profile, set in the host
+[features.development.git]          # enabled in a profile, set in the host
 name  = "Valentin Lukyanets"
 email = "valikluks95@gmail.com"
 
-[features.packaging.makepkg]   # settings may nest
+[features.packaging.makepkg]        # settings may nest
 jobs = "50%"
 ```
 
-Every feature is a table `features.<name>` with `enabled` (default
-`false`; none on a feature that always runs, `packaging`) and its
-settings.
+Every feature is a table `features.<group>.<name>` with `enabled` (default
+`false`; none on a feature that always runs, `packaging`, the one outside
+a group) and its settings. To config a group is a table like any other:
+which tables are features is the code's business, not the schema's.
 
 Resolution for host `H`:
 
@@ -79,7 +81,7 @@ Resolution for host `H`:
    default (every key of `Packaging.types`; `makepkg.jobs`: integer or
    string), which is in the resolved config only when a file sets it. `extends` is the only key not in the schema and must be a list
    of strings. Errors name the file and the dotted key path:
-   `hosts/hyper.toml: features.nvidai: unknown key`.
+   `hosts/hyper.toml: features.hardware.nvidai: unknown key`.
 4. **Merge.** Tables merge recursively; scalars and lists are replaced by
    the later file, so lists never append.
 5. **Value checks** on the merged result: what a type cannot say, from
@@ -155,7 +157,7 @@ Output of `config` is TOML, the same shape as the input files. `--explain`
 prints one line per leaf, itself valid TOML:
 
 ```
-features.git.name = "Valentin Lukyanets"  # hosts/hyper.toml
+features.development.git.name = "Valentin Lukyanets"  # hosts/hyper.toml
 ```
 
 Errors go to stderr as `error: <file>: <key>: <reason>`, exit 1.
