@@ -9,9 +9,9 @@ Every `features.<group>.<name>` in `dotfiles/defaults.toml` does what its
 table in the schema says, through the engine: a check first, a change only
 when the check fails, root only through `shell.as_root`. Today there are
 `packaging`; `package_tools.reflector`, `.paru` and `.pkgfile`;
-`system.locale`, `.timesyncd`, `.no_beep`, `.swap`, `.zram` and `.oomd`;
-`shell.zsh` and `.command_not_found`; `desktop.fonts`; `development.git`
-and `.rustup`.
+`system.locale`, `.timesyncd`, `.no_beep`, `.swap`, `.zram`, `.oomd` and
+`.dkms`; `shell.zsh` and `.command_not_found`; `desktop.fonts`;
+`development.git` and `.rustup`; `hardware.graphics`.
 
 ## Structure
 
@@ -409,6 +409,77 @@ it as `systemd-oomd`. `apply()`:
   `systemd-oomd.service`, which reads `oomd.conf.d` only when it starts.
   Then the service enabled and started.
 
+## `system.dkms` — kernel modules built for every kernel
+
+```toml
+[features.system.dkms]
+enabled = true
+```
+
+Arch only (`platforms/arch/features/system/dkms.py`), off by default; on
+where a feature needs a module DKMS builds (`hardware.graphics` with
+`nvidia`). No settings: its packages are `dkms` and the headers of every
+installed kernel, `<pkgbase>-headers`, each kernel's `pkgbase` read from
+`/usr/lib/modules/*/pkgbase` (`linux`, `linux-lts`, `linux-zen`, …), under
+the sysroot. That is the one `packages()` reading the machine, and it
+reads files only, no command: the kernels are the machine's, which no
+host should have to repeat, and a kernel installed later gets its headers
+on the next apply. It runs `before_packages`, since `hardware.graphics`,
+which does too, requires it, and its headers are in the early
+transaction, before the AUR builds a module. `apply()` only says, as a
+notice, that no kernel was found when there is no `pkgbase`: DKMS then
+builds nothing.
+
+## `hardware.graphics` — the drivers of the GPUs
+
+```toml
+[features.hardware.graphics]
+enabled = true
+gpus    = ["intel", "nvidia"]  # amd, intel, nvidia, nouveau; several on a hybrid laptop
+lib32   = true                 # their 32-bit drivers too, for steam and wine
+
+[features.hardware.graphics.nvidia]
+driver = "580xx"  # current, 580xx, 470xx or 390xx
+```
+
+Arch only (`platforms/arch/features/hardware/graphics.py`), off by
+default; `gpus` is empty, `lib32` false and `driver` `current` by default.
+Packages only, no `apply()`; it runs `before_packages`, so the provider of
+`vulkan-driver` and `lib32-vulkan-driver` is installed, from the AUR too,
+before a package depending on them (steam), which `--noconfirm` would
+fill with the repositories' first provider, `nvidia-utils`. Per GPU, each
+with its `lib32-` package when `lib32` is true:
+
+| `gpus` | packages |
+|---|---|
+| `amd` | `mesa`, `vulkan-radeon` |
+| `intel` | `mesa`, `vulkan-intel`, `intel-media-driver` (no `lib32-`) |
+| `nouveau` | `mesa`, `vulkan-nouveau` |
+| `nvidia`, `current` | `nvidia-open-dkms`, `nvidia-utils`, `libva-nvidia-driver` (no `lib32-`) |
+| `nvidia`, `NNNxx` | `nvidia-NNNxx-dkms`, `nvidia-NNNxx-utils`, `libva-nvidia-driver` but for `390xx` |
+
+- `current` is Turing and newer, from the repositories: `nvidia-open-dkms`
+  is today's `nvidia-dkms`, which it provides and replaces; the name
+  itself is no package, and `pacman -Si` does not find it, so the real
+  name is the one written. `580xx` (Maxwell to Volta), `470xx` (Kepler)
+  and `390xx` (Fermi) are the AUR's, built in the early phase.
+- The module is always DKMS's, for whatever kernel is installed:
+  `requires()` has `system.dkms` while `nvidia` is among `gpus`, and
+  `Setting("packaging.pacman.multilib", True)` while `lib32` is true.
+- `libva-nvidia-driver` (VA-API through NVDEC) needs the 470 series or
+  newer, so `390xx` goes without it.
+- `replaces()`, while `nvidia` is among `gpus`: the packages of the other
+  branches, removed when installed so the chosen one installs without a
+  conflict — for `current` every `nvidia-NNNxx-dkms`, `-utils` and
+  `lib32-nvidia-NNNxx-utils`; for a legacy branch `nvidia-open-dkms`,
+  `nvidia-open`, `nvidia-open-lts`, `nvidia-utils`, `lib32-nvidia-utils`
+  and the other legacy branches'.
+- `Graphics.rules`: `gpus` names from the four, none twice, not both
+  `nvidia` and `nouveau` (the same card); `nvidia.driver` one of
+  `current`, `580xx`, `470xx`, `390xx`.
+- The kernel's side of NVIDIA (modeset, the suspend services, the
+  initramfs) is not here: a `hardware.nvidia` of its own, later.
+
 ## `desktop.fonts` — fonts and fontconfig
 
 An example; by default `packages` and `nerd_fonts` are empty,
@@ -598,6 +669,8 @@ home/.config/zsh/dotfiles.zsh.j2                              its template
 dotfiles/platforms/arch/features/shell/command_not_found.py   CommandNotFound: rules, pkgfile's hooks for zsh and bash
 home/.config/zsh/dotfiles.d/command-not-found.zsh.j2          its template
 dotfiles/defaults.toml                                        every feature and its settings
+dotfiles/platforms/arch/features/system/dkms.py               Dkms: dkms, each kernel's headers from its pkgbase
+dotfiles/platforms/arch/features/hardware/graphics.py         Graphics: rules, the drivers per GPU and branch
 tests/test_features.py                                        each feature against a fake machine
 tests/test_apply.py                                           test_real_features_are_consistent
 ```
@@ -686,11 +759,21 @@ tests/test_apply.py                                           test_real_features
   once, and no zsh hook; both shells, both hooks; `shell.zsh` required
   only with `zsh` among `shells`. `test_config`: an empty `shells`, another
   shell or one twice refused.
+- dkms: `dkms` and `linux-headers` for a `linux` pkgbase, both kernels'
+  headers with `linux-lts` too; no pkgbase, `dkms` alone and a notice;
+  `before_packages`.
+- graphics: the packages of each GPU, with and without `lib32`; `current`
+  and `580xx` with their `replaces()`; `390xx` without
+  `libva-nvidia-driver`; `system.dkms` required only with `nvidia`,
+  multilib only with `lib32`; nothing for an empty `gpus`;
+  `before_packages`. `test_config`: an unknown GPU, one twice, `nvidia`
+  with `nouveau` and an unknown `driver` refused.
 - `test_real_features_are_consistent`: every schema feature has a module
   and every module a schema table with `enabled`, but `packaging`; every
   override subclasses its base's class; only `package_tools.paru`
-  (`packaging`, `development.rustup`) and `shell.command_not_found`
-  (`package_tools.pkgfile`, and `shell.zsh` by default) require others.
+  (`packaging`, `development.rustup`), `shell.command_not_found`
+  (`package_tools.pkgfile`, and `shell.zsh` by default) and
+  `hardware.graphics` (none with an empty `gpus`) require others.
 - Discovery (`test_apply`): a feature in a group named by its path, a
   group in a group, `_` modules and groups skipped at any depth, an
   override that does not subclass its base's refused; a group's table

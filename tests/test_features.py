@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from dotfiles import engine
-from dotfiles.feature import classes, table
+from dotfiles.feature import Setting, classes, table
 from dotfiles.layout import Layout
 from dotfiles.platforms.arch import ArchLinuxOs
 from dotfiles.platforms.arch._pacman import Pacman
@@ -1095,3 +1095,105 @@ def test_oomd_is_part_of_systemd_on_arch_and_its_own_package_on_debian():
 
 def test_packaging_runs_before_the_package_install():
     assert classes(ArchLinuxOs)["packaging"].before_packages
+
+
+def _dkms():
+    """Arch's system.dkms on the test machine."""
+    return classes(ArchLinuxOs)["system.dkms"]({"enabled": True}, ArchLinuxOs(engine.current()))
+
+
+def test_dkms_installs_the_headers_of_every_kernel():
+    write("/usr/lib/modules/7.2.9-arch1-1/pkgbase", "linux\n")
+    write("/usr/lib/modules/6.18.55-1-lts/pkgbase", "\nlinux-lts\n\n")
+    write("/usr/lib/modules/6.1.0-extramodules/version", "")  # no pkgbase: not a kernel
+    assert _dkms().packages() == ["dkms", "linux-headers", "linux-lts-headers"]
+    assert classes(ArchLinuxOs)["system.dkms"].before_packages
+
+
+def test_dkms_without_a_kernel_installs_dkms_alone_and_says_so():
+    dkms = _dkms()
+    assert dkms.packages() == ["dkms"]
+    dkms.apply()
+    assert any("no kernel" in n for n in engine.current().report.notices)
+
+
+def _graphics(gpus, lib32=False, driver="current"):
+    """Arch's hardware.graphics with GPUS, LIB32 and the NVIDIA DRIVER branch."""
+    cfg = defaults(graphics={"gpus": gpus, "lib32": lib32, "nvidia": {"driver": driver}})
+    settings = table(cfg["features"], "hardware.graphics")
+    return classes(ArchLinuxOs)["hardware.graphics"](settings, ArchLinuxOs(engine.current()))
+
+
+@pytest.mark.parametrize(
+    ("gpus", "lib32", "driver", "packages"),
+    [
+        ([], True, "current", []),
+        (["amd"], False, "current", ["mesa", "vulkan-radeon"]),
+        (["amd"], True, "current", ["lib32-mesa", "lib32-vulkan-radeon", "mesa", "vulkan-radeon"]),
+        (["intel"], False, "current", ["intel-media-driver", "mesa", "vulkan-intel"]),
+        (
+            ["nouveau"],
+            True,
+            "current",
+            ["lib32-mesa", "lib32-vulkan-nouveau", "mesa", "vulkan-nouveau"],
+        ),
+        (["nvidia"], False, "current", ["libva-nvidia-driver", "nvidia-open-dkms", "nvidia-utils"]),
+        (
+            ["nvidia"],
+            True,
+            "580xx",
+            [
+                "lib32-nvidia-580xx-utils",
+                "libva-nvidia-driver",
+                "nvidia-580xx-dkms",
+                "nvidia-580xx-utils",
+            ],
+        ),
+        (["nvidia"], False, "390xx", ["nvidia-390xx-dkms", "nvidia-390xx-utils"]),
+        (
+            ["intel", "nvidia"],
+            True,
+            "current",
+            [
+                "intel-media-driver",
+                "lib32-mesa",
+                "lib32-nvidia-utils",
+                "lib32-vulkan-intel",
+                "libva-nvidia-driver",
+                "mesa",
+                "nvidia-open-dkms",
+                "nvidia-utils",
+                "vulkan-intel",
+            ],
+        ),
+    ],
+)
+def test_graphics_packages(gpus, lib32, driver, packages):
+    assert _graphics(gpus, lib32, driver).packages() == packages
+
+
+def test_graphics_replaces_the_other_nvidia_branches():
+    legacy = {
+        b: [f"lib32-nvidia-{b}-utils", f"nvidia-{b}-dkms", f"nvidia-{b}-utils"]
+        for b in ("390xx", "470xx", "580xx")
+    }
+    assert _graphics(["nvidia"]).replaces() == sorted(p for ps in legacy.values() for p in ps)
+    current = [
+        "lib32-nvidia-utils",
+        "nvidia-open",
+        "nvidia-open-dkms",
+        "nvidia-open-lts",
+        "nvidia-utils",
+    ]
+    replaced = _graphics(["nvidia"], driver="580xx").replaces()
+    assert replaced == sorted(current + legacy["390xx"] + legacy["470xx"])
+    assert _graphics(["amd"]).replaces() == []
+
+
+def test_graphics_requires_dkms_for_nvidia_and_multilib_for_lib32():
+    multilib = Setting("packaging.pacman.multilib", True)
+    assert _graphics(["amd"]).requires() == []
+    assert _graphics(["nvidia"]).requires() == ["system.dkms"]
+    assert _graphics(["amd"], lib32=True).requires() == [multilib]
+    assert _graphics(["nvidia"], lib32=True).requires() == ["system.dkms", multilib]
+    assert classes(ArchLinuxOs)["hardware.graphics"].before_packages
