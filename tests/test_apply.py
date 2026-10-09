@@ -621,9 +621,10 @@ def test_a_feature_before_packages_runs_before_the_install(
         lambda self, names: asked.append(len(self.installs)) or depends(self, names),
     )
     assert apply("h", root) == 0
-    assert capsys.readouterr().out == "early saw []\n-> packages: app tool (missing)\nlate ran\n"
-    assert system.installs == [["app", "tool"]]
-    assert asked and asked[0] == 1
+    out = "early saw []\n-> packages: tool (missing)\n-> packages: app (missing)\nlate ran\n"
+    assert capsys.readouterr().out == out
+    assert system.installs == [["tool"], ["app"]]
+    assert asked and asked[0] == 2
 
 
 @pytest.mark.parametrize("requirement", ["late", Setting("late.flag", True)])
@@ -658,27 +659,94 @@ def test_a_failure_before_packages_blocks_what_runs_after_it_not_the_install(
     assert system.installs == [["app", "x"]]
 
 
-def test_an_aur_package_of_a_feature_before_packages_is_built_after_the_install(
+def _events(monkeypatch) -> list[tuple[str, list[str]]]:
+    """Each install and build of FakeManager, in order."""
+    events: list[tuple[str, list[str]]] = []
+    install, build = FakeManager.install, FakeManager.build
+    monkeypatch.setattr(
+        FakeManager,
+        "install",
+        lambda self, names, replaces=(): (
+            events.append(("install", names)) or install(self, names, replaces)
+        ),
+    )
+    monkeypatch.setattr(
+        FakeManager,
+        "build",
+        lambda self, names: events.append(("build", names)) or build(self, names),
+    )
+    return events
+
+
+def test_an_aur_package_of_a_feature_before_packages_is_built_before_the_others(
     root, system, tmp_path, monkeypatch, capsys
 ):
     (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
     early = feature("Early", 'print("early ran")', ["repo", "aurpkg"])
-    late = feature("Late", 'print(f"late saw {self.system.manager.builds}")', requires=["early"])
+    late = feature("Late", 'print("late ran")', ["app"], requires=["early"])
     make_package(tmp_path, monkeypatch, {"early": _early(early), "late": late})
     system.aur = {"aurpkg"}
+    events = _events(monkeypatch)
     assert apply("h", root) == 0
-    assert system.builds == [["aurpkg"]]
+    assert events == [("install", ["aurpkg", "repo"]), ("build", ["aurpkg"]), ("install", ["app"])]
     assert capsys.readouterr().out == (
-        "early ran\n-> packages: aurpkg repo (missing)\nlate saw [['aurpkg']]\n"
+        "early ran\n-> packages: aurpkg repo (missing)\n-> packages: app (missing)\nlate ran\n"
     )
+
+
+def test_a_failed_early_transaction_blocks_its_own_not_the_others(
+    root, system, tmp_path, monkeypatch, capsys
+):
+    (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
+    make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "early": _early(feature("Early", 'print("early ran")', ["tool"])),
+            "late": feature("Late", 'print("late ran")', requires=["early"]),
+            "other": feature("Other", 'print("other ran")', ["app"]),
+        },
+    )
+    install = FakeManager.install
+
+    def broken_for_tool(self, names, replaces=()):
+        if "tool" in names:
+            raise RuntimeError("mirror down")
+        return install(self, names, replaces)
+
+    monkeypatch.setattr(FakeManager, "install", broken_for_tool)
+    assert apply("h", root) == 1
+    out, err = capsys.readouterr()
+    assert out == "early ran\n-> packages: tool (missing)\n-> packages: app (missing)\nother ran\n"
+    assert re.fullmatch(
+        r"error: packages: unexpected RuntimeError \(mirror down\), at .*\n"
+        r"error: early: packages missing: tool\n"
+        r"error: late: not run, early failed\n",
+        err,
+    )
+    assert system.installed == {"app"}
+
+
+def test_a_package_both_list_is_installed_once(root, system, tmp_path, monkeypatch, capsys):
+    (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
+    early = feature("Early", 'print("early ran")', ["git"])
+    late = feature("Late", 'print("late ran")', ["git", "app"])
+    make_package(tmp_path, monkeypatch, {"early": _early(early), "late": late})
+    assert apply("h", root) == 0
+    assert system.installs == [["git"], ["app"]]
+    assert capsys.readouterr().out.endswith("late ran\n")
 
 
 def test_a_dry_run_runs_a_feature_before_packages(root, system, tmp_path, monkeypatch, capsys):
     (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
     early = feature("Early", 'self.system.report.changed("early change")', ["tool"])
-    make_package(tmp_path, monkeypatch, {"early": _early(early)})
+    late = feature("Late", 'print("late ran")', ["app"])
+    make_package(tmp_path, monkeypatch, {"early": _early(early), "late": late})
     assert apply("h", root, dry_run=True) == 0
-    assert capsys.readouterr().out == "-> early change\n-> packages: tool (missing)\n"
+    assert capsys.readouterr().out == (
+        "-> early change\n-> packages: tool (missing)\n-> packages: app (missing)\n"
+        "-> late (after its packages)\n"
+    )
 
 
 def test_packages_that_did_not_install_block_their_features(

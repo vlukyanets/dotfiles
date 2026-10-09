@@ -70,8 +70,8 @@ class Apply:
     def run(self) -> int:
         """Every phase in turn; 1 if anything failed."""
         ready = self._setup()
-        self._early()
-        self._packages(ready)
+        self._early(ready)
+        self._packages(ready, [s for s in self.steps if not s.feature.before_packages])
         self._features()
         if not self.report.printed and not self.failed:
             print("nothing to change")
@@ -97,21 +97,22 @@ class Apply:
             return True
         return False
 
-    def _packages(self, ready: bool) -> None:
-        """The missing packages installed in one go, what they replace removed first."""
+    def _packages(self, ready: bool, steps: list[Step]) -> None:
+        """The missing packages of STEPS installed in one go, what they replace removed first."""
         manager = self.system.manager
-        missing = manager.missing(self.wanted)
+        wanted = sorted(set().union(*(step.packages for step in steps)))
+        missing = manager.missing(wanted)
         if not missing:
             return
         self.report.changed(f"packages: {' '.join(missing)} (missing)")
         if self.system.shell.dry_run:
-            self.pending = set(missing)  # nothing installed, so nothing failed to be
+            self.pending |= set(missing)  # nothing installed, so nothing failed to be
             return
         if ready:
-            replaced = sorted(set().union(*(step.replaces for step in self.steps)))
+            replaced = sorted(set().union(*(step.replaces for step in steps)))
             with self._guard("packages"):
-                self.later = set(manager.install(missing, replaced))
-        self.unavailable = set(manager.missing(self.wanted)) - self.later
+                self.later |= set(manager.install(missing, replaced))
+        self.unavailable |= set(manager.missing(wanted)) - self.later
 
     def _features(self) -> None:
         """Each feature in order, unless what it builds on failed."""
@@ -123,22 +124,29 @@ class Apply:
             self.failed.update(cycle)  # features are cut so they never need each other
             _error(", ".join(cycle), f"not run, they need each other: {circle(cycle)}")
         for step, after in ordered:
-            if not step.feature.before_packages:
+            if not step.feature.before_packages:  # those ran before the install
                 self._run(step, after)
-            elif step.name not in self.failed and (later := sorted(step.packages & self.later)):
-                # It ran before the install: what that left for the AUR is built now.
+
+    def _early(self, ready: bool) -> None:
+        """The features before packages, then their packages, AUR ones built at once.
+
+        Ordered by their requirements alone, not by the package graph: depends() caches
+        for the apply, and would keep a package of a repository this phase adds (steam,
+        of multilib) as needing nothing.
+        """
+        early = order([s for s in self.steps if s.feature.before_packages], {})
+        for step, after in early:
+            self._run(step, after)
+        self._packages(ready, [step for step, _ in early if step.name not in self.failed])
+        for step, _ in early:
+            if step.name in self.failed:
+                continue
+            if gone := sorted(step.packages & self.unavailable):
+                self._fail(step.name, f"packages missing: {' '.join(gone)}")  # it ran already
+            elif later := sorted(step.packages & self.later):
                 with self._guard(step.name):
                     self.system.manager.build(later)
                     self.later -= set(later)
-
-    def _early(self) -> None:
-        """The features before packages, ordered by their requirements alone.
-
-        Not by the package graph: depends() caches for the apply, and would keep a
-        package of a repository this phase adds (steam, of multilib) as needing nothing.
-        """
-        for step, after in order([s for s in self.steps if s.feature.before_packages], {}):
-            self._run(step, after)
 
     def _run(self, step: Step, after: list[str]) -> None:
         """STEP, unless it failed already or what it runs AFTER did."""
