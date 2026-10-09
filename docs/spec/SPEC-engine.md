@@ -462,7 +462,10 @@ class Docker(Feature):  # platforms/arch/features/containers/docker.py
    own packages, which the next phase installs, and it cannot require a
    feature without the flag, which runs later: `packaging:
    before_packages, so it cannot require X`, from `steps()`. Its failure
-   blocks what runs after it, as in phase 5; the rest goes on.
+   blocks what runs after it, as in phase 5, and keeps the packages of
+   what requires it out of phase 4: they may stand on what it would have
+   installed (steam's `vulkan-driver` on `hardware.graphics`'s); the rest
+   goes on.
 3. **Their packages.** The packages of the features of phase 2 that did
    not fail, as phase 4 installs the others: one line `-> packages: a b
    (missing)`, one transaction with their `replaces()` removed first,

@@ -445,7 +445,10 @@ driver = "580xx"  # current, 580xx, 470xx or 390xx
 
 Arch only (`platforms/arch/features/hardware/graphics.py`), off by
 default; `gpus` is empty, `lib32` false and `driver` `current` by default.
-Packages only, no `apply()`; it runs `before_packages`, so the provider of
+Packages only; `apply()` only fails, before any change, while `gpus` is
+empty (`features.hardware.graphics.gpus is empty`): `lib32` would then
+meet steam's requirement with no driver, and `--noconfirm` would pick
+`nvidia-utils`, which blacklists nouveau. It runs `before_packages`, so the provider of
 `vulkan-driver` and `lib32-vulkan-driver` is installed, from the AUR too,
 before a package depending on them (steam), which `--noconfirm` would
 fill with the repositories' first provider, `nvidia-utils`. Per GPU, each
@@ -503,8 +506,9 @@ the repositories, each 32-bit one from [multilib]:
   which `hardware.graphics` requires for `lib32`.
 - `gamemode`: `gamemode` and `lib32-gamemode`. `requires()` multilib.
   `apply()`: `ensure_group_member("gamemode")`, the group the package
-  makes and its `/etc/security/limits.d` lets renice games; a notice to
-  log in again when added.
+  makes (sysusers.d): its polkit rule lets only members switch the CPU
+  governor, which gamemode does by default, and its limits.d lets them
+  renice games; a notice to log in again when added.
 - `mangohud`: `mangohud` and `lib32-mangohud`. `requires()` multilib.
   Its config, `~/.config/MangoHud/`, stays the user's; a game gets the
   overlay through `mangohud %command%` in its launch options.
@@ -800,6 +804,7 @@ tests/test_apply.py                                           test_real_features
   multilib only with `lib32`; nothing for an empty `gpus`;
   `before_packages`. `test_config`: an unknown GPU, one twice, `nvidia`
   with `nouveau` and an unknown `driver` refused.
+- graphics: an empty `gpus` fails before any change.
 - gaming: each feature's packages and its requirement; gamemode adds the
   user to `gamemode`. `test_apply`: steam on without
   `hardware.graphics.lib32` refused by `check`.
@@ -809,8 +814,9 @@ tests/test_apply.py                                           test_real_features
   (`packaging`, `development.rustup`), `shell.command_not_found`
   (`package_tools.pkgfile`, and `shell.zsh` by default), `gaming.steam`
   (`hardware.graphics`, through its setting), `gaming.gamemode` and
-  `gaming.mangohud` (`packaging`, through multilib) require others;
-  `hardware.graphics` none with an empty `gpus`.
+  `gaming.mangohud` (`packaging`, through multilib) and
+  `hardware.graphics` (`packaging`, through multilib, with `lib32`)
+  require others.
 - Discovery (`test_apply`): a feature in a group named by its path, a
   group in a group, `_` modules and groups skipped at any depth, an
   override that does not subclass its base's refused; a group's table

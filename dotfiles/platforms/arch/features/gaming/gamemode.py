@@ -15,5 +15,5 @@ class Gamemode(Feature):
         return [Setting("packaging.pacman.multilib", True)]
 
     def apply(self) -> None:
-        """This user in gamemode: its limits.d lets the group renice games."""
+        """This user in gamemode: its polkit rule lets only members switch the CPU governor."""
         self.system.ensure_group_member("gamemode")

@@ -1218,3 +1218,9 @@ def test_gamemode_adds_the_user_to_its_group(monkeypatch):
     monkeypatch.setattr(ArchLinuxOs, "ensure_group_member", lambda self, g: groups.append(g))
     apply("gamemode")
     assert groups == ["gamemode"]
+
+
+def test_graphics_without_gpus_fails_before_any_change():
+    with pytest.raises(engine.Failed, match=r"^features\.hardware\.graphics\.gpus is empty"):
+        _graphics([], lib32=True).apply()
+    _graphics(["amd"]).apply()  # nothing to do with a GPU named

@@ -655,11 +655,12 @@ def test_a_failure_before_packages_blocks_what_runs_after_it_not_the_install(
         },
     )
     assert apply("h", root) == 1
+    # late's packages wait too: they stand on what early would have done (steam's driver).
     assert capsys.readouterr() == (
-        "-> packages: app x (missing)\nother ran\n",
+        "-> packages: x (missing)\nother ran\n",
         "error: early: broken\nerror: late: not run, early failed\n",
     )
-    assert system.installs == [["app", "x"]]
+    assert system.installs == [["x"]]
 
 
 def _events(monkeypatch) -> list[tuple[str, list[str]]]:
@@ -845,7 +846,7 @@ def _schema_features(tables: dict, prefix: str = ""):
 def _settings_for_gaming(cfg: dict) -> None:
     """What the gaming features require, as a host turning them on would set it."""
     cfg["features"]["packaging"]["pacman"]["multilib"] = True
-    table(cfg["features"], "hardware.graphics")["lib32"] = True
+    table(cfg["features"], "hardware.graphics").update(gpus=["amd"], lib32=True)
 
 
 def test_real_features_are_consistent():
