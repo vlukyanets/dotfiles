@@ -14,7 +14,8 @@ mirrorlist on a timer), `package_tools.paru` (the AUR helper),
 `shell.command_not_found` (its hook in zsh, bash or both) and
 `desktop.fonts` (fonts and fontconfig), `system.dkms` (dkms and each
 kernel's headers) and `hardware.graphics` (the GPUs' drivers, NVIDIA's
-current or legacy branch) on Arch, and on all
+current or legacy branch), `gaming.steam`, `gaming.gamemode` and
+`gaming.mangohud` on Arch, and on all
 `development.rustup` (cargo and rustc), `system.no_beep` (no PC speaker),
 `development.git` (the user's name and email), `shell.zsh` (zsh with
 oh-my-zsh, the login shell), `system.locale` (locales, LANG, the console,

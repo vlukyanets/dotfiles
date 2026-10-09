@@ -184,3 +184,12 @@ lib32   = false  # their 32-bit drivers too, for steam and wine; requires packag
 # current: Turing and newer, nvidia-open-dkms (today's nvidia-dkms) from the
 # repositories; 580xx (Maxwell to Volta), 470xx (Kepler), 390xx (Fermi): the AUR.
 driver = "current"
+
+# gaming: steam (and ttf-liberation for its font), on the 32-bit drivers of
+# the host's GPUs: requires hardware.graphics.lib32. gamemode, this user in
+# its group; mangohud, through `mangohud %command%`, its config the user's.
+# The 32-bit packages are [multilib]'s: they require packaging.pacman.multilib.
+[features.gaming]
+steam.enabled    = false
+gamemode.enabled = false
+mangohud.enabled = false
