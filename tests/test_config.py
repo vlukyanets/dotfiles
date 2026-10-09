@@ -144,6 +144,22 @@ def test_command_not_found_shells_are_zsh_or_bash_once_each(tmp_path, shells):
         resolve("h", tmp_path, checks=feature.checks())
 
 
+@pytest.mark.parametrize(
+    ("setting", "error"),
+    [
+        ('gpus = ["vga"]', "gpus: must be amd, intel, nvidia or nouveau"),
+        ('gpus = ["amd", "amd"]', "gpus: must be amd, intel, nvidia or nouveau"),
+        ('gpus = ["nvidia", "nouveau"]', "gpus: must be amd, intel, nvidia or nouveau"),
+        ('nvidia.driver = "600xx"', "nvidia.driver: must be current, 580xx, 470xx or 390xx"),
+    ],
+)
+def test_graphics_gpus_and_driver(tmp_path, setting, error):
+    write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
+    write(tmp_path, "hosts/h.toml", f"[features.hardware.graphics]\n{setting}\n")
+    with pytest.raises(ConfigError, match=error):
+        resolve("h", tmp_path, checks=feature.checks())
+
+
 def test_a_key_without_default_is_there_only_when_set(tmp_path):
     write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
     write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = true\n")

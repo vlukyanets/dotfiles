@@ -170,3 +170,17 @@ toolchain = "stable"  # stable, beta, nightly, a version ("1.85.0") or a dated n
 # Requires packaging, for makepkg's flags, and development.rustup, for cargo.
 [features.package_tools.paru]
 enabled = false
+
+# hardware.graphics: the drivers of the GPUs: Mesa's Vulkan drivers, VA-API
+# for Intel and NVIDIA, NVIDIA's module through DKMS (requires system.dkms)
+# on its branch. Installed before the other packages, so steam's
+# vulkan-driver is this one, not the repositories' first.
+[features.hardware.graphics]
+enabled = false
+gpus    = []     # amd, intel, nvidia, nouveau; several on a hybrid laptop
+lib32   = false  # their 32-bit drivers too, for steam and wine; requires packaging.pacman.multilib
+
+[features.hardware.graphics.nvidia]
+# current: Turing and newer, nvidia-open-dkms (today's nvidia-dkms) from the
+# repositories; 580xx (Maxwell to Volta), 470xx (Kepler), 390xx (Fermi): the AUR.
+driver = "current"
