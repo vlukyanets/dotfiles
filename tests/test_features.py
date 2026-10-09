@@ -1177,7 +1177,10 @@ def test_graphics_replaces_the_other_nvidia_branches():
         b: [f"lib32-nvidia-{b}-utils", f"nvidia-{b}-dkms", f"nvidia-{b}-utils"]
         for b in ("390xx", "470xx", "580xx")
     }
-    assert _graphics(["nvidia"]).replaces() == sorted(p for ps in legacy.values() for p in ps)
+    prebuilt = ["nvidia-open", "nvidia-open-lts"]  # conflict with nvidia-open-dkms
+    assert _graphics(["nvidia"]).replaces() == sorted(
+        prebuilt + [p for ps in legacy.values() for p in ps]
+    )
     current = [
         "lib32-nvidia-utils",
         "nvidia-open",
