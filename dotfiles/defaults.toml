@@ -50,11 +50,13 @@ enabled = false
 [features.pkgfile]
 enabled = false
 
-# command_not_found: a command zsh does not find names the package that
-# has it, from pkgfile's handler in ~/.config/zsh/dotfiles.d, which zsh's
-# snippet sources. Requires pkgfile and zsh.
+# command_not_found: a command the shell does not find names the package
+# that has it, from pkgfile's handler: for zsh in ~/.config/zsh/dotfiles.d,
+# which zsh's snippet sources; for bash a line at the end of ~/.bashrc.
+# Requires pkgfile, and zsh while zsh is one of `shells`.
 [features.command_not_found]
 enabled = false
+shells  = ["zsh"]  # zsh, bash or both
 
 # git: user.name and user.email in ~/.config/git/dotfiles.gitconfig,
 # included from the top of ~/.config/git/config; the rest of the config,

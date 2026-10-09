@@ -520,14 +520,27 @@ from the three above.
 ```toml
 [features.command_not_found]
 enabled = true
+shells  = ["zsh", "bash"]
 ```
 
 Arch only (`platforms/arch/features/command_not_found.py`), off by
-default, on in `profiles/arch.toml`. Requires `pkgfile`, whose database and
-handler it uses, and `zsh`, whose snippet loads it. No settings, no
-packages: `apply()` writes `~/.config/zsh/dotfiles.d/command-not-found.zsh`,
-which sources `/usr/share/doc/pkgfile/command-not-found.zsh`. A command
-zsh does not find then prints the packages that have it.
+default, on in `profiles/arch.toml`; `shells` is `["zsh"]` by default. No
+packages. It requires `pkgfile`, whose database and handlers it uses, and
+`zsh` only while `zsh` is one of `shells`: `requires()` reads its settings.
+`apply()` writes the hook of each shell:
+
+- zsh: `~/.config/zsh/dotfiles.d/command-not-found.zsh`, which zsh's
+  snippet sources, sourcing `/usr/share/doc/pkgfile/command-not-found.zsh`.
+- bash: `source /usr/share/doc/pkgfile/command-not-found.bash` at the end
+  of `~/.bashrc` (`files.line`; a missing one is created with it alone).
+  bash has no feature, and no snippet of ours: it is on every system, and
+  what `~/.bashrc` reads before the line stays the user's.
+
+A command the shell does not find then prints the packages that have it.
+A shell taken out of `shells` keeps its hook: off never undoes.
+
+`CommandNotFound.rules`: `shells` not empty, only `zsh` and `bash`, each
+once.
 
 ## Project Structure
 
@@ -571,7 +584,7 @@ home/.config/fontconfig/conf.d/50-dotfiles.conf.j2  its template
 dotfiles/platforms/linux/features/zsh.py       Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
 dotfiles/platforms/debian/features/zsh.py      Zsh: Linux's, with Debian's extras_dir
 home/.config/zsh/dotfiles.zsh.j2               its template
-dotfiles/platforms/arch/features/command_not_found.py  CommandNotFound: pkgfile's hook for zsh
+dotfiles/platforms/arch/features/command_not_found.py  CommandNotFound: rules, pkgfile's hooks for zsh and bash
 home/.config/zsh/dotfiles.d/command-not-found.zsh.j2  its template
 dotfiles/defaults.toml                         every feature and its settings
 tests/test_features.py                         each feature against a fake machine
@@ -658,10 +671,13 @@ tests/test_apply.py                            test_real_features_are_consistent
   with it; one that is not there fails before `chsh`, in a dry run too.
   On Debian the extras are sourced from `/usr/share/<extra>/`.
 - command_not_found: the hook sourcing pkgfile's handler, nothing the
-  second time.
+  second time; for bash its line at the end of an existing `~/.bashrc`,
+  once, and no zsh hook; both shells, both hooks; `zsh` required only
+  with `zsh` among `shells`. `test_config`: an empty `shells`, another
+  shell or one twice refused.
 - `test_real_features_are_consistent`: every schema feature has a module
   and every module a schema table; only paru (packaging, rustup) and
-  command_not_found (pkgfile, zsh) require others.
+  command_not_found (pkgfile, and zsh by default) require others.
 
 ## Boundaries
 

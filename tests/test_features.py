@@ -509,6 +509,40 @@ def test_zsh_creates_zshrc_with_the_source_line(machine, monkeypatch):
     assert "plugins=()\n" in text and "/usr/share/zsh/plugins" not in text
 
 
+BASH_HOOK = "source /usr/share/doc/pkgfile/command-not-found.bash"
+
+
+def test_command_not_found_for_bash_adds_its_line_to_bashrc_once(machine, capsys):
+    bashrc = home(".bashrc")
+    bashrc.parent.mkdir(parents=True, exist_ok=True)
+    bashrc.write_text("# mine\nalias ll='ls -l'\n")
+    cfg = defaults(command_not_found={"shells": ["bash"]})
+    apply("command_not_found", cfg)
+    # At the end: what bash reads before it is the user's.
+    assert bashrc.read_text() == f"# mine\nalias ll='ls -l'\n{BASH_HOOK}\n"
+    assert not home(".config/zsh/dotfiles.d/command-not-found.zsh").exists()
+    capsys.readouterr()
+    machine.calls.clear()
+    apply("command_not_found", cfg)
+    assert capsys.readouterr().out == ""
+    assert machine.calls == []
+
+
+def test_command_not_found_for_both_shells_writes_both_hooks(machine):
+    apply("command_not_found", defaults(command_not_found={"shells": ["zsh", "bash"]}))
+    assert home(".config/zsh/dotfiles.d/command-not-found.zsh").exists()
+    assert home(".bashrc").read_text() == f"{BASH_HOOK}\n"
+
+
+@pytest.mark.parametrize(
+    ("shells", "requires"),
+    [(["zsh"], ["pkgfile", "zsh"]), (["bash"], ["pkgfile"]), (["bash", "zsh"], ["pkgfile", "zsh"])],
+)
+def test_command_not_found_requires_zsh_only_for_zsh(shells, requires):
+    cfg = defaults(command_not_found={"shells": shells})["features"]["command_not_found"]
+    assert classes(ArchLinuxOs)["command_not_found"](cfg, None).requires() == requires
+
+
 def test_command_not_found_writes_the_hook_zsh_sources(machine, capsys):
     apply("command_not_found")
     hook = home(".config/zsh/dotfiles.d/command-not-found.zsh")

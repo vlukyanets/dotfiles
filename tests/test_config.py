@@ -136,6 +136,14 @@ def test_zram_numbers_in_their_ranges(tmp_path, setting, error):
         resolve("h", tmp_path, checks=feature.checks())
 
 
+@pytest.mark.parametrize("shells", ["[]", '["fish"]', '["zsh", "zsh"]'])
+def test_command_not_found_shells_are_zsh_or_bash_once_each(tmp_path, shells):
+    write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
+    write(tmp_path, "hosts/h.toml", f"[features.command_not_found]\nshells = {shells}\n")
+    with pytest.raises(ConfigError, match="shells: must be zsh, bash or both, each once"):
+        resolve("h", tmp_path, checks=feature.checks())
+
+
 def test_a_key_without_default_is_there_only_when_set(tmp_path):
     write(tmp_path, "dotfiles/defaults.toml", Layout().defaults.read_text())
     write(tmp_path, "hosts/h.toml", "[features.packaging.pacman]\nmultilib = true\n")
