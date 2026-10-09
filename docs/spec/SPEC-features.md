@@ -470,9 +470,11 @@ with its `lib32-` package when `lib32` is true:
   newer, so `390xx` goes without it.
 - `replaces()`, while `nvidia` is among `gpus`: the packages of the other
   branches, removed when installed so the chosen one installs without a
-  conflict — for `current` every `nvidia-NNNxx-dkms`, `-utils` and
-  `lib32-nvidia-NNNxx-utils`; for a legacy branch `nvidia-open-dkms`,
-  `nvidia-open`, `nvidia-open-lts`, `nvidia-utils`, `lib32-nvidia-utils`
+  conflict — always `nvidia-open` and `nvidia-open-lts`, the modules
+  prebuilt for one kernel, which conflict with every DKMS module (the
+  usual state of a Turing machine); for `current` also every
+  `nvidia-NNNxx-dkms`, `-utils` and `lib32-nvidia-NNNxx-utils`; for a
+  legacy branch `nvidia-open-dkms`, `nvidia-utils`, `lib32-nvidia-utils`
   and the other legacy branches'.
 - `Graphics.rules`: `gpus` names from the four, none twice, not both
   `nvidia` and `nouveau` (the same card); `nvidia.driver` one of

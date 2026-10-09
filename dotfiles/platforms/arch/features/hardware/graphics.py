@@ -11,6 +11,8 @@ _GPUS = {
     "nouveau": (["mesa", "vulkan-nouveau"], ["mesa", "vulkan-nouveau"]),
 }
 _LEGACY = ("580xx", "470xx", "390xx")  # the AUR's: Maxwell to Volta, Kepler, Fermi
+# Prebuilt modules for one kernel each: they conflict with every branch's DKMS module.
+_PREBUILT = ["nvidia-open", "nvidia-open-lts"]
 
 
 def _nvidia(driver: str) -> tuple[list[str], list[str]]:
@@ -27,10 +29,9 @@ def _nvidia(driver: str) -> tuple[list[str], list[str]]:
 
 
 def _branch(driver: str) -> list[str]:
-    """Every package of branch DRIVER, its lib32- ones and current's prebuilt modules too."""
+    """Every package of branch DRIVER, its lib32- ones too."""
     own, lib32 = _nvidia(driver)
-    extra = ["nvidia-open", "nvidia-open-lts"] if driver == "current" else []
-    return [*own, *(f"lib32-{p}" for p in lib32), *extra]
+    return [*own, *(f"lib32-{p}" for p in lib32)]
 
 
 class Graphics(Feature):
@@ -74,7 +75,7 @@ class Graphics(Feature):
         if driver is None:
             return []
         others = [b for b in ("current", *_LEGACY) if b != driver]
-        return sorted({p for b in others for p in _branch(b)} - set(_branch(driver)))
+        return sorted({*_PREBUILT, *(p for b in others for p in _branch(b))} - set(_branch(driver)))
 
     def requires(self) -> list[str | Setting]:
         """dkms for NVIDIA's module; multilib for the lib32- packages."""
