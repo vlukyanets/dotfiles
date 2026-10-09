@@ -481,8 +481,12 @@ class Docker(Feature):  # platforms/arch/features/containers/docker.py
    line `-> packages: a b c (missing)` and `manager.install(...)` in one
    transaction, whose order is the package manager's, what the features
    `replaces()` removed first. What install() returns, not in the
-   repositories, is built at its feature's turn. Nothing missing →
-   nothing printed, no root.
+   repositories, is built at its feature's turn. A wanted name that a
+   replaced package provided (`nvidia-utils`, of `nvidia-580xx-utils`)
+   counts as installed until that package goes, so what is missing once
+   it went is installed in a second go, `-> packages: a (missing once
+   replaced)`; phase 3 does the same. Nothing missing → nothing printed,
+   no root.
 5. **Features, in order;** each first gets the packages install() left,
    built with `manager.build(...)` (the AUR on Arch), a failure its own.
    Feature A runs before feature B when B

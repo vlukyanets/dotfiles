@@ -38,16 +38,20 @@ class FakeManager(PackageManager):
     replaced: ClassVar[list[list[str]]] = []  # REPLACES of each install
     aur: ClassVar[set[str]] = set()  # not in its repositories: left for build()
     builds: ClassVar[list[list[str]]] = []
+    provided: ClassVar[dict[str, str]] = {}  # name -> the installed package that provides it
     broken = False  # install fails
 
     def missing(self, names):
-        return [n for n in names if n not in self.installed]
+        # As pacman -T: a name an installed package provides is there.
+        return [n for n in names if n not in self.installed | {*self.provided}]
 
     def install(self, names, replaces=()):
         self.installs.append(names)
         self.replaced.append(list(replaces))
         if self.broken:
             raise RuntimeError("mirror down")
+        self.installed -= set(replaces)
+        self.provided = {k: v for k, v in self.provided.items() if v not in replaces}
         self.installed.update(set(names) - self.aur)
         return [n for n in names if n in self.aur]
 
@@ -80,6 +84,7 @@ def system(monkeypatch) -> type[FakeManager]:
     monkeypatch.setattr(FakeManager, "replaced", [])
     monkeypatch.setattr(FakeManager, "aur", set())
     monkeypatch.setattr(FakeManager, "builds", [])
+    monkeypatch.setattr(FakeManager, "provided", {})
     monkeypatch.setattr(FakeManager, "broken", False)
     monkeypatch.setattr(discovery, "detect", lambda machine: FakeArch(machine))
     monkeypatch.setattr(discovery, "every", lambda machine: [FakeArch(machine)])
@@ -787,6 +792,18 @@ def test_a_dry_run_runs_a_feature_before_packages(root, system, tmp_path, monkey
     )
 
 
+def test_what_a_replaced_package_provided_is_installed_too(root, system, tmp_path, monkeypatch):
+    # nvidia-580xx-utils provides nvidia-utils: pacman -T counts it until it is replaced.
+    replaces = ["old-utils", "lib32-old-utils"]
+    body = feature("Driver", 'print("driver ran")', ["dkms-mod", "utils", "lib32-utils"], replaces)
+    make_package(tmp_path, monkeypatch, {"driver": body})
+    system.installed = {"old-utils", "lib32-old-utils"}
+    system.provided = {"utils": "old-utils", "lib32-utils": "lib32-old-utils"}
+    assert apply("h", root) == 0
+    assert system.installs == [["dkms-mod"], ["lib32-utils", "utils"]]
+    assert system.installed == {"dkms-mod", "utils", "lib32-utils"}
+
+
 def test_packages_that_did_not_install_block_their_features(
     root, system, tmp_path, monkeypatch, capsys
 ):
@@ -883,6 +900,18 @@ def test_steam_needs_the_32_bit_graphics_drivers():
         ConfigError, match=r"^gaming\.steam: requires features\.hardware\.graphics\.lib32 = true$"
     ):
         steps(cfg, ArchLinuxOs(engine.current()))
+
+
+def test_graphics_with_nvidia_needs_dkms_and_runs_early():
+    cfg = tomllib.loads(Layout().defaults.read_text())
+    graphics = table(cfg["features"], "hardware.graphics")
+    graphics.update(enabled=True, gpus=["nvidia"], lib32=True)
+    cfg["features"]["packaging"]["pacman"]["multilib"] = True
+    with pytest.raises(ConfigError, match=r"requires features\.system\.dkms\.enabled = true"):
+        steps(cfg, ArchLinuxOs(engine.current()))
+    table(cfg["features"], "system.dkms")["enabled"] = True
+    early = [s.name for s in steps(cfg, ArchLinuxOs(engine.current())) if s.feature.before_packages]
+    assert early == ["hardware.graphics", "packaging", "system.dkms"]
 
 
 def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):

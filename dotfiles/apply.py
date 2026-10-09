@@ -118,6 +118,11 @@ class Apply:
             replaced = sorted(set().union(*(step.replaces for step in steps)))
             with self._guard("packages"):
                 self.later |= set(manager.install(missing, replaced))
+                # A name a replaced package provided (nvidia-utils, of nvidia-580xx-utils)
+                # counted as there until it was removed: installed now, in a second go.
+                if again := sorted(set(manager.missing(wanted)) - set(missing) - self.later):
+                    self.report.changed(f"packages: {' '.join(again)} (missing once replaced)")
+                    self.later |= set(manager.install(again))
         self.unavailable |= set(manager.missing(wanted)) - self.later
 
     def _features(self) -> None:
