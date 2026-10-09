@@ -1,3 +1,6 @@
+import grp
+import os
+import pwd
 import re
 import subprocess
 import sys
@@ -657,11 +660,12 @@ def test_a_failure_before_packages_blocks_what_runs_after_it_not_the_install(
         },
     )
     assert apply("h", root) == 1
+    # late's packages wait too: they stand on what early would have done (steam's driver).
     assert capsys.readouterr() == (
-        "-> packages: app x (missing)\nother ran\n",
+        "-> packages: x (missing)\nother ran\n",
         "error: early: broken\nerror: late: not run, early failed\n",
     )
-    assert system.installs == [["app", "x"]]
+    assert system.installs == [["x"]]
 
 
 def _events(monkeypatch) -> list[tuple[str, list[str]]]:
@@ -856,11 +860,18 @@ def _schema_features(tables: dict, prefix: str = ""):
             yield from _schema_features(value, f"{prefix}{key}.")
 
 
+def _settings_for_gaming(cfg: dict) -> None:
+    """What the gaming features require, as a host turning them on would set it."""
+    cfg["features"]["packaging"]["pacman"]["multilib"] = True
+    table(cfg["features"], "hardware.graphics").update(gpus=["amd"], lib32=True)
+
+
 def test_real_features_are_consistent():
     cfg = tomllib.loads(Layout().defaults.read_text())
     schema = set(_schema_features(cfg["features"]))
     for name in schema - {"packaging"}:
         table(cfg["features"], name)["enabled"] = True
+    _settings_for_gaming(cfg)
     modules = {name for os in (ArchLinuxOs, DebianOs, VoidOs) for name in classes(os)}
     # A module without `enabled` in its table is taken for a group, so it is missing here too.
     assert not modules - schema, f"features not in the schema: {sorted(modules - schema)}"
@@ -870,7 +881,25 @@ def test_real_features_are_consistent():
     assert {n: sorted(s.requires) for n, s in found.items() if s.requires} == {
         "package_tools.paru": ["development.rustup", "packaging"],
         "shell.command_not_found": ["package_tools.pkgfile", "shell.zsh"],
+        "gaming.steam": ["hardware.graphics"],
+        "hardware.graphics": ["packaging"],
+        "gaming.gamemode": ["packaging"],
+        "gaming.mangohud": ["packaging"],
     }
+
+
+def test_steam_needs_the_32_bit_graphics_drivers():
+    cfg = tomllib.loads(Layout().defaults.read_text())
+    table(cfg["features"], "gaming.steam")["enabled"] = True
+    with pytest.raises(
+        ConfigError, match=r"^gaming\.steam: requires features\.hardware\.graphics\.enabled = true$"
+    ):
+        steps(cfg, ArchLinuxOs(engine.current()))
+    table(cfg["features"], "hardware.graphics")["enabled"] = True
+    with pytest.raises(
+        ConfigError, match=r"^gaming\.steam: requires features\.hardware\.graphics\.lib32 = true$"
+    ):
+        steps(cfg, ArchLinuxOs(engine.current()))
 
 
 def test_graphics_with_nvidia_needs_dkms_and_runs_early():
@@ -899,8 +928,14 @@ def test_dry_run_on_a_real_host_never_calls_sudo(monkeypatch, capsys):
     cfg = config.resolve("hyper")
     for name in set(_schema_features(cfg["features"])) - {"packaging"}:
         table(cfg["features"], name)["enabled"] = True
+    _settings_for_gaming(cfg)
     cfg["features"]["packaging"]["pacman"]["flags"] = ["Color"]  # it writes only what is set
-    # Every package counts as installed: zsh's among them, and tzdata's zone.
+    # Every package counts as installed: zsh's among them, and tzdata's zone, and gamemode's
+    # group, with this user in it.
+    me = pwd.getpwuid(os.geteuid())
+    monkeypatch.setattr(
+        grp, "getgrnam", lambda name: grp.struct_group((name, "x", me.pw_gid, [me.pw_name]))
+    )
     zsh = engine.current().files.path("/usr/bin/zsh")
     zsh.parent.mkdir(parents=True)
     zsh.touch(mode=0o755)

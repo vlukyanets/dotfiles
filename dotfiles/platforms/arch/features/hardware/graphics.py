@@ -2,6 +2,7 @@
 
 from typing import ClassVar
 
+from dotfiles.engine import die
 from dotfiles.feature import Feature, Setting
 
 # Per GPU: its packages, and of those the ones with a lib32- pair for 32-bit programs.
@@ -76,6 +77,13 @@ class Graphics(Feature):
             return []
         others = [b for b in ("current", *_LEGACY) if b != driver]
         return sorted({*_PREBUILT, *(p for b in others for p in _branch(b))} - set(_branch(driver)))
+
+    def apply(self) -> None:
+        """Nothing to do but refuse an empty gpus, before any change: steam's vulkan-driver
+        would otherwise be --noconfirm's first provider, nvidia-utils.
+        """
+        if not self.settings["gpus"]:
+            die('features.hardware.graphics.gpus is empty: name the GPUs, e.g. ["amd"]')
 
     def requires(self) -> list[str | Setting]:
         """dkms for NVIDIA's module; multilib for the lib32- packages."""

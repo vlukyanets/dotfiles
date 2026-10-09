@@ -72,7 +72,10 @@ class Apply:
         """Every phase in turn; 1 if anything failed."""
         ready = self._setup()
         self._early(ready)
-        self._packages(ready, [s for s in self.steps if not s.feature.before_packages])
+        # Not the packages of a feature whose requirement failed early: they may stand on what
+        # it would have installed (steam's vulkan-driver on hardware.graphics's).
+        later = [s for s in self.steps if not s.feature.before_packages]
+        self._packages(ready, [s for s in later if not s.requires & self.failed])
         self._features()
         if not self.report.printed and not self.failed:
             print("nothing to change")

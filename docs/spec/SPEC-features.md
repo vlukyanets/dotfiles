@@ -11,7 +11,8 @@ when the check fails, root only through `shell.as_root`. Today there are
 `packaging`; `package_tools.reflector`, `.paru` and `.pkgfile`;
 `system.locale`, `.timesyncd`, `.no_beep`, `.swap`, `.zram`, `.oomd` and
 `.dkms`; `shell.zsh` and `.command_not_found`; `desktop.fonts`;
-`development.git` and `.rustup`; `hardware.graphics`.
+`development.git` and `.rustup`; `hardware.graphics`; `gaming.steam`,
+`.gamemode` and `.mangohud`.
 
 ## Structure
 
@@ -444,7 +445,10 @@ driver = "580xx"  # current, 580xx, 470xx or 390xx
 
 Arch only (`platforms/arch/features/hardware/graphics.py`), off by
 default; `gpus` is empty, `lib32` false and `driver` `current` by default.
-Packages only, no `apply()`; it runs `before_packages`, so the provider of
+Packages only; `apply()` only fails, before any change, while `gpus` is
+empty (`features.hardware.graphics.gpus is empty`): `lib32` would then
+meet steam's requirement with no driver, and `--noconfirm` would pick
+`nvidia-utils`, which blacklists nouveau. It runs `before_packages`, so the provider of
 `vulkan-driver` and `lib32-vulkan-driver` is installed, from the AUR too,
 before a package depending on them (steam), which `--noconfirm` would
 fill with the repositories' first provider, `nvidia-utils`. Per GPU, each
@@ -481,6 +485,35 @@ with its `lib32-` package when `lib32` is true:
   `current`, `580xx`, `470xx`, `390xx`.
 - The kernel's side of NVIDIA (modeset, the suspend services, the
   initramfs) is not here: a `hardware.nvidia` of its own, later.
+
+## `gaming.steam`, `gaming.gamemode`, `gaming.mangohud` — games
+
+```toml
+[features.gaming]
+steam.enabled    = true
+gamemode.enabled = true
+mangohud.enabled = true
+```
+
+Arch only (`platforms/arch/features/gaming/`), each off by default and on
+by itself; none requires another. No settings, packages from
+the repositories, each 32-bit one from [multilib]:
+
+- `steam`: `steam` and `ttf-liberation`, the font Arch's wiki names for
+  it, so its `ttf-font` is not `--noconfirm`'s first provider.
+  `requires()` `Setting("hardware.graphics.lib32", True)`: the 32-bit
+  drivers of the host's GPUs, which `hardware.graphics` installs before
+  the other packages, so steam's `vulkan-driver` and `lib32-vulkan-driver`
+  are those, not the repositories' first; multilib comes with it,
+  which `hardware.graphics` requires for `lib32`.
+- `gamemode`: `gamemode` and `lib32-gamemode`. `requires()` multilib.
+  `apply()`: `ensure_group_member("gamemode")`, the group the package
+  makes (sysusers.d): its polkit rule lets only members switch the CPU
+  governor, which gamemode does by default, and its limits.d lets them
+  renice games; a notice to log in again when added.
+- `mangohud`: `mangohud` and `lib32-mangohud`. `requires()` multilib.
+  Its config, `~/.config/MangoHud/`, stays the user's; a game gets the
+  overlay through `mangohud %command%` in its launch options.
 
 ## `desktop.fonts` — fonts and fontconfig
 
@@ -673,6 +706,9 @@ home/.config/zsh/dotfiles.d/command-not-found.zsh.j2          its template
 dotfiles/defaults.toml                                        every feature and its settings
 dotfiles/platforms/arch/features/system/dkms.py               Dkms: dkms, each kernel's headers from its pkgbase
 dotfiles/platforms/arch/features/hardware/graphics.py         Graphics: rules, the drivers per GPU and branch
+dotfiles/platforms/arch/features/gaming/steam.py              Steam: steam, its font
+dotfiles/platforms/arch/features/gaming/gamemode.py           Gamemode: gamemode, the group
+dotfiles/platforms/arch/features/gaming/mangohud.py           Mangohud: mangohud
 tests/test_features.py                                        each feature against a fake machine
 tests/test_apply.py                                           test_real_features_are_consistent
 ```
@@ -770,12 +806,19 @@ tests/test_apply.py                                           test_real_features
   multilib only with `lib32`; nothing for an empty `gpus`;
   `before_packages`. `test_config`: an unknown GPU, one twice, `nvidia`
   with `nouveau` and an unknown `driver` refused.
+- graphics: an empty `gpus` fails before any change.
+- gaming: each feature's packages and its requirement; gamemode adds the
+  user to `gamemode`. `test_apply`: steam on without
+  `hardware.graphics.lib32` refused by `check`.
 - `test_real_features_are_consistent`: every schema feature has a module
   and every module a schema table with `enabled`, but `packaging`; every
   override subclasses its base's class; only `package_tools.paru`
   (`packaging`, `development.rustup`), `shell.command_not_found`
-  (`package_tools.pkgfile`, and `shell.zsh` by default) and
-  `hardware.graphics` (none with an empty `gpus`) require others.
+  (`package_tools.pkgfile`, and `shell.zsh` by default), `gaming.steam`
+  (`hardware.graphics`, through its setting), `gaming.gamemode` and
+  `gaming.mangohud` (`packaging`, through multilib) and
+  `hardware.graphics` (`packaging`, through multilib, with `lib32`)
+  require others.
 - Discovery (`test_apply`): a feature in a group named by its path, a
   group in a group, `_` modules and groups skipped at any depth, an
   override that does not subclass its base's refused; a group's table

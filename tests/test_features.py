@@ -1200,3 +1200,30 @@ def test_graphics_requires_dkms_for_nvidia_and_multilib_for_lib32():
     assert _graphics(["amd"], lib32=True).requires() == [multilib]
     assert _graphics(["nvidia"], lib32=True).requires() == ["system.dkms", multilib]
     assert classes(ArchLinuxOs)["hardware.graphics"].before_packages
+
+
+@pytest.mark.parametrize(
+    ("name", "packages", "requires"),
+    [
+        ("steam", ["steam", "ttf-liberation"], [Setting("hardware.graphics.lib32", True)]),
+        ("gamemode", ["gamemode", "lib32-gamemode"], [Setting("packaging.pacman.multilib", True)]),
+        ("mangohud", ["mangohud", "lib32-mangohud"], [Setting("packaging.pacman.multilib", True)]),
+    ],
+)
+def test_gaming_packages_and_requirements(name, packages, requires):
+    found = classes(ArchLinuxOs)[f"gaming.{name}"]({"enabled": True}, None)
+    assert found.packages() == packages
+    assert found.requires() == requires
+
+
+def test_gamemode_adds_the_user_to_its_group(monkeypatch):
+    groups = []
+    monkeypatch.setattr(ArchLinuxOs, "ensure_group_member", lambda self, g: groups.append(g))
+    apply("gamemode")
+    assert groups == ["gamemode"]
+
+
+def test_graphics_without_gpus_fails_before_any_change():
+    with pytest.raises(engine.Failed, match=r"^features\.hardware\.graphics\.gpus is empty"):
+        _graphics([], lib32=True).apply()
+    _graphics(["amd"]).apply()  # nothing to do with a GPU named
