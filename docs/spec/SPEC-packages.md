@@ -130,7 +130,8 @@ tests/test_apply.py                    replaces reach install, only when somethi
   the sources and deletes the old packages; a name the AUR lacks fails;
   as root nothing runs.
 - apply: a feature's AUR package built at its turn, after the feature it
-  requires, and not again once installed.
+  requires, and not again once installed; one of a `before_packages`
+  feature built before the other packages' transaction.
 
 ## Boundaries
 
