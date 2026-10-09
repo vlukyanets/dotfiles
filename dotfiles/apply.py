@@ -70,6 +70,7 @@ class Apply:
     def run(self) -> int:
         """Every phase in turn; 1 if anything failed."""
         ready = self._setup()
+        self._early()
         self._packages(ready)
         self._features()
         if not self.report.printed and not self.failed:
@@ -122,23 +123,42 @@ class Apply:
             self.failed.update(cycle)  # features are cut so they never need each other
             _error(", ".join(cycle), f"not run, they need each other: {circle(cycle)}")
         for step, after in ordered:
-            if step.name in self.failed:
-                continue
-            if why := self._blocked(step, after):
-                self._fail(step.name, f"not run, {why}")
-                continue
-            if step.packages & self.pending or self.waiting.intersection(after):
-                self.waiting.add(step.name)  # its checks would only see what is not there yet
-                self.report.changed(f"{step.name} (after its packages)")
-                continue
-            with self._guard(step.name):
-                if later := sorted(step.packages & self.later):
+            if not step.feature.before_packages:
+                self._run(step, after)
+            elif step.name not in self.failed and (later := sorted(step.packages & self.later)):
+                # It ran before the install: what that left for the AUR is built now.
+                with self._guard(step.name):
                     self.system.manager.build(later)
                     self.later -= set(later)
-                try:
-                    step.feature.apply()
-                except engine.Deferred as e:
-                    self.report.notice(f"{e} (network?) — the next apply retries")
+
+    def _early(self) -> None:
+        """The features before packages, ordered by their requirements alone.
+
+        Not by the package graph: depends() caches for the apply, and would keep a
+        package of a repository this phase adds (steam, of multilib) as needing nothing.
+        """
+        for step, after in order([s for s in self.steps if s.feature.before_packages], {}):
+            self._run(step, after)
+
+    def _run(self, step: Step, after: list[str]) -> None:
+        """STEP, unless it failed already or what it runs AFTER did."""
+        if step.name in self.failed:
+            return
+        if why := self._blocked(step, after):
+            self._fail(step.name, f"not run, {why}")
+            return
+        if step.packages & self.pending or self.waiting.intersection(after):
+            self.waiting.add(step.name)  # its checks would only see what is not there yet
+            self.report.changed(f"{step.name} (after its packages)")
+            return
+        with self._guard(step.name):
+            if later := sorted(step.packages & self.later):
+                self.system.manager.build(later)
+                self.later -= set(later)
+            try:
+                step.feature.apply()
+            except engine.Deferred as e:
+                self.report.notice(f"{e} (network?) — the next apply retries")
 
     def _blocked(self, step: Step, after: list[str]) -> str | None:
         """Why STEP cannot run: its packages missing, or what it runs after failed."""

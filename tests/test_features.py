@@ -1091,3 +1091,7 @@ def test_oomd_is_part_of_systemd_on_arch_and_its_own_package_on_debian():
     cfg = defaults()["features"]["system"]["oomd"]
     assert classes(ArchLinuxOs)["system.oomd"](cfg, None).packages() == []
     assert classes(DebianOs)["system.oomd"](cfg, None).packages() == ["systemd-oomd"]
+
+
+def test_packaging_runs_before_the_package_install():
+    assert classes(ArchLinuxOs)["packaging"].before_packages

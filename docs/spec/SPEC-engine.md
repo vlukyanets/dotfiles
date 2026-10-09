@@ -459,7 +459,8 @@ class Docker(Feature):  # platforms/arch/features/containers/docker.py
    phase installs, and it cannot require a feature without the flag,
    which runs later: `packaging: before_packages, so it cannot require X`,
    from `steps()`. Its failure blocks what runs after it, as in phase 4;
-   the install still runs.
+   the install still runs. What the install leaves of its packages for
+   the AUR is built at its place in phase 4.
 3. **Packages.** The packages of every enabled feature that applies here,
    together: `manager.missing(...)`, and when something is missing, one
    line `-> packages: a b c (missing)` and `manager.install(...)` in one

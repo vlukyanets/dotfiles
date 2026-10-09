@@ -69,7 +69,8 @@ master and every PR; uv is pinned there by version and sha256.
   rest in `apply()`. The name gates it; the order comes from the package
   graph and those requirements (`dotfiles/plan.py`; `dotfiles/apply.py`
   runs it). Nothing else is
-  declared. The schema in `defaults.toml` is shared by every platform.
+  declared but `before_packages`: such a feature (`packaging`) runs after
+  setup, before the package install, so its repositories serve that install. The schema in `defaults.toml` is shared by every platform.
 - Why: `docs/spec/SPEC-<module>.md`, then `docs/spec/CAPABILITY-MAP.md`.
 
 ## Commits and branches

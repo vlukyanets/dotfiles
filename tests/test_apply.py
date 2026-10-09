@@ -590,6 +590,97 @@ def test_a_cycle_through_a_setting_s_owner_is_a_config_error(root, system, tmp_p
         apply("h", root)
 
 
+_EARLY_SCHEMA = """\
+[features.early]
+enabled = true
+[features.late]
+enabled = true
+flag = true
+[features.other]
+enabled = true
+"""
+
+
+def _early(body: str) -> str:
+    """BODY, a feature's source, with before_packages set."""
+    return body + "    before_packages = True\n"
+
+
+def test_a_feature_before_packages_runs_before_the_install(
+    root, system, tmp_path, monkeypatch, capsys
+):
+    (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
+    early = feature("Early", 'print(f"early saw {self.system.manager.installs}")', ["tool"])
+    late = feature("Late", 'print("late ran")', ["app"])
+    make_package(tmp_path, monkeypatch, {"early": _early(early), "late": late})
+    asked = []  # installs so far at each depends(): its cache must not predate the install
+    depends = FakeManager.depends
+    monkeypatch.setattr(
+        FakeManager,
+        "depends",
+        lambda self, names: asked.append(len(self.installs)) or depends(self, names),
+    )
+    assert apply("h", root) == 0
+    assert capsys.readouterr().out == "early saw []\n-> packages: app tool (missing)\nlate ran\n"
+    assert system.installs == [["app", "tool"]]
+    assert asked and asked[0] == 1
+
+
+@pytest.mark.parametrize("requirement", ["late", Setting("late.flag", True)])
+def test_a_feature_before_packages_cannot_require_a_later_one(
+    root, system, tmp_path, monkeypatch, requirement
+):
+    (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
+    early = feature("Early", requires=[requirement])
+    make_package(tmp_path, monkeypatch, {"early": _early(early), "late": feature("Late")})
+    with pytest.raises(ConfigError, match=r"^early: before_packages, so it cannot require late$"):
+        apply("h", root)
+
+
+def test_a_failure_before_packages_blocks_what_runs_after_it_not_the_install(
+    root, system, tmp_path, monkeypatch, capsys
+):
+    (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
+    make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "early": _early(feature("Early", 'die("broken")')),
+            "late": feature("Late", 'print("late ran")', ["app"], requires=["early"]),
+            "other": feature("Other", 'print("other ran")', ["x"]),
+        },
+    )
+    assert apply("h", root) == 1
+    assert capsys.readouterr() == (
+        "-> packages: app x (missing)\nother ran\n",
+        "error: early: broken\nerror: late: not run, early failed\n",
+    )
+    assert system.installs == [["app", "x"]]
+
+
+def test_an_aur_package_of_a_feature_before_packages_is_built_after_the_install(
+    root, system, tmp_path, monkeypatch, capsys
+):
+    (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
+    early = feature("Early", 'print("early ran")', ["repo", "aurpkg"])
+    late = feature("Late", 'print(f"late saw {self.system.manager.builds}")', requires=["early"])
+    make_package(tmp_path, monkeypatch, {"early": _early(early), "late": late})
+    system.aur = {"aurpkg"}
+    assert apply("h", root) == 0
+    assert system.builds == [["aurpkg"]]
+    assert capsys.readouterr().out == (
+        "early ran\n-> packages: aurpkg repo (missing)\nlate saw [['aurpkg']]\n"
+    )
+
+
+def test_a_dry_run_runs_a_feature_before_packages(root, system, tmp_path, monkeypatch, capsys):
+    (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
+    early = feature("Early", 'self.system.report.changed("early change")', ["tool"])
+    make_package(tmp_path, monkeypatch, {"early": _early(early)})
+    assert apply("h", root, dry_run=True) == 0
+    assert capsys.readouterr().out == "-> early change\n-> packages: tool (missing)\n"
+
+
 def test_packages_that_did_not_install_block_their_features(
     root, system, tmp_path, monkeypatch, capsys
 ):
