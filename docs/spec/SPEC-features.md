@@ -5,32 +5,42 @@ depends on `packages` and `render`.
 
 ## Objective
 
-Every `features.<name>` in `dotfiles/defaults.toml` does what its table in
-the schema says, through the engine: a check first, a change only when the
-check fails, root only through `shell.as_root`. Today there are
-`packaging`, `reflector`, `rustup`, `paru`, `no_beep`, `pkgfile`, `git`, `fonts`,
-`zsh`, `command_not_found`, `locale`, `timesyncd`, `swap`, `zram` and
-`oomd`.
+Every `features.<group>.<name>` in `dotfiles/defaults.toml` does what its
+table in the schema says, through the engine: a check first, a change only
+when the check fails, root only through `shell.as_root`. Today there are
+`packaging`; `package_tools.reflector`, `.paru` and `.pkgfile`;
+`system.locale`, `.timesyncd`, `.no_beep`, `.swap`, `.zram` and `.oomd`;
+`shell.zsh` and `.command_not_found`; `desktop.fonts`; `development.git`
+and `.rustup`.
 
 ## Structure
 
 Platforms share no feature code. Each has its own directory,
-`dotfiles/platforms/<name>/features/`, one module per feature, and in it one
-`Feature` subclass named after the module (`packaging` → `Packaging`,
-`nvidia_driver` → `NvidiaDriver`): the runner finds it by that name
-(`discovery.named`) and gates it by the file name. A platform runs its own
-module of a name, else its base's: `linux/features/` holds what every Linux
-does the same, and is the only code two platforms share. A feature with no
-module on a platform, nor on Linux, does not run there. A module whose name
-starts with `_` is a helper of that platform's features, not one itself.
+`dotfiles/platforms/<name>/features/`, a directory per group (with an empty
+`__init__.py`) and a module per feature in it, and in each module one
+`Feature` subclass named after the module (`zram` → `Zram`,
+`command_not_found` → `CommandNotFound`): the runner finds it by that name
+(`discovery.named`) and gates it by its path, `system/zram.py` being
+`system.zram`. Only `packaging` is outside a group. A group is a name, no
+feature: no `enabled`, no keys of its own. A platform runs its own module
+of a name, else its base's: `linux/features/` holds what every Linux does
+the same, and is the only code two platforms share; a platform's module of
+a name its base has too holds a subclass of the base's class, or discovery
+fails. A feature with no module on a platform, nor on Linux, does not run
+there. A module or group whose name starts with `_` is a helper of that
+platform's features, not one itself.
 
 A feature is built with `(settings, system)`, `settings` being
-`features.<name>` and `system` the platform (`ArchLinuxOs`), and reaches its
-package manager and the machine through it (`self.system.files.ensure(...)`,
-`self.system.manager`). It declares `packages()`, `replaces()` and
-`requires()`, each `[]` by default, and does the rest in `apply()`.
+`features.<group>.<name>` and `system` the platform (`ArchLinuxOs`), and
+reaches its package manager and the machine through it
+(`self.system.files.ensure(...)`, `self.system.manager`). It declares
+`packages()`, `replaces()` and `requires()`, each `[]` by default, and does
+the rest in `apply()`. `requires()` names features by their full name
+(`"shell.zsh"`) or a setting of another (`Setting("packaging.pacman.multilib",
+True)`, `SPEC-engine`). A feature whose class sets `before_packages` runs
+before the package install (`packaging`).
 
-The schema is one for every platform: `features.<name>` in
+The schema is one for every platform: `features.<group>.<name>` in
 `dotfiles/defaults.toml`, and the checks the types cannot make are the
 `rules` and `types` of that name's classes, gathered from every platform
 by `feature.checks()` and passed to `config` by the entry points.
@@ -104,10 +114,10 @@ names the key: `parallel_downloads` and an integer `jobs` at least 1, a
 string `jobs` a positive percent, `packager` `Name <email>`,
 `flags` from pacman's list of valueless options.
 
-## `reflector` — the mirrorlist
+## `package_tools.reflector` — the mirrorlist
 
 ```toml
-[features.reflector]
+[features.package_tools.reflector]
 enabled            = true
 country            = ["Germany", "PL"]  # empty: every country
 protocol           = "https"
@@ -120,7 +130,7 @@ on_calendar        = "weekly"
 on_boot_sec        = "15min"
 ```
 
-Arch only (`platforms/arch/features/reflector.py`), off by default, on in
+Arch only (`platforms/arch/features/package_tools/reflector.py`), off by default, on in
 `profiles/arch.toml`. Its package is `reflector`; then `apply()`:
 
 - `/etc/xdg/reflector/reflector.conf` (`root:root` 644), the arguments
@@ -141,20 +151,20 @@ Arch only (`platforms/arch/features/reflector.py`), off by default, on in
 `age` and `download_timeout` at least 1, `completion_percent` 0 to 100,
 `on_calendar` and `on_boot_sec` not empty.
 
-## `rustup` — cargo and rustc
+## `development.rustup` — cargo and rustc
 
 ```toml
-[features.rustup]
+[features.development.rustup]
 enabled   = true
 toolchain = "stable"  # beta, nightly, "1.85.0", "nightly-2026-09-01"
 ```
 
-Every Linux (`platforms/linux/features/rustup.py`), off by default, on in
+Every Linux (`platforms/linux/features/development/rustup.py`), off by default, on in
 `profiles/base.toml`. Its package is `rustup`; on Arch
-(`platforms/arch/features/rustup.py`, a subclass) it replaces `rust`,
+(`platforms/arch/features/development/rustup.py`, a subclass) it replaces `rust`,
 which conflicts with it, and on Debian apt removes `rustc` and `cargo`
 itself. Void's package has only `rustup-init`
-(`platforms/void/features/rustup.py`, a subclass): while
+(`platforms/void/features/development/rustup.py`, a subclass): while
 `~/.cargo/bin/rustup` is not there, `rustup-init -y --default-toolchain
 TOOLCHAIN`, retried, which installs it, the toolchain, and `~/.cargo/bin`
 on the PATH of `~/.profile` and the shells' rc files; the checks after run
@@ -167,17 +177,17 @@ toolchain is never updated (`rustup update` is the user's), and the one it
 replaces stays installed. `Rustup.rules`: `toolchain` letters, digits,
 `.`, `_` and `-`.
 
-## `paru` — the AUR helper
+## `package_tools.paru` — the AUR helper
 
 ```toml
-[features.paru]
+[features.package_tools.paru]
 enabled = true
 ```
 
-Arch only (`platforms/arch/features/paru.py`), off by default, on in
+Arch only (`platforms/arch/features/package_tools/paru.py`), off by default, on in
 `profiles/arch.toml`. No settings, no packages: requires `packaging`, so
-makepkg builds with its `MAKEFLAGS` and `OPTIONS`, and `rustup`, for
-cargo.
+makepkg builds with its `MAKEFLAGS` and `OPTIONS`, and
+`development.rustup`, for cargo.
 
 - `paru --version` runs: nothing more. That is the check, not the
   package, which is why paru is not in `packages()`: a paru left behind
@@ -187,14 +197,14 @@ cargo.
   `~/.cache/dotfiles/aur/paru`.
 - Dry run: the check only, and `paru built from the AUR` reported.
 
-## `no_beep` — no PC speaker
+## `system.no_beep` — no PC speaker
 
 ```toml
-[features.no_beep]
+[features.system.no_beep]
 enabled = true
 ```
 
-Every Linux (`platforms/linux/features/no_beep.py`), off by default, on in
+Every Linux (`platforms/linux/features/system/no_beep.py`), off by default, on in
 `profiles/base.toml`. No settings, no packages.
 
 - `/etc/modprobe.d/nobeep.conf` (`root:root` 644): `blacklist pcspkr` and
@@ -204,14 +214,14 @@ Every Linux (`platforms/linux/features/no_beep.py`), off by default, on in
   It fails while a sound server holds `snd_pcsp`: a notice that the
   speaker is silent after a reboot.
 
-## `pkgfile` — which package has a file
+## `package_tools.pkgfile` — which package has a file
 
 ```toml
-[features.pkgfile]
+[features.package_tools.pkgfile]
 enabled = true
 ```
 
-Arch only (`platforms/arch/features/pkgfile.py`), off by default, on in
+Arch only (`platforms/arch/features/package_tools/pkgfile.py`), off by default, on in
 `profiles/arch.toml`. No settings; its package is `pkgfile`; then `apply()`:
 
 - `ensure_service("pkgfile-update.timer")`: the database refreshed daily.
@@ -219,18 +229,18 @@ Arch only (`platforms/arch/features/pkgfile.py`), off by default, on in
   once, since until the timer's first run pkgfile finds nothing. A failed
   download is a notice; the timer tries again.
 
-## `git` — the user's name and email
+## `development.git` — the user's name and email
 
 An example; by default `name` and `email` are empty.
 
 ```toml
-[features.git]
+[features.development.git]
 enabled = true
 name    = "Jane Doe"
 email   = "jane@example.org"
 ```
 
-Every Linux (`platforms/linux/features/git.py`), off by default, on in
+Every Linux (`platforms/linux/features/development/git.py`), off by default, on in
 `profiles/base.toml`; `name` and `email` are the host's. Its package is
 `git`; then `apply()`:
 
@@ -245,24 +255,24 @@ Every Linux (`platforms/linux/features/git.py`), off by default, on in
 `Git.rules`: `name` without `"`, `\` or a newline, which would need
 escaping; `email` empty or one `@` between non-blanks.
 
-## `locale` — locales, LANG, the console, the timezone
+## `system.locale` — locales, LANG, the console, the timezone
 
 An example; by default `en_US.UTF-8`, the `us` keymap, no font, `UTC`.
 
 ```toml
-[features.locale]
+[features.system.locale]
 enabled  = true
 lang     = "en_US.UTF-8"
 locales  = ["en_US.UTF-8 UTF-8"]
 timezone = "Europe/Kyiv"
 
-[features.locale.console]
+[features.system.locale.console]
 keymap   = "us"
 font     = "ter-v20n"
 packages = ["terminus-font"]
 ```
 
-Every systemd Linux (`platforms/linux/features/locale.py`), off by
+Every systemd Linux (`platforms/linux/features/system/locale.py`), off by
 default, on in `profiles/base.toml` with `Europe/Kyiv`; off on the Void node, which has no
 module of its own yet. Its packages are `console.packages` (Debian:
 `locales`, which ships `locale-gen`); then `apply()`, the timezone first:
@@ -287,29 +297,29 @@ module of its own yet. Its packages are `console.packages` (Debian:
 `Locale.rules`: `timezone` a name of word characters, `+` and `-` in
 `/`-separated parts, so it stays under `/usr/share/zoneinfo`.
 
-## `timesyncd` — the clock in sync
+## `system.timesyncd` — the clock in sync
 
 ```toml
-[features.timesyncd]
+[features.system.timesyncd]
 enabled = true
 ```
 
-Every systemd Linux (`platforms/linux/features/timesyncd.py`), off by
+Every systemd Linux (`platforms/linux/features/system/timesyncd.py`), off by
 default, on in `profiles/base.toml`, off on the Void node. No settings:
 the servers are the distribution's. Part of systemd on Arch, no
 packages; Debian ships it as `systemd-timesyncd`, for which apt removes
 another time daemon (`chrony`, `ntpsec`). `apply()`:
 `systemd-timesyncd.service` enabled and started.
 
-## `swap` — a swap file on btrfs
+## `system.swap` — a swap file on btrfs
 
 ```toml
-[features.swap]
+[features.system.swap]
 enabled = true
 size    = "20g"
 ```
 
-Every systemd Linux (`platforms/linux/features/swap.py`), off by default,
+Every systemd Linux (`platforms/linux/features/system/swap.py`), off by default,
 on in `profiles/laptop.toml`; `size` is the host's. Its package is
 `btrfs-progs`; then `apply()`, which fails before any change while `size`
 is empty or `/` is not btrfs (`findmnt -no FSTYPE /`):
@@ -338,13 +348,13 @@ is empty or `/` is not btrfs (`findmnt -no FSTYPE /`):
 
 `Swap.rules`: `size` empty or a number with one of `KMGTPE`, either case.
 
-## `zram` — compressed swap in RAM
+## `system.zram` — compressed swap in RAM
 
 An example; by default `swappiness` and `watermark_scale_factor` are 0,
 the kernel's.
 
 ```toml
-[features.zram]
+[features.system.zram]
 enabled                = true
 size                   = "min(ram / 2, 4096)"
 algorithm              = "zstd"
@@ -353,7 +363,7 @@ swappiness             = 100
 watermark_scale_factor = 125
 ```
 
-Every systemd Linux (`platforms/linux/features/zram.py`), off by default,
+Every systemd Linux (`platforms/linux/features/system/zram.py`), off by default,
 on in `profiles/laptop.toml` and on the arch and deb nodes. Its package
 is `zram-generator` (Debian: `systemd-zram-generator`); then `apply()`:
 
@@ -375,14 +385,14 @@ sets none, and the kernel's is negative): zram fills first.
 `swappiness` 0 to 200, `watermark_scale_factor` 0 to 3000, the kernel's
 ranges.
 
-## `oomd` — earlier OOM kills
+## `system.oomd` — earlier OOM kills
 
 ```toml
-[features.oomd]
+[features.system.oomd]
 enabled = true
 ```
 
-Every systemd Linux (`platforms/linux/features/oomd.py`), off by default,
+Every systemd Linux (`platforms/linux/features/system/oomd.py`), off by default,
 on in `profiles/laptop.toml`: on a server or a VM the kernel's OOM killer
 decides. No settings: the limits
 are in its templates. Part of systemd on Arch, no packages; Debian ships
@@ -399,7 +409,7 @@ it as `systemd-oomd`. `apply()`:
   `systemd-oomd.service`, which reads `oomd.conf.d` only when it starts.
   Then the service enabled and started.
 
-## `fonts` — fonts and fontconfig
+## `desktop.fonts` — fonts and fontconfig
 
 An example; by default `packages` and `nerd_fonts` are empty,
 `nerd_version` is `v3.5.1`, `nerd_url` is the GitHub release's
@@ -407,24 +417,24 @@ An example; by default `packages` and `nerd_fonts` are empty,
 and `default` and `render` set nothing.
 
 ```toml
-[features.fonts]
+[features.desktop.fonts]
 enabled      = true
 packages     = ["noto-fonts-emoji"]
 nerd_fonts   = ["JetBrainsMono"]        # on Arch, rather ttf-jetbrains-mono-nerd in packages
 nerd_version = "v3.5.1"
 nerd_url     = "https://mirror.example.org/nerd-fonts/{version}/{name}.tar.xz"
 
-[features.fonts.default]
+[features.desktop.fonts.default]
 monospace = "JetBrainsMono Nerd Font"   # also sans_serif, serif, emoji
 emoji     = "Noto Color Emoji"
 
-[features.fonts.render]
+[features.desktop.fonts.render]
 antialias = true
 hinting   = "slight"                    # none, slight, medium, full
 subpixel  = "rgb"                       # rgb, bgr, vrgb, vbgr, none
 ```
 
-Arch only (`platforms/arch/features/fonts.py`): `packages` are Arch's
+Arch only (`platforms/arch/features/desktop/fonts.py`): `packages` are Arch's
 names. Off by default. Its packages are `fontconfig`, `packages`, and
 `curl` when there are Nerd Fonts; then `apply()`:
 
@@ -454,29 +464,29 @@ and `{version}`, the families without `<`, `>` or `&`, `hinting` and
 `subpixel` from the names above; `Fonts.types` gives `default` and
 `render` their keys, none with a default.
 
-## `zsh` — zsh and oh-my-zsh
+## `shell.zsh` — zsh and oh-my-zsh
 
 An example; by default `shell` is `/usr/bin/zsh`, `plugins` and `extras`
 are empty, `theme.name` is `robbyrussell`, `theme.repo` and `theme.branch`
 are empty.
 
 ```toml
-[features.zsh]
+[features.shell.zsh]
 enabled = true
 shell   = "/usr/bin/zsh"
 plugins = ["git"]
 extras  = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions"]
 
-[features.zsh.theme]
+[features.shell.zsh.theme]
 name   = "mytheme/mytheme"                       # <dir>/<name>: a theme of the repo
 repo   = "https://example.org/someone/mytheme.git"
 branch = ""                                      # the repo's default
 ```
 
-Every Linux (`platforms/linux/features/zsh.py`): the extras' scripts are
+Every Linux (`platforms/linux/features/shell/zsh.py`): the extras' scripts are
 `<extras_dir>/<extra>/<extra>.zsh`, `extras_dir` being
 `/usr/share/zsh/plugins` (Arch, Void) or `/usr/share` on Debian
-(`platforms/debian/features/zsh.py`, a subclass); Debian has no
+(`platforms/debian/features/shell/zsh.py`, a subclass); Debian has no
 zsh-completions, so asking for it there fails at the install. Off by
 default, on in `profiles/base.toml`. Of the user's files it writes two
 only: `~/.config/zsh/dotfiles.zsh`, and one line of `~/.zshrc`. Whatever
@@ -515,18 +525,18 @@ extras; then `apply()`:
 `https://` URL; `theme.branch` empty or a branch name; `extras` names
 from the three above.
 
-## `command_not_found` — the package of a missing command
+## `shell.command_not_found` — the package of a missing command
 
 ```toml
-[features.command_not_found]
+[features.shell.command_not_found]
 enabled = true
 shells  = ["zsh", "bash"]
 ```
 
-Arch only (`platforms/arch/features/command_not_found.py`), off by
+Arch only (`platforms/arch/features/shell/command_not_found.py`), off by
 default, on in `profiles/arch.toml`; `shells` is `["zsh"]` by default. No
-packages. It requires `pkgfile`, whose database and handlers it uses, and
-`zsh` only while `zsh` is one of `shells`: `requires()` reads its settings.
+packages. It requires `package_tools.pkgfile`, whose database and handlers it
+uses, and `shell.zsh` only while `zsh` is one of `shells`: `requires()` reads its settings.
 `apply()` writes the hook of each shell:
 
 - zsh: `~/.config/zsh/dotfiles.d/command-not-found.zsh`, which zsh's
@@ -545,50 +555,51 @@ once.
 ## Project Structure
 
 ```
-dotfiles/platforms/arch/features/packaging.py  Packaging: rules, types, drop-ins, multilib
-system/etc/pacman.conf.d/options.conf.j2       its templates
+dotfiles/platforms/<p>/features/<group>/__init__.py           empty: a group
+dotfiles/platforms/arch/features/packaging.py                 Packaging: rules, types, drop-ins, multilib; before_packages
+system/etc/pacman.conf.d/options.conf.j2                      its templates
 system/etc/pacman.conf.d/multilib.conf.j2
 system/etc/makepkg.conf.d/dotfiles.conf.j2
-dotfiles/platforms/arch/features/reflector.py  Reflector: rules, config, timer, refresh
-system/etc/xdg/reflector/reflector.conf.j2     its templates
+dotfiles/platforms/arch/features/package_tools/reflector.py   Reflector: rules, config, timer, refresh
+system/etc/xdg/reflector/reflector.conf.j2                    its templates
 system/etc/systemd/system/reflector.timer.d/override.conf.j2
-dotfiles/platforms/linux/features/rustup.py    Rustup: rustup, its default toolchain
-dotfiles/platforms/arch/features/rustup.py     Rustup: Linux's, in place of rust
-dotfiles/platforms/void/features/rustup.py     Rustup: rustup-init first, then Linux's
-dotfiles/platforms/arch/features/paru.py       Paru: built from the AUR while it does not run
-dotfiles/platforms/linux/features/no_beep.py   NoBeep: blacklist, unload
-system/etc/modprobe.d/nobeep.conf.j2           its template
-dotfiles/platforms/arch/features/pkgfile.py    Pkgfile: timer, first download
-dotfiles/platforms/linux/features/git.py       Git: our gitconfig, its include
-home/.config/git/dotfiles.gitconfig.j2         its template
-dotfiles/platforms/linux/features/locale.py    Locale: rules, locale-gen, LANG, console, timezone
-dotfiles/platforms/debian/features/locale.py   Locale: Linux's, LANG in /etc/default/locale, no console
-system/etc/locale.conf.j2                      its templates
+dotfiles/platforms/linux/features/development/rustup.py       Rustup: rustup, its default toolchain
+dotfiles/platforms/arch/features/development/rustup.py        Rustup: Linux's, in place of rust
+dotfiles/platforms/void/features/development/rustup.py        Rustup: rustup-init first, then Linux's
+dotfiles/platforms/arch/features/package_tools/paru.py        Paru: built from the AUR while it does not run
+dotfiles/platforms/linux/features/system/no_beep.py           NoBeep: blacklist, unload
+system/etc/modprobe.d/nobeep.conf.j2                          its template
+dotfiles/platforms/arch/features/package_tools/pkgfile.py     Pkgfile: timer, first download
+dotfiles/platforms/linux/features/development/git.py          Git: our gitconfig, its include
+home/.config/git/dotfiles.gitconfig.j2                        its template
+dotfiles/platforms/linux/features/system/locale.py            Locale: rules, locale-gen, LANG, console, timezone
+dotfiles/platforms/debian/features/system/locale.py           Locale: Linux's, LANG in /etc/default/locale, no console
+system/etc/locale.conf.j2                                     its templates
 system/etc/default/locale.j2
 system/etc/vconsole.conf.j2
-dotfiles/platforms/linux/features/timesyncd.py Timesyncd: the service
-dotfiles/platforms/debian/features/timesyncd.py  Timesyncd: Linux's, with its package
-dotfiles/platforms/linux/features/swap.py      Swap: rules, subvolume, units, the file
-system/etc/systemd/system/swap.mount.j2        its templates
+dotfiles/platforms/linux/features/system/timesyncd.py         Timesyncd: the service
+dotfiles/platforms/debian/features/system/timesyncd.py        Timesyncd: Linux's, with its package
+dotfiles/platforms/linux/features/system/swap.py              Swap: rules, subvolume, units, the file
+system/etc/systemd/system/swap.mount.j2                       its templates
 system/etc/systemd/system/swap-swapfile.swap.j2
-dotfiles/platforms/linux/features/zram.py      Zram: rules, config, the unit, sysctls
-dotfiles/platforms/debian/features/zram.py     Zram: Linux's, with Debian's package
-system/etc/systemd/zram-generator.conf.j2      its template
-dotfiles/platforms/linux/features/oomd.py      Oomd: drop-ins, restart, the service
-dotfiles/platforms/debian/features/oomd.py     Oomd: Linux's, with its package
-system/etc/systemd/oomd.conf.d/10-dotfiles.conf.j2  its templates
+dotfiles/platforms/linux/features/system/zram.py              Zram: rules, config, the unit, sysctls
+dotfiles/platforms/debian/features/system/zram.py             Zram: Linux's, with Debian's package
+system/etc/systemd/zram-generator.conf.j2                     its template
+dotfiles/platforms/linux/features/system/oomd.py              Oomd: drop-ins, restart, the service
+dotfiles/platforms/debian/features/system/oomd.py             Oomd: Linux's, with its package
+system/etc/systemd/oomd.conf.d/10-dotfiles.conf.j2            its templates
 system/etc/systemd/system/-.slice.d/10-oomd.conf.j2
 system/etc/systemd/system/user@.service.d/10-oomd.conf.j2
-dotfiles/platforms/arch/features/fonts.py      Fonts: Nerd Fonts, fc-cache, fontconfig
-home/.config/fontconfig/conf.d/50-dotfiles.conf.j2  its template
-dotfiles/platforms/linux/features/zsh.py       Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
-dotfiles/platforms/debian/features/zsh.py      Zsh: Linux's, with Debian's extras_dir
-home/.config/zsh/dotfiles.zsh.j2               its template
-dotfiles/platforms/arch/features/command_not_found.py  CommandNotFound: rules, pkgfile's hooks for zsh and bash
-home/.config/zsh/dotfiles.d/command-not-found.zsh.j2  its template
-dotfiles/defaults.toml                         every feature and its settings
-tests/test_features.py                         each feature against a fake machine
-tests/test_apply.py                            test_real_features_are_consistent
+dotfiles/platforms/arch/features/desktop/fonts.py             Fonts: Nerd Fonts, fc-cache, fontconfig
+home/.config/fontconfig/conf.d/50-dotfiles.conf.j2            its template
+dotfiles/platforms/linux/features/shell/zsh.py                Zsh: oh-my-zsh, our part of ~/.zshrc, chsh
+dotfiles/platforms/debian/features/shell/zsh.py               Zsh: Linux's, with Debian's extras_dir
+home/.config/zsh/dotfiles.zsh.j2                              its template
+dotfiles/platforms/arch/features/shell/command_not_found.py   CommandNotFound: rules, pkgfile's hooks for zsh and bash
+home/.config/zsh/dotfiles.d/command-not-found.zsh.j2          its template
+dotfiles/defaults.toml                                        every feature and its settings
+tests/test_features.py                                        each feature against a fake machine
+tests/test_apply.py                                           test_real_features_are_consistent
 ```
 
 ## Testing Strategy
@@ -672,12 +683,25 @@ tests/test_apply.py                            test_real_features_are_consistent
   On Debian the extras are sourced from `/usr/share/<extra>/`.
 - command_not_found: the hook sourcing pkgfile's handler, nothing the
   second time; for bash its line at the end of an existing `~/.bashrc`,
-  once, and no zsh hook; both shells, both hooks; `zsh` required only
-  with `zsh` among `shells`. `test_config`: an empty `shells`, another
+  once, and no zsh hook; both shells, both hooks; `shell.zsh` required
+  only with `zsh` among `shells`. `test_config`: an empty `shells`, another
   shell or one twice refused.
 - `test_real_features_are_consistent`: every schema feature has a module
-  and every module a schema table; only paru (packaging, rustup) and
-  command_not_found (pkgfile, and zsh by default) require others.
+  and every module a schema table with `enabled`, but `packaging`; every
+  override subclasses its base's class; only `package_tools.paru`
+  (`packaging`, `development.rustup`) and `shell.command_not_found`
+  (`package_tools.pkgfile`, and `shell.zsh` by default) require others.
+- Discovery (`test_apply`): a feature in a group named by its path, a
+  group in a group, `_` modules and groups skipped at any depth, an
+  override that does not subclass its base's refused; a group's table
+  holds only its features'.
+- `Setting` (`test_apply`): met, unmet with `true` and with `false`, a key
+  no file sets unmet, a key that is not a boolean and an unknown `op`
+  refused, a disabled owner reported, the requiring feature run after
+  its owner and failed with it, a cycle through an owner found.
+- `before_packages` (`test_apply`): run before the install and its
+  packages installed after it; requiring a feature without the flag
+  refused; its failure blocks what runs after it, not the install.
 
 ## Boundaries
 
@@ -690,8 +714,20 @@ tests/test_apply.py                            test_real_features_are_consistent
 ## Decisions
 
 1. **`packaging` is an ordinary feature**, not the platform's setup. A
-   feature that needs it says so in `requires()`, as `paru` does for its
-   `MAKEFLAGS` and `OPTIONS`.
+   feature that needs it says so in `requires()`, as `package_tools.paru`
+   does for its `MAKEFLAGS` and `OPTIONS`, or requires one of its settings
+   (`Setting("packaging.pacman.multilib", True)` for what is in
+   [multilib]). It runs `before_packages`, so its multilib is there for the
+   install of the same apply.
+6. **Groups are directories, no features.** A feature's name is its path,
+   so nothing declares it; a group has no switch, so a feature has one.
+   Leaves keep their names (`development.rustup`, not `.rust`), so
+   classes, templates and their tests stay as they are. The group of
+   reflector, paru and pkgfile is `package_tools`: `pacman` would read
+   like `packaging.pacman`'s table, `packages` like `packages()`.
+7. **No migration code.** The resolved `~/.config/dotfiles/config.toml`
+   keeps the old flat keys and fails with `unknown key` after the move;
+   `dotfiles init <host>` writes it again.
 2. **What is not set writes nothing**: a key no host or profile sets
    leaves the main file's value, so a host sets only what it wants to
    change. multilib is the exception: `false` empties its drop-in, since
