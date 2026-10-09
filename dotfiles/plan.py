@@ -4,7 +4,7 @@ from typing import NamedTuple
 
 from dotfiles import engine
 from dotfiles.errors import ConfigError
-from dotfiles.feature import Feature, classes
+from dotfiles.feature import Feature, classes, table
 from dotfiles.platforms import discovery
 from dotfiles.platforms.operating_system import OperatingSystem
 
@@ -23,9 +23,10 @@ def _found(cfg: dict, system: OperatingSystem) -> list[Step]:
     """A Step per feature of SYSTEM's platform that CFG does not disable."""
     found = []
     for name, cls in classes(type(system)).items():
-        if not cfg["features"].get(name, {}).get("enabled", True):  # no `enabled`: always on
+        settings = table(cfg["features"], name) or {}
+        if not settings.get("enabled", True):  # no `enabled`: always on
             continue
-        feature = cls(cfg["features"].get(name, {}), system)
+        feature = cls(settings, system)
         packages, replaces = frozenset(feature.packages()), frozenset(feature.replaces())
         found.append(Step(name, feature, packages, replaces, frozenset(feature.requires())))
     return found
@@ -52,9 +53,10 @@ def _unmet(cfg: dict, requires: dict[str, frozenset[str]]) -> list[str]:
         for name in sorted(names):
             if name in requires:  # it runs: on, or always on without a table of its own
                 continue
-            if name not in cfg["features"]:
+            settings = table(cfg["features"], name)
+            if settings is None:
                 problems.append(f"{feature}: requires {name}, which is not a feature")
-            elif not cfg["features"][name].get("enabled", True):
+            elif not settings.get("enabled", True):
                 problems.append(f"{feature}: requires features.{name}.enabled = true")
     return problems
 

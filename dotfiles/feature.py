@@ -44,6 +44,14 @@ class Feature:
         """What this feature does, once its packages are installed."""
 
 
+def table(features: dict, name: str) -> dict | None:
+    """The table of feature NAME, dotted, in FEATURES (the config's `features`); None if absent."""
+    found = features
+    for part in name.split("."):
+        found = found.get(part) if isinstance(found, dict) else None
+    return found if isinstance(found, dict) else None
+
+
 def _package(package: str, prefix: str = "") -> dict[str, type[Feature]]:
     """Every feature class of PACKAGE and its groups by its dotted path: system.zram -> Zram."""
     try:

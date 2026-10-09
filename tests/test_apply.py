@@ -215,6 +215,27 @@ def test_an_override_must_subclass_its_base(tmp_path, monkeypatch):
         classes(_Own)
 
 
+def test_a_feature_in_a_group_is_gated_by_its_table(root, system, tmp_path, monkeypatch, capsys):
+    (root / "dotfiles/defaults.toml").write_text(
+        "[features.g.on]\nenabled = true\n[features.g.off]\nenabled = false\n"
+        "[features.h.need]\nenabled = true\n"
+    )
+    make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "g/on": feature("On", 'print("on ran")'),
+            "g/off": feature("Off", 'raise AssertionError("a disabled feature ran")'),
+            "h/need": feature("Need", 'print("need ran")', requires=["g.on"]),
+        },
+    )
+    assert apply("h", root) == 0
+    assert capsys.readouterr().out == "on ran\nneed ran\nnothing to change\n"
+    (root / "hosts/h.toml").write_text("[features.g.on]\nenabled = false\n")
+    with pytest.raises(ConfigError, match=r"^h\.need: requires features\.g\.on\.enabled = true$"):
+        apply("h", root)
+
+
 def test_one_install_then_silence(root, system, tmp_path, monkeypatch, capsys):
     make_package(
         tmp_path,
