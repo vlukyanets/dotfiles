@@ -737,6 +737,40 @@ def test_a_package_both_list_is_installed_once(root, system, tmp_path, monkeypat
     assert capsys.readouterr().out.endswith("late ran\n")
 
 
+def _broken_for(monkeypatch, name: str) -> list[list[str]]:
+    """FakeManager.install raising whenever NAME is asked for; every list it was asked."""
+    asked: list[list[str]] = []
+    install = FakeManager.install
+
+    def broken(self, names, replaces=()):
+        asked.append(names)
+        if name in names:
+            raise RuntimeError("mirror down")
+        return install(self, names, replaces)
+
+    monkeypatch.setattr(FakeManager, "install", broken)
+    return asked
+
+
+def test_a_package_both_list_keeps_the_early_outcome(root, system, tmp_path, monkeypatch, capsys):
+    (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
+    make_package(
+        tmp_path,
+        monkeypatch,
+        {
+            "early": _early(feature("Early", "pass", ["tool"])),
+            "late": feature("Late", 'print("late ran")', ["tool"]),
+            "other": feature("Other", 'print("other ran")', ["app"]),
+        },
+    )
+    asked = _broken_for(monkeypatch, "tool")
+    assert apply("h", root) == 1
+    assert asked == [["tool"], ["app"]]  # tool not asked again: the early phase decided it
+    out, err = capsys.readouterr()
+    assert out.endswith("other ran\n") and system.installed == {"app"}
+    assert err.endswith("error: late: not run, packages missing: tool\n")
+
+
 def test_a_dry_run_runs_a_feature_before_packages(root, system, tmp_path, monkeypatch, capsys):
     (root / "dotfiles/defaults.toml").write_text(_EARLY_SCHEMA)
     early = feature("Early", 'self.system.report.changed("early change")', ["tool"])

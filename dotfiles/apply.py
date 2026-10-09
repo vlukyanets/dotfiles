@@ -61,9 +61,10 @@ class Apply:
         self.steps = found
         self.failed: set[str] = set()  # phases and features, by name
         self.wanted = sorted(set().union(*(step.packages for step in found)))
-        self.unavailable: set[str] = set()  # wanted, and still missing after the install
+        self.unavailable: set[str] = set()  # wanted, and still missing after its install
         self.pending: set[str] = set()  # missing, left so by a dry run
-        # Not in the repositories: each built at its feature's turn, after what it requires.
+        # Not in the repositories: each built at its feature's turn, after what it requires,
+        # or at once after the early install for a feature before packages.
         self.later: set[str] = set()
         self.waiting: set[str] = set()  # features a dry run cannot check before their packages
 
@@ -100,7 +101,9 @@ class Apply:
     def _packages(self, ready: bool, steps: list[Step]) -> None:
         """The missing packages of STEPS installed in one go, what they replace removed first."""
         manager = self.system.manager
-        wanted = sorted(set().union(*(step.packages for step in steps)))
+        # What an earlier transaction left missing, pending or for the AUR keeps that outcome.
+        decided = self.unavailable | self.pending | self.later
+        wanted = sorted(set().union(*(step.packages for step in steps)) - decided)
         missing = manager.missing(wanted)
         if not missing:
             return
