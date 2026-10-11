@@ -21,7 +21,12 @@ Why it is built this way: [docs/decisions.md](docs/decisions.md).
 ```sh
 sudo pacman -S python uv
 uv sync
+git config core.hooksPath .githooks
 ```
+
+The last line turns on the pre-commit hook in `.githooks/`. Cloning does
+not turn it on; that is up to you. Without it, nothing stops a secret
+before it is pushed.
 
 ## Checking for secrets
 
@@ -40,6 +45,9 @@ the file, the line and the rule, never the value, and exits with 1 if it
 finds something. A line that only looks like a secret can be marked with
 `secret-leaks:allow`. `dotfiles add` runs the same check on each file it
 copies.
+
+The pre-commit hook runs `dotfiles scan --staged`; CI runs
+`dotfiles scan --history` on every pull request.
 
 ## Adding a file
 
