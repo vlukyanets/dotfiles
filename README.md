@@ -81,7 +81,8 @@ uv run pytest
 ```
 
 The tests run on a fake filesystem (pyfakefs) with fake owners; they never
-touch the machine.
+touch the machine. CI runs them on every pull request, on Python 3.12, the
+oldest `pyproject.toml` allows.
 
 ## License
 
