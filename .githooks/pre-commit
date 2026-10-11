@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stops a commit whose staged changes look like they hold a secret: this
+# repository is public. Enabled with: git config core.hooksPath .githooks
+exec uv run --frozen --quiet dotfiles scan --staged
