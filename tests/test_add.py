@@ -1,0 +1,282 @@
+"""Tests for dotfiles add, on a fake filesystem with fake owners."""
+
+import os
+from pathlib import Path
+
+import pytest
+from pyfakefs import helpers
+
+from dotfiles import add as add_module
+from dotfiles.add import Error, add
+
+REPO = Path("/repo")
+ROOT, ALICE = 0, 1000
+NAMES = {ROOT: "root", ALICE: "alice"}
+
+
+@pytest.fixture(autouse=True)
+def machine(fs, monkeypatch):
+    """A machine with root-owned /etc, alice's home, and alice running."""
+    helpers.set_uid(ALICE)
+    helpers.set_gid(ALICE)
+    monkeypatch.setattr(add_module, "user_name", NAMES.__getitem__)
+    monkeypatch.setattr(add_module, "group_name", NAMES.__getitem__)
+    # sudo, here: the same call as root.
+    monkeypatch.setattr(add_module, "sudo_read", as_root(lambda path: Path(path).read_bytes()))
+    monkeypatch.setattr(
+        add_module, "sudo_stat", as_root(lambda path, follow: add_module.mode_and_ids(path, follow))
+    )
+
+    make("/etc", 0o755, ROOT)
+    make("/home", 0o755, ROOT)
+    make("/home/alice", 0o755, ALICE)
+    make("/home/alice/.config", 0o755, ALICE)
+    make("/etc/hosts", 0o644, ROOT, b"127.0.0.1 localhost\n")
+    make("/home/alice/.config/plain", 0o644, ALICE, b"plain\n")
+    make("/home/alice/.config/run", 0o755, ALICE, b"#!/bin/sh\n")
+    fs.create_dir(REPO)
+    yield
+    helpers.reset_ids()
+
+
+def as_root(function):
+    def call(*args):
+        helpers.set_uid(ROOT)
+        try:
+            return function(*args)
+        finally:
+            helpers.set_uid(ALICE)
+    return call
+
+
+@as_root
+def make(path, mode, uid, contents=None):
+    """Creates a directory, or a file when contents are given."""
+    if contents is None:
+        os.makedirs(path, exist_ok=True)
+    else:
+        Path(path).write_bytes(contents)
+    os.chown(path, uid, uid)
+    os.chmod(path, mode)
+
+
+def meta(node="hyper"):
+    path = REPO / "nodes" / node / ".meta"
+    return path.read_text().splitlines() if path.exists() else None
+
+
+def run(*paths, **kwargs):
+    add(REPO, "hyper", list(paths), **kwargs)
+
+
+def test_copies_files_with_git_modes(capsys):
+    run("/etc/hosts", "/home/alice/.config/plain", "/home/alice/.config/run")
+
+    node = REPO / "nodes/hyper"
+    assert (node / "etc/hosts").read_bytes() == b"127.0.0.1 localhost\n"
+    assert (node / "etc/hosts").stat().st_mode & 0o777 == 0o644
+    assert (node / "home/alice/.config/run").stat().st_mode & 0o777 == 0o755
+    assert capsys.readouterr().out.splitlines() == [
+        "added nodes/hyper/etc/hosts",
+        "added nodes/hyper/home/alice/.config/plain",
+        "added nodes/hyper/home/alice/.config/run",
+    ]
+    assert meta() is None
+
+
+def test_records_files_and_directories_that_differ():
+    make("/etc/sudoers.d", 0o750, ROOT)
+    make("/etc/sudoers.d/alice", 0o440, ROOT, b"alice ALL=(ALL) ALL\n")
+    make("/home/alice/.ssh", 0o700, ALICE)
+    make("/home/alice/.ssh/config", 0o600, ALICE, b"Host *\n")
+    make("/etc/owned", 0o644, ALICE, b"x\n")
+
+    run("/home/alice/.ssh/config", "/etc/sudoers.d/alice", "/etc/owned")
+
+    assert meta() == [
+        "0644 alice:alice etc/owned",
+        "0750 root:root etc/sudoers.d/",
+        "0440 root:root etc/sudoers.d/alice",
+        "0700 alice:alice home/alice/.ssh/",
+        "0600 alice:alice home/alice/.ssh/config",
+    ]
+
+
+def test_home_directory_itself_belongs_to_its_user():
+    make("/home/alice", 0o700, ALICE)
+    run("/home/alice/.config/plain")
+    assert meta() == ["0700 alice:alice home/alice/"]
+
+
+def test_second_run_changes_nothing(capsys):
+    make("/home/alice/.ssh", 0o700, ALICE)
+    make("/home/alice/.ssh/config", 0o600, ALICE, b"Host *\n")
+    run("/home/alice/.ssh/config", "/etc/hosts")
+    capsys.readouterr()
+
+    run("/home/alice/.ssh/config", "/etc/hosts")
+
+    assert capsys.readouterr().out.splitlines() == [
+        "unchanged nodes/hyper/home/alice/.ssh/config",
+        "unchanged nodes/hyper/etc/hosts",
+    ]
+
+
+def test_updates_a_copy_whose_contents_changed(capsys):
+    run("/etc/hosts")
+    make("/etc/hosts", 0o644, ROOT, b"changed\n")
+    capsys.readouterr()
+
+    run("/etc/hosts")
+
+    assert (REPO / "nodes/hyper/etc/hosts").read_bytes() == b"changed\n"
+    assert capsys.readouterr().out.splitlines() == ["updated nodes/hyper/etc/hosts"]
+
+
+def test_updates_a_copy_that_became_executable(capsys):
+    run("/etc/hosts")
+    make("/etc/hosts", 0o755, ROOT, b"127.0.0.1 localhost\n")
+    capsys.readouterr()
+
+    run("/etc/hosts")
+
+    assert (REPO / "nodes/hyper/etc/hosts").stat().st_mode & 0o777 == 0o755
+    assert capsys.readouterr().out.splitlines() == ["updated nodes/hyper/etc/hosts"]
+
+
+def test_line_follows_the_mode_and_goes_with_it(capsys):
+    make("/home/alice/.ssh", 0o700, ALICE)
+    make("/home/alice/.ssh/config", 0o600, ALICE, b"Host *\n")
+    run("/home/alice/.ssh/config")
+
+    os.chmod("/home/alice/.ssh", 0o750)
+    run("/home/alice/.ssh/config")
+    assert "0750 alice:alice home/alice/.ssh/" in meta()
+
+    os.chmod("/home/alice/.ssh", 0o755)
+    os.chmod("/home/alice/.ssh/config", 0o644)
+    capsys.readouterr()
+    run("/home/alice/.ssh/config")
+
+    out = capsys.readouterr().out.splitlines()
+    assert "meta: removed home/alice/.ssh/" in out
+    assert "meta: removed home/alice/.ssh/config" in out
+    assert meta() is None
+
+
+def test_dry_run_writes_nothing(capsys):
+    make("/etc/key", 0o600, ROOT, b"secret\n")
+    run("/etc/key", dry_run=True)
+
+    assert not (REPO / "nodes").exists()
+    assert capsys.readouterr().out.splitlines() == [
+        "added nodes/hyper/etc/key",
+        "meta: set 0600 root:root etc/key",
+    ]
+
+
+def test_reads_inside_a_closed_directory_with_sudo():
+    make("/etc/sudoers.d", 0o750, ROOT)
+    make("/etc/sudoers.d/alice", 0o440, ROOT, b"alice ALL=(ALL) ALL\n")
+    run("/etc/sudoers.d/alice")
+    assert (REPO / "nodes/hyper/etc/sudoers.d/alice").read_bytes() == b"alice ALL=(ALL) ALL\n"
+
+
+def test_reads_a_closed_file_with_sudo_and_warns(capsys):
+    make("/etc/key", 0o600, ROOT, b"secret\n")
+    run("/etc/key")
+
+    assert (REPO / "nodes/hyper/etc/key").read_bytes() == b"secret\n"
+    assert "/etc/key is closed to others" in capsys.readouterr().err
+
+
+def test_warns_about_a_readable_file_closed_to_others(capsys):
+    make("/home/alice/.config/token", 0o600, ALICE, b"token\n")
+    run("/home/alice/.config/token")
+    assert "token is closed to others" in capsys.readouterr().err
+
+
+def test_reads_from_another_root():
+    make("/mnt/etc", 0o755, ROOT)
+    make("/mnt/etc/fstab", 0o644, ROOT, b"# fstab\n")
+    run("/etc/fstab", root=Path("/mnt"))
+    assert (REPO / "nodes/hyper/etc/fstab").read_bytes() == b"# fstab\n"
+
+
+@pytest.mark.parametrize(
+    "path, message",
+    [
+        ("etc/hosts", "not an absolute path"),
+        ("/etc", "not a regular file"),
+        ("/missing", "no such file"),
+        ("/etc/link", "symlinks are not supported"),
+    ],
+)
+def test_rejects_what_is_not_an_absolute_regular_file(path, message):
+    as_root(os.symlink)("hosts", "/etc/link")
+    with pytest.raises(Error, match=message):
+        run(path)
+    assert not (REPO / "nodes").exists()
+
+
+def test_rejects_a_bad_node_name():
+    with pytest.raises(Error):
+        add(REPO, "../x", ["/etc/hosts"])
+
+
+def test_command_reports_an_error(capsys):
+    from dotfiles.cli import main
+
+    assert main(["add", "hyper", "etc/hosts"]) == 1
+    assert capsys.readouterr().err.startswith("error: ")
+
+
+# Built from pieces, so that secret scanners do not flag this file.
+GITHUB_SAMPLE = "gh" + "o_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
+SECRETS = [
+    (f"oauth_token: {GITHUB_SAMPLE}\n", "GitHub token"),
+    ("-----BEGIN OPENSSH " + "PRIVATE KEY-----\n", "private key"),
+    ("AKIA" + "IOSFODNN7EXAMPLE\n", "AWS access key"),
+    ("xox" + "b-1234567890-abcdefghij\n", "Slack token"),
+    ("sk-" + "ant-" + "a" * 40 + "\n", "API key"),
+    ("psk=correct-horse-battery\n", "password or key"),
+    ("  Passphrase = correct-horse-battery\n", "password or key"),
+    ("wifi_password: hunter22\n", "password or key"),
+]
+
+
+# Test ids name the rule, so the secrets stay out of pytest's output and cache.
+@pytest.mark.parametrize("line, rule", SECRETS, ids=[f"{i}-{rule}" for i, (_, rule) in enumerate(SECRETS)])
+def test_refuses_a_file_with_a_secret(line, rule):
+    make("/etc/conf", 0o644, ROOT, b"# a config\n" + line.encode())
+    with pytest.raises(Error, match=f"/etc/conf:2: {rule}") as error:
+        run("/etc/hosts", "/etc/conf")
+    assert line.split()[-1] not in str(error.value)
+    assert not (REPO / "nodes").exists()
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "PasswordAuthentication no\n",
+        "# token: <put your token here>\n",
+        "password=\n",
+        "Include /etc/ssh/sshd_config.d/*.conf\n",
+    ],
+)
+def test_does_not_flag_ordinary_lines(line):
+    make("/etc/conf", 0o644, ROOT, line.encode())
+    run("/etc/conf")
+    assert (REPO / "nodes/hyper/etc/conf").exists()
+
+
+def test_force_copies_a_secret_and_warns(capsys):
+    make("/etc/conf", 0o644, ROOT, f"token = {GITHUB_SAMPLE}\n".encode())
+    run("/etc/conf", force=True)
+
+    assert (REPO / "nodes/hyper/etc/conf").exists()
+    err = capsys.readouterr().err
+    # The line matches the password rule too, but is reported once.
+    assert err.count("/etc/conf:1:") == 1
+    assert "/etc/conf:1: GitHub token" in err
+    assert GITHUB_SAMPLE not in err

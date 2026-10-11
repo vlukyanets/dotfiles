@@ -10,7 +10,7 @@ first change.
 |---|---|
 | `nodes/<node>/` | One machine: its files at their paths from `/`, one to one (`nodes/hyper/etc/ssh/sshd_config.d/10-local.conf`) |
 | `nodes/<node>/.meta` | Only the files and directories whose owner or mode differ from the defaults below, one per line: `0600 root:root etc/ssh/ssh_host_ed25519_key`; a directory's path ends in a slash: `0700 valentinl:valentinl home/valentinl/` |
-| `scripts/dotfiles/` | The Python package behind the `dotfiles` command: a subcommand for each job (adding files, installing a node, filling templates, checking what drifted) |
+| `dotfiles/` | The Python package behind the `dotfiles` command: a subcommand for each job (adding files, installing a node, filling templates, checking what drifted) |
 | `tests/` | The tests: `tests/test_add.py` checks `dotfiles add` |
 | `pyproject.toml`, `uv.lock` | The package and its dependencies, pinned; everything runs through `uv` |
 | `docs/` | How it works now, the decisions with why, and plans |
@@ -124,7 +124,7 @@ The agent the owner talks to is the **lead**; the agents it starts are
   machine.
 - Copy only what the owner set on purpose. A file a package installed and
   nobody changed stays out.
-- A subcommand is a module in `scripts/dotfiles/` (`add.py` for
+- A subcommand is a module in `dotfiles/` (`add.py` for
   `dotfiles add`); `cli.py` only parses the arguments and calls it.
 - Subcommands are idempotent: run twice, the second run changes nothing.
   They print each change they make, and have a dry run that prints the

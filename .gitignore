@@ -1,0 +1,9 @@
+# Python and uv
+.venv/
+__pycache__/
+.pytest_cache/
+dist/
+
+# Local settings of Claude Code and its plugins
+.claude/settings.local.json
+.superpowers/
