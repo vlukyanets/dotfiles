@@ -4,6 +4,9 @@ __pycache__/
 .pytest_cache/
 dist/
 
+# The files dotfiles install replaced
+/.backups/
+
 # Local settings of Claude Code and its plugins
 .claude/settings.local.json
 .superpowers/
