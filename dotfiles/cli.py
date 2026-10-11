@@ -2,9 +2,11 @@
 
 import argparse
 import os
+import subprocess
 import sys
 from pathlib import Path
 
+from dotfiles import secrets
 from dotfiles.add import Error, add
 
 REPO = Path(__file__).resolve().parents[1]
@@ -27,7 +29,18 @@ def main(argv: list[str] | None = None) -> int:
     add_parser.add_argument("node", help="the node's name, as in nodes/<node>/")
     add_parser.add_argument("paths", nargs="+", metavar="path", help="an absolute path on the machine")
 
+    scan_parser = commands.add_parser(
+        "scan", help="find what looks like a secret, by the rules in secret_leaks.toml"
+    )
+    what = scan_parser.add_mutually_exclusive_group(required=True)
+    what.add_argument("--staged", action="store_true", help="scan the lines the staged changes add")
+    what.add_argument("--history", action="store_true", help="scan the lines every commit adds")
+    what.add_argument("paths", nargs="*", default=[], type=Path, metavar="path",
+                      help="a file, or a directory to scan file by file")
+
     args = parser.parse_args(argv)
+    if args.command == "scan":
+        return scan(args)
     try:
         if os.geteuid() == 0:
             raise Error("run as your user; the files read through sudo when needed")
@@ -36,3 +49,26 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {e}", file=sys.stderr)
         return 1
     return 0
+
+
+def scan(args: argparse.Namespace) -> int:
+    config = secrets.load(REPO / "secret_leaks.toml")
+    if args.staged or args.history:
+        try:
+            findings = (secrets.scan_staged if args.staged else secrets.scan_history)(config, REPO)
+        except subprocess.CalledProcessError as e:
+            print(f"error: git: {e.stderr.strip()}", file=sys.stderr)
+            return 2
+    else:
+        missing = [str(path) for path in args.paths if not path.exists()]
+        if missing:
+            print(f"error: no such file: {', '.join(missing)}", file=sys.stderr)
+            return 2
+        findings = secrets.scan_paths(config, args.paths)
+    if not findings:
+        return 0
+    print("these look like secrets; keep the file as a template, or mark a line"
+          " that holds none with secret-leaks:allow:", file=sys.stderr)
+    for finding in findings:
+        print(f"  {finding}", file=sys.stderr)
+    return 1
