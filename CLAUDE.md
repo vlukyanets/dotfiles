@@ -12,6 +12,7 @@ first change.
 | `nodes/<node>/.meta` | Only the files and directories whose owner or mode differ from the defaults below, one per line: `0600 root:root etc/ssh/ssh_host_ed25519_key`; a directory's path ends in a slash: `0700 valentinl:valentinl home/valentinl/` |
 | `dotfiles/` | The Python package behind the `dotfiles` command: a subcommand for each job (adding files, installing a node, filling templates, checking what drifted) |
 | `tests/` | The tests: `tests/test_add.py` checks `dotfiles add` |
+| `secret_leaks.toml` | The secret rules, read by `dotfiles scan` and `dotfiles add` |
 | `pyproject.toml`, `uv.lock` | The package and its dependencies, pinned; everything runs through `uv` |
 | `docs/` | How it works now, the decisions with why, and plans |
 

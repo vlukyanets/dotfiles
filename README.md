@@ -23,6 +23,24 @@ sudo pacman -S python uv
 uv sync
 ```
 
+## Checking for secrets
+
+```sh
+uv run dotfiles scan --staged          # the lines the staged changes add
+uv run dotfiles scan --history         # the lines every commit adds
+uv run dotfiles scan nodes/hyper       # whole files, or a directory
+```
+
+The rules are in `secret_leaks.toml`: hundreds of known token formats,
+plus rules for what dotfiles hold, like Wi-Fi passwords in `psk=` lines.
+The scanner weighs keywords, entropy and allowlists, so placeholders like
+`${WIFI_PASSWORD}` or `{{ .psk }}` pass, and it decodes base64, hex,
+percent and unicode-escaped text to find secrets hidden in it. It names
+the file, the line and the rule, never the value, and exits with 1 if it
+finds something. A line that only looks like a secret can be marked with
+`secret-leaks:allow`. `dotfiles add` runs the same check on each file it
+copies.
+
 ## Adding a file
 
 ```sh
@@ -56,3 +74,8 @@ uv run pytest
 
 The tests run on a fake filesystem (pyfakefs) with fake owners; they never
 touch the machine.
+
+## License
+
+Released into the public domain; see [LICENSE](LICENSE). `secret_leaks.toml`
+contains third-party rules under the MIT license; see the notice at its top.

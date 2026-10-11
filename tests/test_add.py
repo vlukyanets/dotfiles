@@ -35,6 +35,8 @@ def machine(fs, monkeypatch):
     make("/home/alice/.config/plain", 0o644, ALICE, b"plain\n")
     make("/home/alice/.config/run", 0o755, ALICE, b"#!/bin/sh\n")
     fs.create_dir(REPO)
+    # The real rules, as the command reads them from the repository.
+    fs.add_real_file(Path(__file__).parents[1] / "secret_leaks.toml", target_path=REPO / "secret_leaks.toml")
     yield
     helpers.reset_ids()
 
@@ -231,43 +233,17 @@ def test_command_reports_an_error(capsys):
     assert capsys.readouterr().err.startswith("error: ")
 
 
-# Built from pieces, so that secret scanners do not flag this file.
+# Built from pieces, so that secret scanners do not flag this file. The
+# rules themselves are tested in test_secrets.py.
 GITHUB_SAMPLE = "gh" + "o_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
-SECRETS = [
-    (f"oauth_token: {GITHUB_SAMPLE}\n", "GitHub token"),
-    ("-----BEGIN OPENSSH " + "PRIVATE KEY-----\n", "private key"),
-    ("AKIA" + "IOSFODNN7EXAMPLE\n", "AWS access key"),
-    ("xox" + "b-1234567890-abcdefghij\n", "Slack token"),
-    ("sk-" + "ant-" + "a" * 40 + "\n", "API key"),
-    ("psk=correct-horse-battery\n", "password or key"),
-    ("  Passphrase = correct-horse-battery\n", "password or key"),
-    ("wifi_password: hunter22\n", "password or key"),
-]
 
 
-# Test ids name the rule, so the secrets stay out of pytest's output and cache.
-@pytest.mark.parametrize("line, rule", SECRETS, ids=[f"{i}-{rule}" for i, (_, rule) in enumerate(SECRETS)])
-def test_refuses_a_file_with_a_secret(line, rule):
-    make("/etc/conf", 0o644, ROOT, b"# a config\n" + line.encode())
-    with pytest.raises(Error, match=f"/etc/conf:2: {rule}") as error:
+def test_refuses_a_file_with_a_secret():
+    make("/etc/conf", 0o644, ROOT, f"# a config\npsk={GITHUB_SAMPLE}\n".encode())
+    with pytest.raises(Error, match="/etc/conf:2: github-oauth") as error:
         run("/etc/hosts", "/etc/conf")
-    assert line.split()[-1] not in str(error.value)
+    assert GITHUB_SAMPLE not in str(error.value)
     assert not (REPO / "nodes").exists()
-
-
-@pytest.mark.parametrize(
-    "line",
-    [
-        "PasswordAuthentication no\n",
-        "# token: <put your token here>\n",
-        "password=\n",
-        "Include /etc/ssh/sshd_config.d/*.conf\n",
-    ],
-)
-def test_does_not_flag_ordinary_lines(line):
-    make("/etc/conf", 0o644, ROOT, line.encode())
-    run("/etc/conf")
-    assert (REPO / "nodes/hyper/etc/conf").exists()
 
 
 def test_force_copies_a_secret_and_warns(capsys):
@@ -276,7 +252,5 @@ def test_force_copies_a_secret_and_warns(capsys):
 
     assert (REPO / "nodes/hyper/etc/conf").exists()
     err = capsys.readouterr().err
-    # The line matches the password rule too, but is reported once.
-    assert err.count("/etc/conf:1:") == 1
-    assert "/etc/conf:1: GitHub token" in err
+    assert "/etc/conf:1: github-oauth" in err
     assert GITHUB_SAMPLE not in err

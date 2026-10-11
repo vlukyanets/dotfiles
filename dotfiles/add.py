@@ -15,36 +15,11 @@ import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 
+from dotfiles import secrets
+
 
 class Error(Exception):
     """A problem with the input or the machine, reported to the user."""
-
-
-# What a secret looks like, most specific first; a line reports the first
-# rule it matches. NOTE: these catch known token formats and obvious
-# assignments only, so a file they pass may still hold a secret.
-SECRET_RULES = {
-    "GitHub token": re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36}\b|\bgithub_pat_\w{82}\b"),
-    "private key": re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
-    "AWS access key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
-    "Slack token": re.compile(r"\bxox[abposr]-[A-Za-z0-9-]{10,}"),
-    "API key": re.compile(r"\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{32,}"),
-    "password or key": re.compile(
-        r"(?i)^[ \t]*(?:\w*[_-])?(?:password|passwd|passphrase|psk|secret|token|api_?key)"
-        r"[ \t]*[:=][ \t]*\S"
-    ),
-}
-
-
-def find_secrets(data: bytes) -> list[tuple[int, str]]:
-    """The line numbers and rule names of what looks like a secret."""
-    found = []
-    for number, line in enumerate(data.decode(errors="replace").splitlines(), 1):
-        for name, rule in SECRET_RULES.items():
-            if rule.search(line):
-                found.append((number, name))
-                break
-    return found
 
 
 def user_name(uid: int) -> str:
@@ -129,8 +104,9 @@ def add(
         if not stat.S_ISREG(st_mode):
             raise Error(f"not a regular file: {path}")
 
+    config = secrets.load(repo / "secret_leaks.toml")
     contents = {}
-    secrets = []
+    found = []
     for path in paths:
         src = root / path.lstrip("/")
         if not mode_and_ids(src)[0] & 0o004:
@@ -140,11 +116,11 @@ def add(
             contents[path] = src.read_bytes()
         except PermissionError:
             contents[path] = sudo_read(src)
-        secrets += [f"{path}:{number}: {name}" for number, name in find_secrets(contents[path])]
-    if secrets and not force:
+        found += secrets.report(path, secrets.find_secrets(config, contents[path], path))
+    if found and not force:
         raise Error("these look like secrets; keep the file as a template, "
-                    "or pass --force to copy it anyway:\n  " + "\n  ".join(secrets))
-    for secret in secrets:
+                    "or pass --force to copy it anyway:\n  " + "\n  ".join(found))
+    for secret in found:
         print(f"warning: copying a secret: {secret}", file=sys.stderr)
 
     node_dir = repo / "nodes" / node
