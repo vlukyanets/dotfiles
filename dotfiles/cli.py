@@ -8,6 +8,7 @@ from pathlib import Path
 
 from dotfiles import secrets
 from dotfiles.add import Error, add
+from dotfiles.install import install
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -29,6 +30,15 @@ def main(argv: list[str] | None = None) -> int:
     add_parser.add_argument("node", help="the node's name, as in nodes/<node>/")
     add_parser.add_argument("paths", nargs="+", metavar="path", help="an absolute path on the machine")
 
+    install_parser = commands.add_parser(
+        "install", help="put nodes/<node>/ onto the machine, with its owners and modes"
+    )
+    install_parser.add_argument("--dry-run", action="store_true", help="print the changes, make none")
+    install_parser.add_argument(
+        "--root", type=Path, default=Path("/"), help="install under ROOT instead of /"
+    )
+    install_parser.add_argument("node", help="the node's name, as in nodes/<node>/")
+
     scan_parser = commands.add_parser(
         "scan", help="find what looks like a secret, by the rules in secret_leaks.toml"
     )
@@ -43,8 +53,11 @@ def main(argv: list[str] | None = None) -> int:
         return scan(args)
     try:
         if os.geteuid() == 0:
-            raise Error("run as your user; the files read through sudo when needed")
-        add(REPO, args.node, args.paths, root=args.root, dry_run=args.dry_run, force=args.force)
+            raise Error("run as your user; sudo is used when needed")
+        if args.command == "add":
+            add(REPO, args.node, args.paths, root=args.root, dry_run=args.dry_run, force=args.force)
+        else:
+            install(REPO, args.node, root=args.root, dry_run=args.dry_run)
     except Error as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

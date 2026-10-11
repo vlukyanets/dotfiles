@@ -74,6 +74,51 @@ it may hold a secret too. A file or directory closed to you is read with
 
 Only regular files are supported; a directory or a symlink is an error.
 
+## Installing a node
+
+```sh
+uv run dotfiles install --dry-run hyper
+uv run dotfiles install hyper
+```
+
+The command puts each file of `nodes/hyper/` at its path from `/`, with the
+owner and mode from `.meta` or the defaults. It prints each change and
+changes nothing else. Run twice, the second run prints nothing.
+
+| On the machine | What happens | Printed |
+|---|---|---|
+| Missing file | Written | `installed /etc/x` |
+| Other contents | The old file is kept as a backup, then replaced | `updated /etc/x (backup …/.backups/hyper/20261011-213000/etc/x)` |
+| Same contents, other owner or mode | Owner and mode set; no backup | `owner /etc/x root:root → alice:alice`, `mode /etc/x 0644 → 0600` |
+| Same | Nothing | Nothing |
+| Missing directory | Created | `created /etc/x/` |
+| Directory with a `.meta` line | Owner and mode set to that line | `mode /home/alice/.ssh/ 0755 → 0700` |
+| Directory without one | Left alone | Nothing |
+
+- A file is written to a temporary file beside it and renamed over the
+  target, so it is never missing or half-written.
+- The backup is a copy of the old file, made before it is replaced, in
+  `.backups/<node>/<YYYYmmdd-HHMMSS>/` of this repository, at the file's
+  path from `/`. The time is when the run started, in local time, so one
+  run keeps all its backups in one directory. A copy is yours and 0600;
+  the old file's owner and mode are in that directory's `.meta`, a line
+  for each file, in the format of a node's. `.backups/` is closed to others (0700) and ignored by
+  git; delete what you no longer need.
+- The command runs as you. What you cannot write goes through one
+  `sudo` helper, started at the first need, so the password is asked once.
+- The whole plan is built before the first write. The command stops with an
+  error, having changed nothing, when a user or group does not exist on the
+  machine, when a target or a directory on the way is a symlink, when a file
+  is not a regular file or a directory is not a directory, when a `.meta`
+  line names a path the node does not have, or when the node or the root
+  does not exist.
+- `--dry-run` prints the same lines and changes nothing. It may still read
+  through `sudo`.
+- `--root DIR` installs under `DIR` instead of `/`.
+
+It does not remove what the node lacks, show diffs, or install packages and
+services.
+
 ## Testing
 
 ```sh
