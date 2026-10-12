@@ -103,7 +103,7 @@ changes nothing else. Run twice, the second run prints nothing.
   run keeps all its backups in one directory. A copy is yours and 0600;
   the old file's owner and mode are in that directory's `.meta`, a line
   for each file, in the format of a node's. `.backups/` is closed to others (0700) and ignored by
-  git; delete what you no longer need.
+  git; `dotfiles cleanup` removes what you no longer need.
 - The command runs as you. What you cannot write goes through one
   `sudo` helper, started at the first need, so the password is asked once.
 - The whole plan is built before the first write. The command stops with an
@@ -118,6 +118,19 @@ changes nothing else. Run twice, the second run prints nothing.
 
 It does not remove what the node lacks, show diffs, or install packages and
 services.
+
+## Removing backups
+
+```sh
+uv run dotfiles cleanup --dry-run      # what it would remove
+uv run dotfiles cleanup                # every backup
+uv run dotfiles cleanup --keep 3       # all but the last 3 runs of each node
+uv run dotfiles cleanup --older-than 30   # the runs older than 30 days
+```
+
+It removes whole runs, the directories under `.backups/<node>/`, and
+prints each one. It stops with an error, having removed nothing, when a
+directory there is not named like a run.
 
 ## Testing
 
