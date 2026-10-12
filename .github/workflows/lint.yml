@@ -14,6 +14,7 @@ jobs:
         with:
           version: "0.12.24"
           python-version: "3.12"
+          save-cache: false  # cache.yml saves it
       - run: uv run --frozen ruff check
 
   mypy:
@@ -24,4 +25,5 @@ jobs:
         with:
           version: "0.12.24"
           python-version: "3.12"
+          save-cache: false  # cache.yml saves it
       - run: uv run --frozen mypy

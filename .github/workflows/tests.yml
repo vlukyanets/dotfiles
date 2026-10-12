@@ -15,5 +15,6 @@ jobs:
           version: "0.12.24"
           # The oldest Python pyproject.toml allows.
           python-version: "3.12"
+          save-cache: false  # cache.yml saves it
       - run: uv run --frozen python --version
       - run: uv run --frozen pytest
