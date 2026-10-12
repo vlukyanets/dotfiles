@@ -21,7 +21,15 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from dotfiles import packages, template
-from dotfiles.add import OWN, Error, default_owner, group_name, read_meta, user_name
+from dotfiles.add import (
+    OWN,
+    Error,
+    default_owner,
+    group_name,
+    read_meta,
+    symlink_on_the_way,
+    user_name,
+)
 from dotfiles.machine import Local, Stat, Sudo
 
 local = Local()
@@ -194,6 +202,8 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
             raise Error(f"{node_dir / '.meta'}: not a path inside the node: {key}")
         if (node_dir / key.rstrip("/")).is_symlink():
             raise Error(f"{node_dir / '.meta'}: a symlink has no owner or mode: {key}")
+        if symlink_on_the_way(node_dir, key.rstrip("/")):
+            raise Error(f"{node_dir / '.meta'}: under a symlink in the node: {key}")
         if not user or not group:
             raise Error(f"{node_dir / '.meta'}: bad owner: {line}")
         if not (node_dir / key).exists() or key.endswith("/") != (node_dir / key).is_dir():

@@ -91,10 +91,10 @@ This repository is public, so the command refuses a file that looks like it
 holds a secret: a known token format (GitHub, AWS, Slack, API keys), a
 private key, or a line like `psk=…` or `password: …`. It names the file,
 the line and the kind of secret, never the value. Keep such a file as a
-template instead: `--template`, below. It also warns about a file that others cannot read, since
-it may hold a secret too. A file or directory closed to you is read
-through one `sudo` helper, started at the first need, so the password is
-asked once.
+template instead: `--template`, below. It also warns about a file that
+others cannot read, since it may hold a secret too. A file or directory
+closed to you is read through one `sudo` helper, started at the first need,
+so the password is asked once.
 
 - `--dry-run` prints what would change and changes nothing.
 - `--force` copies a file even if it looks like it holds a secret.
@@ -104,9 +104,10 @@ asked once.
 A symlink is kept as a symlink, its target as it is, whatever it points
 to: `added nodes/hyper/etc/localtime -> /usr/share/zoneinfo/UTC`. It gets
 no `.meta` line and is not checked for secrets, since its target is a path;
-it cannot be a template. A directory, or a path through a symlinked
-directory on the machine or in the node, is an error; so is forgetting a
-path through a symlinked directory in the node.
+it cannot be a template. A directory, a path through a symlinked
+directory on the machine or in the node, or a path the node keeps as a
+directory is an error; so is forgetting a path through a symlinked
+directory in the node.
 
 ### Taking back what changed
 
@@ -130,8 +131,8 @@ uv run dotfiles forget hyper /etc/ssh/sshd_config.d/10-local.conf
 
 The command removes the file's copy, its template or its symlink from
 `nodes/hyper/` with its line in `.meta`, and so does it for each directory
-of the node left with no files. The machine keeps the file. `--dry-run` prints what
-would change and changes nothing.
+of the node left with no files. The machine keeps the file. `--dry-run`
+prints what would change and changes nothing.
 
 ## Packages
 
@@ -203,8 +204,9 @@ changes nothing else. Run twice, the second run prints nothing.
   error, having changed nothing, when a user or group does not exist on the
   machine, when a directory on the way is a symlink, when a target is not a
   regular file or a symlink or a directory is not a directory, when a
-  `.meta` line names a path the node does not have or a symlink, or when
-  the node or the root does not exist.
+  `.meta` line names a path the node does not have, a symlink or a path
+  under a symlinked directory of the node, or when the node or the root
+  does not exist.
 - `--dry-run` prints the same lines and changes nothing. It may still read
   through `sudo`.
 - `--root DIR` installs under `DIR` instead of `/`.
@@ -221,14 +223,14 @@ one line each: a pattern of paths from `/`, then the command.
 etc/ssh/sshd_config.d/*          sudo systemctl reload sshd
 etc/systemd/system/*             sudo systemctl daemon-reload
 home/valentinl/.config/waybar/*  systemctl --user restart waybar
-etc/systemd/system/*.wants/*     sudo systemctl daemon-reload
 ```
 
 - After the last write, each command whose pattern matches a file
   installed or updated runs once, in the order of the file, printing
   `ran <command>`. A change of owner or mode alone runs nothing. A symlink
   made counts as written; one in `*.wants/` starts nothing by itself, since
-  systemd reads it on `daemon-reload` or at boot.
+  systemd reads it on `daemon-reload`, which `etc/systemd/system/*` above
+  runs, or at boot.
 - A template matches by its path without `.tmpl`. The pattern is
   [fnmatch](https://docs.python.org/3/library/fnmatch.html)'s, so `*`
   matches a slash too; empty lines and lines starting with `#` are skipped.
@@ -349,7 +351,8 @@ A run's directory in `.backups/<node>/` is laid out like a node, its
 `.meta` holding a line for every file, so `restore` puts it back the way
 `install` puts a node: each file at its path with its old owner and mode,
 printing the same lines, a symlink put back as a symlink. The files it
-replaces are kept in a new run, so a restore can be undone too. Files the run does not hold are left alone.
+replaces are kept in a new run, so a restore can be undone too. Files the
+run does not hold are left alone.
 
 - An argument that starts with `/` is a path; the other one, if any, is the
   run. A path the run does not hold is an error.

@@ -281,6 +281,20 @@ def test_refuses_a_file_kept_as_a_template():
     assert not (REPO / "nodes/hyper/etc/hosts").exists()
 
 
+@pytest.mark.parametrize("kind", ["symlink", "file"])
+def test_refuses_a_path_the_node_keeps_as_a_directory(kind):
+    if kind == "symlink":
+        as_root(os.symlink)("/y", "/etc/x")
+    else:
+        make("/etc/x", 0o644, ROOT, b"x\n")
+    (REPO / "nodes/hyper/etc/x").mkdir(parents=True)
+    (REPO / "nodes/hyper/etc/x/f").write_text("f\n")
+
+    with pytest.raises(Error, match="^nodes/hyper/etc/x is a directory in the node; dotfiles forget its files first$"):
+        run("/etc/x")
+    assert (REPO / "nodes/hyper/etc/x/f").read_text() == "f\n"
+
+
 def test_refuses_a_file_named_like_a_template():
     make("/etc/x.tmpl", 0o644, ROOT, b"x\n")
     with pytest.raises(Error, match="ending in .tmpl as a template: /etc/x.tmpl"):
