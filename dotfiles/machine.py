@@ -57,6 +57,20 @@ class Local:
             os.unlink(temp)
             raise
 
+    def readlink(self, path: str) -> str:
+        return os.readlink(path)
+
+    def symlink(self, path: str, target: str, uid: int, gid: int) -> None:
+        """Replaces path with a symlink made beside it, as write does a file."""
+        temp = os.path.join(os.path.dirname(path), f".dotfiles-{os.urandom(8).hex()}")
+        os.symlink(target, temp)
+        try:
+            os.chown(temp, uid, gid, follow_symlinks=False)
+            os.replace(temp, path)
+        except BaseException:
+            os.unlink(temp)
+            raise
+
     def chmod(self, path: str, mode: int) -> None:
         os.chmod(path, mode)
 
@@ -127,6 +141,12 @@ class Sudo:
 
     def write(self, path: str, data: bytes, mode: int, uid: int, gid: int) -> None:
         self.call("write", path=path, data=data, mode=mode, uid=uid, gid=gid)
+
+    def readlink(self, path: str) -> str:
+        return self.call("readlink", path=path)
+
+    def symlink(self, path: str, target: str, uid: int, gid: int) -> None:
+        self.call("symlink", path=path, target=target, uid=uid, gid=gid)
 
     def chmod(self, path: str, mode: int) -> None:
         self.call("chmod", path=path, mode=mode)
