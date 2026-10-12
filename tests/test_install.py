@@ -745,3 +745,16 @@ def test_dry_run_changes_no_symlink(capsys):
 
     assert snapshot() == before
     assert capsys.readouterr().out.startswith("updated /etc/l -> /b (backup ")
+
+
+def test_replaces_a_symlink_with_a_filled_template(capsys):
+    make_symlink("/a", "/etc/x")
+    node_file("etc/x.tmpl", b"v={{ v }}\n")
+    template.save_value(VALUES, "v", "1")
+
+    run()
+
+    backup = f"/repo/.backups/hyper/{STAMP}/etc/x"
+    assert read("/etc/x") == b"v=1\n"
+    assert os.readlink(backup) == "/a"
+    assert capsys.readouterr().out == f"updated /etc/x (backup {backup})\n"

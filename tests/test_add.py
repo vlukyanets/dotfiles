@@ -547,3 +547,20 @@ def test_refuses_a_path_through_a_symlinked_directory_of_the_node():
         run("/etc/d/f")
     assert Path("/outside/f").read_bytes() == b"outside\n"
     assert meta() is None
+
+
+def test_keeps_a_relative_target_as_it_is():
+    as_root(os.symlink)("../usr/share/zoneinfo/UTC", "/etc/localtime")
+
+    run("/etc/localtime")
+
+    assert os.readlink(NODE / "etc/localtime") == "../usr/share/zoneinfo/UTC"
+
+
+def test_dry_run_writes_no_symlink(capsys):
+    as_root(os.symlink)("/y", "/etc/l")
+
+    run("/etc/l", dry_run=True)
+
+    assert not (REPO / "nodes").exists()
+    assert capsys.readouterr().out == "added nodes/hyper/etc/l -> /y\n"
