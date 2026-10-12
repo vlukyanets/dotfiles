@@ -120,6 +120,39 @@ changes nothing else. Run twice, the second run prints nothing.
 It does not remove what the node lacks, show diffs, or install packages and
 services.
 
+## Templates
+
+A file that holds a secret, or a value only the machine knows, is kept as a
+template: `nodes/<node>/<path>.tmpl`, with a placeholder in place of each
+value.
+
+```
+# nodes/hyper/etc/NetworkManager/system-connections/home.nmconnection.tmpl
+[wifi-security]
+psk={{ wifi_home_psk }}
+```
+
+- `install` writes it to its path without `.tmpl`, each `{{ name }}`
+  filled in; `name` is `[a-z0-9_]`, and anything else is left as it is.
+  Its `.meta` line names the template: `0600 root:root
+  etc/NetworkManager/system-connections/home.nmconnection.tmpl`.
+- The values are in `~/.config/dotfiles/<node>.toml` (under
+  `$XDG_CONFIG_HOME` when it is set), outside the repository, a flat TOML
+  table of strings, 0600 in a 0700 directory:
+  `wifi_home_psk = "…"`. A value can be written there by hand, a
+  multi-line one as `"""…"""`.
+- A value `install` does not find, it asks for without echo, before the
+  first write, and adds to that file. Without a terminal it stops with an
+  error instead. `--dry-run` asks nothing and prints
+  `unfilled /etc/x (wifi_home_psk)`.
+- `status` fills a template with the values it has and compares the result;
+  one it cannot fill is `unfilled`. `-v` shows no diff of a template, since
+  it would show the values.
+- A value is never printed. A template is checked for secrets like any
+  other file, so one left in it is still caught.
+- A node cannot keep both `x` and `x.tmpl`, and `add` refuses a file kept
+  as a template, or one whose name ends in `.tmpl`.
+
 ## Checking what drifted
 
 ```sh

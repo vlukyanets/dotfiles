@@ -6,9 +6,10 @@ from pathlib import Path
 import pytest
 
 from dotfiles import install as install_module
+from dotfiles import template
 from dotfiles.add import Error
 from dotfiles.status import status
-from test_install import REPO, as_root, machine, make, node_file, node_meta, snapshot  # noqa: F401
+from test_install import REPO, VALUES, as_root, machine, make, node_file, node_meta, snapshot  # noqa: F401
 
 
 def run(**kwargs):
@@ -143,3 +144,38 @@ def test_command_runs_status(capsys):
 
     assert main(["status", "nope"]) == 1
     assert "no such node: nope" in capsys.readouterr().err
+
+
+def test_compares_a_template_filled_in(capsys):
+    template.save_value(VALUES, "psk", "s3cret")
+    make("/etc/wifi", 0o644, 0, b"psk=s3cret\n")
+    node_file("etc/wifi.tmpl", b"psk={{ psk }}\n")
+
+    run()
+
+    assert capsys.readouterr().out == "Node hyper, root /\nNothing differs from the node.\n"
+
+
+def test_a_template_without_its_values(capsys):
+    make("/etc/wifi", 0o600, 0, b"psk=s3cret\n")
+    node_file("etc/wifi.tmpl", b"psk={{ psk }} {{ id }}\n")
+
+    run()
+
+    out = capsys.readouterr().out
+    assert "        unfilled:  /etc/wifi  (psk, id)\n" in out
+    assert "        mode:      /etc/wifi  0644 → 0600\n" in out
+
+
+def test_verbose_shows_no_diff_of_a_template(capsys):
+    template.save_value(VALUES, "psk", "s3cret")
+    make("/etc/wifi", 0o644, 0, b"psk=other\n")
+    node_file("etc/wifi.tmpl", b"psk={{ psk }}\n")
+
+    run(verbose=True)
+
+    out = capsys.readouterr().out
+    assert "        modified:  /etc/wifi\n" in out
+    assert out.endswith("\nTemplate nodes/hyper/etc/wifi.tmpl and /etc/wifi differ;"
+                        " the diff would show its values\n")
+    assert "s3cret" not in out and "other" not in out
