@@ -13,15 +13,19 @@ import sys
 import tempfile
 from typing import BinaryIO
 
-from dotfiles.add import Error
+
+class Error(Exception):
+    """A problem with the input or the machine, reported to the user."""
+
 
 Stat = tuple[int, int, int]  # st_mode (file type bits included), uid, gid
 
 
 class Local:
-    def stat(self, path: str) -> Stat | None:
+    def stat(self, path: str, follow: bool = False) -> Stat | None:
+        """Without follow, a symlink is not followed."""
         try:
-            st = os.lstat(path)
+            st = os.stat(path, follow_symlinks=follow)
         except FileNotFoundError:
             return None
         return st.st_mode, st.st_uid, st.st_gid
@@ -103,8 +107,8 @@ class Sudo:
             raise Error(answer["error"])
         return answer["ok"]
 
-    def stat(self, path: str) -> Stat | None:
-        result = self.call("stat", path=path)
+    def stat(self, path: str, follow: bool = False) -> Stat | None:
+        result = self.call("stat", path=path, follow=follow)
         return None if result is None else tuple(result)
 
     def read(self, path: str) -> bytes:

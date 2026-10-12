@@ -65,8 +65,9 @@ holds a secret: a known token format (GitHub, AWS, Slack, API keys), a
 private key, or a line like `psk=…` or `password: …`. It names the file,
 the line and the kind of secret, never the value. Keep such a file as a
 template instead. It also warns about a file that others cannot read, since
-it may hold a secret too. A file or directory closed to you is read with
-`sudo`.
+it may hold a secret too. A file or directory closed to you is read
+through one `sudo` helper, started at the first need, so the password is
+asked once.
 
 - `--dry-run` prints what would change and changes nothing.
 - `--force` copies a file even if it looks like it holds a secret.

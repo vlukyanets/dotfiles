@@ -8,6 +8,7 @@ from pyfakefs import helpers
 
 from dotfiles import add as add_module
 from dotfiles.add import Error, add
+from test_install import FakeSudo
 
 REPO = Path("/repo")
 ROOT, ALICE = 0, 1000
@@ -21,11 +22,7 @@ def machine(fs, monkeypatch):
     helpers.set_gid(ALICE)
     monkeypatch.setattr(add_module, "user_name", NAMES.__getitem__)
     monkeypatch.setattr(add_module, "group_name", NAMES.__getitem__)
-    # sudo, here: the same call as root.
-    monkeypatch.setattr(add_module, "sudo_read", as_root(lambda path: Path(path).read_bytes()))
-    monkeypatch.setattr(
-        add_module, "sudo_stat", as_root(lambda path, follow: add_module.mode_and_ids(path, follow))
-    )
+    monkeypatch.setattr(add_module, "sudo", FakeSudo())
 
     make("/etc", 0o755, ROOT)
     make("/home", 0o755, ROOT)
@@ -177,11 +174,21 @@ def test_dry_run_writes_nothing(capsys):
     ]
 
 
-def test_reads_inside_a_closed_directory_with_sudo():
+def test_reads_inside_a_closed_directory_with_one_sudo_helper():
     make("/etc/sudoers.d", 0o750, ROOT)
     make("/etc/sudoers.d/alice", 0o440, ROOT, b"alice ALL=(ALL) ALL\n")
-    run("/etc/sudoers.d/alice")
+    make("/etc/sudoers.d/bob", 0o440, ROOT, b"bob ALL=(ALL) ALL\n")
+    run("/etc/sudoers.d/alice", "/etc/sudoers.d/bob")
     assert (REPO / "nodes/hyper/etc/sudoers.d/alice").read_bytes() == b"alice ALL=(ALL) ALL\n"
+    assert {"stat", "read"} <= set(add_module.sudo.calls)
+    assert add_module.sudo.closed
+
+
+def test_a_path_missing_behind_a_closed_directory():
+    make("/etc/sudoers.d", 0o750, ROOT)
+    with pytest.raises(Error, match="no such file: /etc/sudoers.d/nope"):
+        run("/etc/sudoers.d/nope")
+    assert add_module.sudo.closed
 
 
 def test_reads_a_closed_file_with_sudo_and_warns(capsys):
