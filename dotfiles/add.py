@@ -16,6 +16,7 @@ from pathlib import Path, PurePosixPath
 
 from dotfiles import secrets
 from dotfiles.machine import Error, Sudo
+from dotfiles import template
 from dotfiles.template import SUFFIX
 
 sudo = Sudo()
@@ -73,20 +74,24 @@ def add(
     root: Path = Path("/"),
     dry_run: bool = False,
     force: bool = False,
+    as_template: bool = False,
 ) -> None:
     """Copies each path from root into repo/nodes/<node>/ and updates .meta.
 
     Prints each change; with dry_run, prints them and changes nothing.
     Refuses files that look like they hold a secret, unless force is set.
+    With as_template, keeps each as a template instead, its secrets named
+    and moved to the node's values file (template.py).
     What the user cannot read goes to one sudo helper (machine.Sudo).
     """
     try:
-        copy(repo, node, paths, root, dry_run, force)
+        copy(repo, node, paths, root, dry_run, force, as_template)
     finally:
         sudo.close()
 
 
-def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, force: bool) -> None:
+def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, force: bool,
+         as_template: bool) -> None:
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", node):
         raise Error(f"bad node name: {node}")
     for path in paths:
@@ -99,11 +104,17 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
             raise Error(f"not a regular file: {path}")
         if path.endswith(SUFFIX):
             raise Error(f"a node reads a file ending in {SUFFIX} as a template: {path}")
-        kept = f"nodes/{node}/{path.lstrip('/')}{SUFFIX}"
-        if (repo / kept).exists():
-            raise Error(f"{path} is kept as a template, {kept}; change that instead")
+        plain = f"nodes/{node}/{path.lstrip('/')}"
+        if as_template and (repo / plain).exists():
+            raise Error(f"{path} is kept as a plain copy, {plain}; git rm it first")
+        if not as_template and (repo / f"{plain}{SUFFIX}").exists():
+            raise Error(f"{path} is kept as a template, {plain}{SUFFIX}; use --template")
 
     config = secrets.load(repo / "secret_leaks.toml")
+    values_path = template.values_path(node)
+    values = template.read_values(values_path)
+    new_values: dict[str, str] = {}
+    unnamed: dict[str, int] = {}  # path -> secrets left to name, in a dry run
     contents = {}
     found = []
     for path in paths:
@@ -115,10 +126,22 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
             contents[path] = src.read_bytes()
         except PermissionError:
             contents[path] = sudo.read(str(src))
-        found += secrets.report(path, secrets.find_secrets(config, contents[path], path))
+        if as_template:
+            text, unnamed[path] = make_template(path, contents[path], config, values,
+                                                new_values, ask=not dry_run)
+            contents[path] = text.encode()
+            found += secrets.report(path, secrets.find(config, text, path) if not unnamed[path] else [])
+        else:
+            found += secrets.report(path, secrets.find_secrets(config, contents[path], path))
+    if found and as_template:
+        raise Error("these still look like secrets in the template; make it by hand:\n  "
+                    + "\n  ".join(found))
     if found and not force:
-        raise Error("these look like secrets; keep the file as a template, "
+        raise Error("these look like secrets; keep the file as a template with --template, "
                     "or pass --force to copy it anyway:\n  " + "\n  ".join(found))
+    if not dry_run:
+        for name, value in new_values.items():
+            template.save_value(values_path, name, value)
     for secret in found:
         print(f"warning: copying a secret: {secret}", file=sys.stderr)
 
@@ -130,24 +153,27 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
     for path in paths:
         rel = path.lstrip("/")
         src = root / rel
+        key = rel + SUFFIX if as_template else rel
         mode = mode_and_ids(src)[0] & 0o7777
         data = contents[path]
         git_mode = 0o755 if mode & 0o100 else 0o644
 
-        dest = node_dir / rel
+        dest = node_dir / key
         if not dest.exists():
             change = "added"
-        elif dest.read_bytes() != data or dest.stat().st_mode & 0o777 != git_mode:
+        elif (unnamed.get(path) or dest.read_bytes() != data
+              or dest.stat().st_mode & 0o777 != git_mode):
             change = "updated"
         else:
             change = "unchanged"
-        print(f"{change} nodes/{node}/{rel}")
+        left = f" ({unnamed[path]} values to name)" if unnamed.get(path) else ""
+        print(f"{change} nodes/{node}/{key}{left}")
         if change != "unchanged" and not dry_run:
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(data)
             dest.chmod(git_mode)
 
-        update_meta(meta, rel, mode_and_ids(src), git_mode)
+        update_meta(meta, key, mode_and_ids(src), git_mode)
         for parent in PurePosixPath(rel).parents[:-1]:
             update_meta(meta, f"{parent}/", mode_and_ids(root / parent, follow=True), 0o755)
 
@@ -174,3 +200,47 @@ def update_meta(
     if meta.get(key) != line:
         meta[key] = line
         print(f"meta: set {line}")
+
+
+def make_template(path: str, data: bytes, config: secrets.Config, values: dict[str, str],
+                  new_values: dict[str, str], ask: bool) -> tuple[str, int]:
+    """data with each secret found in it replaced by its placeholder, and how
+    many secrets are left without a name. A secret already in values takes
+    its name; with ask, a new one is named by the user and goes into values
+    and new_values, and without, it is left as it is and counted."""
+    try:
+        text = data.decode()
+    except UnicodeDecodeError:
+        raise Error(f"a template must be UTF-8 text: {path}") from None
+    lines = text.splitlines()
+    named = {value: name for name, value in reversed(values.items())}  # the first name wins
+    unnamed = set()
+    for line, rule, value in secrets.find_values(config, text, path):
+        if not line or not value or value not in lines[line - 1]:
+            raise Error(f"{path}:{line}: {rule}: the secret is not in the line as it is; "
+                        "make the template by hand")
+        if value in named:
+            continue
+        if not ask:
+            unnamed.add(value)
+            continue
+        name = ask_name(f"{path}:{line}: {rule}", values)
+        values[name] = new_values[name] = value
+        named[value] = name
+    for value in sorted(named.keys() - unnamed, key=len, reverse=True):
+        text = text.replace(value, f"{{{{ {named[value]} }}}}")
+    return text, len(unnamed)
+
+
+def ask_name(where: str, values: dict[str, str]) -> str:
+    """A name for the secret at where, asked until it is a free placeholder name."""
+    if not sys.stdin.isatty():
+        raise Error(f"{where}: the secret's name is asked in a terminal")
+    while True:
+        name = input(f"{where}, name for it: ").strip()
+        if not template.PLACEHOLDER.fullmatch(f"{{{{ {name} }}}}"):
+            print("a name is [a-z0-9_]", file=sys.stderr)
+        elif name in values:
+            print(f"{name} is taken by another value", file=sys.stderr)
+        else:
+            return name

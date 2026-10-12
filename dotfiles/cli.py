@@ -23,8 +23,13 @@ def main(argv: list[str] | None = None) -> int:
         "add", help="copy machine files into nodes/<node>/ and update its .meta"
     )
     add_parser.add_argument("--dry-run", action="store_true", help="print the changes, make none")
-    add_parser.add_argument(
+    copying = add_parser.add_mutually_exclusive_group()
+    copying.add_argument(
         "--force", action="store_true", help="copy files even if they look like they hold a secret"
+    )
+    copying.add_argument(
+        "--template", action="store_true",
+        help="keep each file as a template, naming the secrets found in it",
     )
     add_parser.add_argument(
         "--root", type=Path, default=Path("/"), help="read the files from ROOT instead of /"
@@ -76,7 +81,8 @@ def main(argv: list[str] | None = None) -> int:
         if os.geteuid() == 0:
             raise Error("run as your user; sudo is used when needed")
         if args.command == "add":
-            add(REPO, args.node, args.paths, root=args.root, dry_run=args.dry_run, force=args.force)
+            add(REPO, args.node, args.paths, root=args.root, dry_run=args.dry_run, force=args.force,
+                as_template=args.template)
         elif args.command == "install":
             install(REPO, args.node, root=args.root, dry_run=args.dry_run)
         elif args.command == "status":

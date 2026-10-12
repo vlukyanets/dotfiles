@@ -137,6 +137,16 @@ def find(config: Config, text: str, path: str, first_line: int = 1) -> list[tupl
     The rules run on the text and then on up to
     MAX_DECODE_DEPTH passes of decoding it, a decoded match counting only if
     it touches what the last pass decoded."""
+    found: dict[int, str] = {}
+    for line, rule_id, _ in find_values(config, text, path):
+        found.setdefault(line + first_line - 1 if line else 0, rule_id)
+    return sorted(found.items())
+
+
+def find_values(config: Config, text: str, path: str) -> list[tuple[int, str, str]]:
+    """The line, the rule id and the secret of every finding in text, as find
+    sees them before it keeps one per line; the secret of a decoded finding
+    is the decoded one."""
     if any(a.skips_file(path) for a in config.allowlists):
         return []
     newlines = [m.start() for m in re.finditer("\n", text)]
@@ -154,10 +164,7 @@ def find(config: Config, text: str, path: str, first_line: int = 1) -> list[tupl
         current, segments = decoder.decode(current, segments)
         if not segments:
             break
-    found: dict[int, str] = {}
-    for line, rule_id, _ in drop_generic_duplicates(findings):
-        found.setdefault(line + first_line - 1 if line else 0, rule_id)
-    return sorted(found.items())
+    return drop_generic_duplicates(findings)
 
 
 def detect(
