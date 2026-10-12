@@ -8,6 +8,7 @@ path ends in a slash: `0700 alice:alice home/alice/`.
 """
 
 import grp
+import os
 import pwd
 import re
 import stat
@@ -114,13 +115,20 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
         if path.lstrip("/") in OWN:
             raise Error(f"a node keeps its own {path.lstrip('/')} there: {path}")
         st_mode = mode_and_ids(root / path.lstrip("/")).mode
-        if stat.S_ISLNK(st_mode):
-            raise Error(f"symlinks are not supported: {path}")
-        if not stat.S_ISREG(st_mode):
+        for parent in reversed(PurePosixPath(path.lstrip("/")).parents[:-1]):
+            if stat.S_ISLNK(mode_and_ids(root / parent).mode):
+                raise Error(f"a symlink, not a directory: /{parent}")
+        if not stat.S_ISREG(st_mode) and not stat.S_ISLNK(st_mode):
             raise Error(f"not a regular file: {path}")
         if path.endswith(SUFFIX):
             raise Error(f"a node reads a file ending in {SUFFIX} as a template: {path}")
         plain = f"nodes/{node}/{path.lstrip('/')}"
+        if stat.S_ISLNK(st_mode):
+            if as_template:
+                raise Error(f"a symlink cannot be a template: {path}")
+            if (repo / f"{plain}{SUFFIX}").exists():
+                raise Error(f"{path} is kept as a template, {plain}{SUFFIX}; dotfiles forget it first")
+            continue
         if as_template and (repo / plain).exists():
             raise Error(f"{path} is kept as a plain copy, {plain}; git rm it first")
         if not as_template and (repo / f"{plain}{SUFFIX}").exists():
@@ -132,9 +140,16 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
     new_values: dict[str, str] = {}
     unnamed: dict[str, int] = {}  # path -> secrets left to name, in a dry run
     contents = {}
+    links = {}  # path -> its target, for a symlink
     found = []
     for path in paths:
         src = root / path.lstrip("/")
+        if stat.S_ISLNK(mode_and_ids(src).mode):  # A target is a path, not checked for secrets.
+            try:
+                links[path] = os.readlink(src)
+            except PermissionError:
+                links[path] = sudo.readlink(str(src))
+            continue
         if not mode_and_ids(src).mode & 0o004:
             print(f"warning: {path} is closed to others; it may hold a secret, "
                   "check it before committing", file=sys.stderr)
@@ -170,31 +185,56 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
         rel = path.lstrip("/")
         src = root / rel
         key = rel + SUFFIX if as_template else rel
-        mode = mode_and_ids(src).mode & 0o7777
-        data = contents[path]
-        git_mode = 0o755 if mode & 0o100 else 0o644
-
         dest = node_dir / key
-        if not dest.exists():
-            change = "added"
-        elif (unnamed.get(path) or dest.read_bytes() != data
-              or dest.stat().st_mode & 0o777 != git_mode):
-            change = "updated"
+        if path in links:
+            copy_link(dest, links[path], f"nodes/{node}/{key}", dry_run)
+            if meta.pop(key, None) is not None:
+                print(f"meta: removed {key}")
         else:
-            change = "unchanged"
-        left = f" ({unnamed[path]} values to name)" if unnamed.get(path) else ""
-        print(f"{change} nodes/{node}/{key}{left}")
-        if change != "unchanged" and not dry_run:
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(data)
-            dest.chmod(git_mode)
-
-        update_meta(meta, key, mode_and_ids(src), git_mode)
+            st = mode_and_ids(src)
+            git_mode = 0o755 if st.mode & 0o100 else 0o644
+            copy_file(dest, contents[path], git_mode, unnamed.get(path, 0), f"nodes/{node}/{key}",
+                      dry_run)
+            update_meta(meta, key, st, git_mode)
         for parent in PurePosixPath(rel).parents[:-1]:
             update_meta(meta, f"{parent}/", mode_and_ids(root / parent, follow=True), 0o755)
 
     if meta != old_meta and not dry_run:
         write_meta(meta_path, meta)
+
+
+def copy_link(dest: Path, target: str, name: str, dry_run: bool) -> None:
+    """Makes dest a symlink to target, in place of what is there; prints the change."""
+    if dest.is_symlink() and os.readlink(dest) == target:
+        change = "unchanged"
+    else:
+        change = "updated" if dest.is_symlink() or dest.exists() else "added"
+    print(f"{change} {name} -> {target}")
+    if change != "unchanged" and not dry_run:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.unlink(missing_ok=True)
+        dest.symlink_to(target)
+
+
+def copy_file(dest: Path, data: bytes, git_mode: int, unnamed: int, name: str,
+              dry_run: bool) -> None:
+    """Writes data to dest with git_mode, never through a symlink there;
+    prints the change, and the values a template has left to name."""
+    if dest.is_symlink():
+        change = "updated"
+    elif not dest.exists():
+        change = "added"
+    elif unnamed or dest.read_bytes() != data or dest.stat().st_mode & 0o777 != git_mode:
+        change = "updated"
+    else:
+        change = "unchanged"
+    left = f" ({unnamed} values to name)" if unnamed else ""
+    print(f"{change} {name}{left}")
+    if change != "unchanged" and not dry_run:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.unlink(missing_ok=True)  # a symlink there is replaced, not written through
+        dest.write_bytes(data)
+        dest.chmod(git_mode)
 
 
 def write_meta(path: Path, meta: dict[str, str]) -> None:

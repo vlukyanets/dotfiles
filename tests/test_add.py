@@ -224,11 +224,13 @@ def test_reads_from_another_root():
         ("etc/hosts", "not an absolute path"),
         ("/etc", "not a regular file"),
         ("/missing", "no such file"),
-        ("/etc/link", "symlinks are not supported"),
+        ("/etc/d/f", "a symlink, not a directory: /etc/d"),
     ],
 )
 def test_rejects_what_is_not_an_absolute_regular_file(path, message):
-    as_root(os.symlink)("hosts", "/etc/link")
+    make("/srv", 0o755, ROOT)
+    make("/srv/f", 0o644, ROOT, b"f\n")
+    as_root(os.symlink)("/srv", "/etc/d")
     with pytest.raises(Error, match=message):
         run(path)
     assert not (REPO / "nodes").exists()
@@ -433,3 +435,100 @@ def test_command_needs_a_path_or_a_package(capsys):
     with pytest.raises(SystemExit):
         main(["add", "hyper"])
     assert "give a path or --package" in capsys.readouterr().err
+
+
+NODE = REPO / "nodes/hyper"
+
+
+def test_keeps_a_symlink_as_a_symlink(capsys):
+    as_root(os.symlink)("/usr/share/zoneinfo/UTC", "/etc/localtime")
+
+    run("/etc/localtime")
+    run("/etc/localtime")
+
+    assert os.readlink(NODE / "etc/localtime") == "/usr/share/zoneinfo/UTC"
+    assert capsys.readouterr().out.splitlines() == [
+        "added nodes/hyper/etc/localtime -> /usr/share/zoneinfo/UTC",
+        "unchanged nodes/hyper/etc/localtime -> /usr/share/zoneinfo/UTC",
+    ]
+    assert meta() is None
+
+
+def test_updates_a_symlink_whose_target_changed(capsys):
+    as_root(os.symlink)("/a", "/etc/l")
+    run("/etc/l")
+    as_root(os.unlink)("/etc/l")
+    as_root(os.symlink)("/b", "/etc/l")
+    capsys.readouterr()
+
+    run("/etc/l")
+
+    assert os.readlink(NODE / "etc/l") == "/b"
+    assert capsys.readouterr().out == "updated nodes/hyper/etc/l -> /b\n"
+
+
+def test_a_symlink_replaces_a_file_and_its_meta_line(capsys):
+    make("/etc/x", 0o600, ROOT, b"x\n")
+    run("/etc/x")
+    as_root(os.unlink)("/etc/x")
+    as_root(os.symlink)("/y", "/etc/x")
+    capsys.readouterr()
+
+    run("/etc/x")
+
+    assert os.readlink(NODE / "etc/x") == "/y"
+    assert meta() is None
+    assert capsys.readouterr().out == "updated nodes/hyper/etc/x -> /y\nmeta: removed etc/x\n"
+
+
+def test_a_file_replaces_a_symlink_without_writing_through_it(capsys):
+    as_root(os.symlink)("/home/alice/.config/plain", "/etc/x")
+    run("/etc/x")
+    as_root(os.unlink)("/etc/x")
+    make("/etc/x", 0o644, ROOT, b"file\n")
+    capsys.readouterr()
+
+    run("/etc/x")
+
+    assert not (NODE / "etc/x").is_symlink()
+    assert (NODE / "etc/x").read_bytes() == b"file\n"
+    assert Path("/home/alice/.config/plain").read_bytes() == b"plain\n"
+    assert capsys.readouterr().out == "updated nodes/hyper/etc/x\n"
+
+
+def test_keeps_a_symlink_to_a_directory():
+    make("/srv", 0o755, ROOT)
+    make("/srv/f", 0o644, ROOT, b"f\n")
+    as_root(os.symlink)("/srv", "/etc/d")
+
+    run("/etc/d")
+
+    assert os.readlink(NODE / "etc/d") == "/srv"
+    assert sorted(str(p.relative_to(NODE)) for p in NODE.rglob("*")) == ["etc", "etc/d"]
+
+
+def test_reads_a_symlink_in_a_closed_directory_with_sudo():
+    make("/etc/closed", 0o700, ROOT)
+    as_root(os.symlink)("/y", "/etc/closed/l")
+
+    run("/etc/closed/l")
+
+    assert os.readlink(NODE / "etc/closed/l") == "/y"
+    assert "readlink" in add_module.sudo.calls
+
+
+def test_rejects_a_symlink_as_a_template():
+    as_root(os.symlink)("hosts", "/etc/link")
+    with pytest.raises(Error, match="a symlink cannot be a template: /etc/link"):
+        run("/etc/link", as_template=True)
+    assert not (REPO / "nodes").exists()
+
+
+def test_refuses_a_symlink_kept_as_a_template():
+    (NODE / "etc").mkdir(parents=True)
+    (NODE / "etc/x.tmpl").write_text("{{ x }}\n")
+    as_root(os.symlink)("hosts", "/etc/x")
+
+    with pytest.raises(Error, match="kept as a template, nodes/hyper/etc/x.tmpl; dotfiles forget it first"):
+        run("/etc/x")
+    assert not (NODE / "etc/x").is_symlink()
