@@ -78,6 +78,25 @@ def test_dry_run_changes_nothing(capsys):
         "removed nodes/hyper/etc/\n")
 
 
+def test_removes_a_symlink(fs, capsys):
+    fs.create_symlink(NODE / "etc/localtime", "/usr/share/zoneinfo/UTC")
+
+    forget(REPO, "hyper", ["/etc/localtime"])
+
+    assert not (NODE / "etc/localtime").is_symlink()
+    assert capsys.readouterr().out == "removed nodes/hyper/etc/localtime\n"
+
+
+def test_keeps_a_symlink_to_a_directory_beside_the_files_forgotten(fs, capsys):
+    fs.create_symlink(NODE / "etc/ssh/link", NODE / "home")
+
+    forget(REPO, "hyper", ["/etc/ssh/ssh_host_ed25519_key", "/etc/ssh/sshd_config.d/10-local.conf"])
+
+    assert (NODE / "etc/ssh/link").is_symlink()
+    assert (NODE / "home/alice/.ssh/config.tmpl").exists()
+    assert "removed nodes/hyper/etc/ssh/\n" not in capsys.readouterr().out
+
+
 @pytest.mark.parametrize("node, path, message", [
     ("laptop", "/etc/x", "no such node: laptop"),
     ("../hyper", "/etc/x", "no such node: ../hyper"),

@@ -101,7 +101,11 @@ asked once.
 - `--template` keeps each file as a template; see [Templates](#templates).
 - `--root DIR` reads the files from `DIR` instead of `/`.
 
-Only regular files are supported; a directory or a symlink is an error.
+A symlink is kept as a symlink, its target as it is, whatever it points
+to: `added nodes/hyper/etc/localtime -> /usr/share/zoneinfo/UTC`. It gets
+no `.meta` line and is not checked for secrets, since its target is a path;
+it cannot be a template. A directory, or a path through a symlinked
+directory, is an error.
 
 ## Forgetting a file
 
@@ -109,9 +113,9 @@ Only regular files are supported; a directory or a symlink is an error.
 uv run dotfiles forget hyper /etc/ssh/sshd_config.d/10-local.conf
 ```
 
-The command removes the file's copy, or its template, from `nodes/hyper/`
-with its line in `.meta`, and so does it for each directory of the node
-left with no files. The machine keeps the file. `--dry-run` prints what
+The command removes the file's copy, its template or its symlink from
+`nodes/hyper/` with its line in `.meta`, and so does it for each directory
+of the node left with no files. The machine keeps the file. `--dry-run` prints what
 would change and changes nothing.
 
 ## Packages

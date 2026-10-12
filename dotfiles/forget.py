@@ -26,7 +26,8 @@ def forget(repo: Path, node: str, paths: list[str], dry_run: bool = False,
     keys = []
     for path in paths:
         rel = path.lstrip("/")
-        key = next((key for key in (rel, rel + SUFFIX) if (node_dir / key).is_file()), None)
+        key = next((key for key in (rel, rel + SUFFIX)
+                    if (node_dir / key).is_symlink() or (node_dir / key).is_file()), None)
         if not path.startswith("/") or ".." in PurePosixPath(rel).parts or rel in OWN or not key:
             raise Error(f"not in node {node}: {path}")
         if key not in keys:
@@ -48,7 +49,7 @@ def forget(repo: Path, node: str, paths: list[str], dry_run: bool = False,
     parents = {str(parent) for key in keys for parent in PurePosixPath(key).parents[:-1]}
     for parent in sorted(parents, reverse=True):  # a directory after those in it
         directory = node_dir / parent
-        if any(not p.is_dir() and p not in gone for p in directory.rglob("*")):
+        if any((p.is_symlink() or not p.is_dir()) and p not in gone for p in directory.rglob("*")):
             continue
         print(f"removed nodes/{node}/{parent}/")
         if not dry_run:
