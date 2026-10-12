@@ -33,7 +33,9 @@ The owner made these; they go into `docs/decisions.md` as row 30.
 
 - A path that is itself a symlink is kept as a symlink, whatever it points
   to, a directory included; the target is read with `readlink`, through
-  `sudo` when needed. A symlinked directory on the way stays an error.
+  `sudo` when needed. A symlinked directory on the way becomes an error,
+  `a symlink, not a directory: <path>`, since `install` refuses one; until
+  now `add` went through it.
 - It prints `added nodes/<node>/<path> -> <target>`, `updated …` when the
   node has another target or a file there, or `unchanged …`.
 - No `.meta` line is written for it; a file it replaces loses its line.
