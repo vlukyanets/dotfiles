@@ -14,12 +14,13 @@ import stat
 import sys
 from pathlib import Path, PurePosixPath
 
+from dotfiles import packages as node_packages
 from dotfiles import secrets, template
 from dotfiles.machine import Error, Stat, Sudo
 from dotfiles.template import SUFFIX
 
 sudo = Sudo()
-OWN = (".meta", ".hooks")  # the files of a node that are its own, not the machine's
+OWN = (".meta", ".hooks", ".packages")  # the files of a node that are its own, not the machine's
 
 
 def user_name(uid: int) -> str:
@@ -75,8 +76,10 @@ def add(
     dry_run: bool = False,
     force: bool = False,
     as_template: bool = False,
+    packages: list[str] | None = None,
 ) -> None:
-    """Copies each path from root into repo/nodes/<node>/ and updates .meta.
+    """Copies each path from root into repo/nodes/<node>/ and updates .meta,
+    then adds each of packages, which must be installed, to its .packages.
 
     Prints each change; with dry_run, prints them and changes nothing.
     Refuses files that look like they hold a secret, unless force is set.
@@ -84,16 +87,27 @@ def add(
     and moved to the node's values file (template.py).
     What the user cannot read goes to one sudo helper (machine.Sudo).
     """
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", node):
+        raise Error(f"bad node name: {node}")
+    if packages:
+        have = node_packages.installed()
+        if lacking := [name for name in packages if name not in have]:
+            raise Error(f"not installed: {', '.join(lacking)}")
     try:
         copy(repo, node, paths, root, dry_run, force, as_template)
     finally:
         sudo.close()
+    if packages:
+        node_dir = repo / "nodes" / node
+        listed = node_packages.read(node_dir)
+        for name in dict.fromkeys(packages):
+            print(f"{'unchanged' if name in listed else 'added'} package {name}")
+        if not dry_run and not set(packages) <= set(listed):
+            node_packages.write(node_dir, listed + packages)
 
 
 def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, force: bool,
          as_template: bool) -> None:
-    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", node):
-        raise Error(f"bad node name: {node}")
     for path in paths:
         if not path.startswith("/"):
             raise Error(f"not an absolute path: {path}")

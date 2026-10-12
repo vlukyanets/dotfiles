@@ -602,3 +602,18 @@ def test_a_failed_hook_is_an_error():
     install_module.run_hook("true")
     with pytest.raises(Error, match="^exit 3: exited with 3$"):
         install_module.run_hook("exit 3")
+
+
+def test_installs_missing_packages_first(monkeypatch, capsys):
+    from dotfiles import packages
+    installs = []
+    monkeypatch.setattr(packages, "installed", lambda: {"base"})
+    monkeypatch.setattr(packages, "install", installs.append)
+    (NODE / ".packages").write_text("base\nniri\n")
+    node_file("etc/x")
+
+    run()
+
+    assert installs == [["niri"]]
+    assert not Path("/.packages").exists()
+    assert capsys.readouterr().out == "installed packages niri\ninstalled /etc/x\n"
