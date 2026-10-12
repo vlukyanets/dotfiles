@@ -532,3 +532,18 @@ def test_refuses_a_symlink_kept_as_a_template():
     with pytest.raises(Error, match="kept as a template, nodes/hyper/etc/x.tmpl; dotfiles forget it first"):
         run("/etc/x")
     assert not (NODE / "etc/x").is_symlink()
+
+
+def test_refuses_a_path_through_a_symlinked_directory_of_the_node():
+    make("/outside", 0o755, ALICE)
+    make("/outside/f", 0o644, ALICE, b"outside\n")
+    make("/etc/d", 0o755, ROOT)
+    make("/etc/d/f", 0o644, ROOT, b"machine\n")
+    (NODE / "etc").mkdir(parents=True)
+    (NODE / "etc/d").symlink_to("/outside")
+
+    with pytest.raises(Error, match="a symlink in the node, not a directory: nodes/hyper/etc/d;"
+                                    " dotfiles forget it first"):
+        run("/etc/d/f")
+    assert Path("/outside/f").read_bytes() == b"outside\n"
+    assert meta() is None

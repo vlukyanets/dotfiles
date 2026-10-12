@@ -97,6 +97,15 @@ def test_keeps_a_symlink_to_a_directory_beside_the_files_forgotten(fs, capsys):
     assert "removed nodes/hyper/etc/ssh/\n" not in capsys.readouterr().out
 
 
+def test_refuses_a_path_through_a_symlinked_directory_of_the_node(fs):
+    fs.create_file("/outside/init.lua")
+    fs.create_symlink(NODE / "etc/nvim", "/outside")
+
+    with pytest.raises(Error, match="^not in node hyper: /etc/nvim/init.lua$"):
+        forget(REPO, "hyper", ["/etc/nvim/init.lua"])
+    assert Path("/outside/init.lua").exists()
+
+
 @pytest.mark.parametrize("node, path, message", [
     ("laptop", "/etc/x", "no such node: laptop"),
     ("../hyper", "/etc/x", "no such node: ../hyper"),

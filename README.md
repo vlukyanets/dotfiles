@@ -105,7 +105,8 @@ A symlink is kept as a symlink, its target as it is, whatever it points
 to: `added nodes/hyper/etc/localtime -> /usr/share/zoneinfo/UTC`. It gets
 no `.meta` line and is not checked for secrets, since its target is a path;
 it cannot be a template. A directory, or a path through a symlinked
-directory, is an error.
+directory on the machine or in the node, is an error; so is forgetting a
+path through a symlinked directory in the node.
 
 ## Forgetting a file
 
