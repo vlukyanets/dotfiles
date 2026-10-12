@@ -104,6 +104,11 @@ def node_file(rel, contents=b"new\n", mode=0o644):
     (NODE / rel).chmod(mode)
 
 
+def node_link(rel, target):
+    (NODE / rel).parent.mkdir(parents=True, exist_ok=True)
+    (NODE / rel).symlink_to(target)
+
+
 def node_meta(*lines):
     (NODE / ".meta").write_text("".join(line + "\n" for line in lines))
 
@@ -356,15 +361,24 @@ def make_symlink(target, link):
     as_root(os.symlink)(target, link)
 
 
-def a_symlink_target():
-    make_symlink("hosts", "/etc/x")
-    node_file("etc/x")
-
-
 def a_symlink_on_the_way():
     make("/srv", 0o755, ROOT)
     make_symlink("/srv", "/etc/d")
     node_file("etc/d/x")
+
+
+def a_directory_where_a_symlink_goes():
+    make("/etc/x", 0o755, ROOT)
+    node_link("etc/x", "/y")
+
+
+def a_meta_line_for_a_symlink():
+    node_link("etc/l", "/y")
+    node_meta("0644 root:root etc/l")
+
+
+def a_symlink_named_like_a_template():
+    node_link("etc/x.tmpl", "/y")
 
 
 def a_directory_where_a_file_goes():
@@ -414,8 +428,10 @@ def a_meta_line_with_a_dotdot_part():
 @pytest.mark.parametrize(
     "setup, message",
     [
-        (a_symlink_target, "/etc/x"),
-        (a_symlink_on_the_way, "/etc/d"),
+        (a_symlink_on_the_way, "a symlink, not a directory: /etc/d"),
+        (a_directory_where_a_symlink_goes, "not a symlink or a regular file: /etc/x"),
+        (a_meta_line_for_a_symlink, "a symlink has no owner or mode: etc/l"),
+        (a_symlink_named_like_a_template, "a symlink cannot be a template: etc/x.tmpl"),
         (a_directory_where_a_file_goes, "/etc/x"),
         (a_file_where_a_directory_goes, "/etc/d"),
         (an_unknown_user, "no such user: bob"),
@@ -618,3 +634,114 @@ def test_installs_missing_packages_first(monkeypatch, capsys):
     assert installs == [["niri"]]
     assert not Path("/.packages").exists()
     assert capsys.readouterr().out == "installed packages niri\ninstalled /etc/x\n"
+
+
+@as_root
+def own_link(path, uid):
+    os.chown(path, uid, uid, follow_symlinks=False)
+
+
+def test_installs_a_missing_symlink(capsys):
+    node_link("etc/localtime", "/usr/share/zoneinfo/UTC")
+
+    run()
+
+    assert os.readlink("/etc/localtime") == "/usr/share/zoneinfo/UTC"
+    assert state("/etc/localtime")[1:] == (ROOT, ROOT)
+    assert capsys.readouterr().out == "installed /etc/localtime -> /usr/share/zoneinfo/UTC\n"
+
+
+def test_installs_a_home_symlink_as_the_user():
+    node_link("home/alice/.x", "y")
+
+    run()
+
+    assert os.readlink("/home/alice/.x") == "y"
+    assert state("/home/alice/.x")[1:] == (ALICE, ALICE)
+    assert install_module.sudo.calls == []
+
+
+def test_leaves_a_symlink_with_the_same_target(capsys):
+    make_symlink("t", "/etc/l")
+    own_link("/etc/l", ALICE)
+    node_link("etc/l", "t")
+
+    run()
+
+    assert capsys.readouterr().out == ""
+    assert state("/etc/l")[1:] == (ALICE, ALICE)
+
+
+def test_replaces_a_symlink_with_another_target_and_keeps_it(capsys):
+    make_symlink("/usr/share/zoneinfo/A", "/etc/localtime")
+    node_link("etc/localtime", "/usr/share/zoneinfo/B")
+
+    run()
+
+    backup = f"/repo/.backups/hyper/{STAMP}/etc/localtime"
+    assert os.readlink("/etc/localtime") == "/usr/share/zoneinfo/B"
+    assert os.readlink(backup) == "/usr/share/zoneinfo/A"
+    assert state(backup)[1:] == (ALICE, ALICE)
+    assert not Path(f"/repo/.backups/hyper/{STAMP}/.meta").exists()
+    assert capsys.readouterr().out == (
+        f"updated /etc/localtime -> /usr/share/zoneinfo/B (backup {backup})\n")
+
+
+def test_replaces_a_file_with_a_symlink(capsys):
+    make("/etc/x", 0o600, ROOT, b"old\n")
+    node_link("etc/x", "/y")
+
+    run()
+
+    backup = f"/repo/.backups/hyper/{STAMP}/etc/x"
+    assert os.readlink("/etc/x") == "/y"
+    assert read(backup) == b"old\n"
+    assert Path(f"/repo/.backups/hyper/{STAMP}/.meta").read_text() == "0600 root:root etc/x\n"
+    assert capsys.readouterr().out == f"updated /etc/x -> /y (backup {backup})\n"
+
+
+def test_replaces_a_symlink_with_a_file(capsys):
+    make("/etc/hosts", 0o600, ROOT, b"secret\n")
+    make_symlink("hosts", "/etc/x")
+    node_file("etc/x")
+
+    run()
+
+    backup = f"/repo/.backups/hyper/{STAMP}/etc/x"
+    assert not os.path.islink("/etc/x")
+    assert read("/etc/x") == b"new\n"
+    assert read("/etc/hosts") == b"secret\n"
+    assert os.readlink(backup) == "hosts"
+    assert "read" not in install_module.sudo.calls  # the link is read, not the file behind it
+    assert capsys.readouterr().out == f"updated /etc/x (backup {backup})\n"
+
+
+def test_installs_a_symlink_to_a_directory_without_entering_it(capsys):
+    node_file("etc/sub/f")
+    node_link("etc/d", str(NODE / "etc/sub"))
+
+    run()
+
+    assert os.readlink("/etc/d") == str(NODE / "etc/sub")
+    assert "/etc/d/f" not in capsys.readouterr().out
+
+
+def test_runs_a_hook_on_a_symlink_written(hooks):
+    node_link("etc/systemd/system/multi-user.target.wants/sshd.service",
+              "/usr/lib/systemd/system/sshd.service")
+    node_hooks("etc/systemd/system/*.wants/* sudo systemctl daemon-reload")
+
+    run()
+
+    assert hooks == ["sudo systemctl daemon-reload"]
+
+
+def test_dry_run_changes_no_symlink(capsys):
+    make_symlink("/a", "/etc/l")
+    node_link("etc/l", "/b")
+    before = snapshot()
+
+    run(dry_run=True)
+
+    assert snapshot() == before
+    assert capsys.readouterr().out.startswith("updated /etc/l -> /b (backup ")

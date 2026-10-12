@@ -70,16 +70,29 @@ def owner_text(uid: int, gid: int) -> str:
     return ":".join(names)
 
 
-def replace(path: str, data: bytes, mode: int, uid: int, gid: int, mine: bool,
-            backups: Path, run: Path, rel: str, old: bytes, st: Stat) -> None:
-    """Copies the old file to run/rel as the user's, closed to others, and
-    notes its owner and mode in run/.meta; then writes path."""
+def replace(item: "Item", mine: bool, backups: Path, run: Path, rel: str) -> None:
+    """Keeps what the machine has at item's path in run/rel as the user's: a
+    symlink as a symlink, a file closed to others with its owner and mode
+    noted in run/.meta; then puts item there."""
+    st = item.st
+    assert st is not None  # Only a path the machine has is replaced.
     backups.mkdir(mode=0o700, exist_ok=True)  # closed: a backup may hold a secret
     (run / rel).parent.mkdir(parents=True, exist_ok=True)
-    call("write", str(run / rel), old, 0o600, os.getuid(), os.getgid())
-    with open(run / ".meta", "a") as meta:
-        meta.write(f"{st.mode & 0o7777:04o} {owner_text(st.uid, st.gid)} {rel}\n")
-    call("write", path, data, mode, uid, gid, as_user=mine)
+    if item.machine_link is not None:
+        call("symlink", str(run / rel), item.machine_link, os.getuid(), os.getgid())
+    else:
+        call("write", str(run / rel), item.machine_data, 0o600, os.getuid(), os.getgid())
+        with open(run / ".meta", "a") as meta:
+            meta.write(f"{st.mode & 0o7777:04o} {owner_text(st.uid, st.gid)} {rel}\n")
+    put(item, mine)
+
+
+def put(item: "Item", mine: bool) -> None:
+    """Writes item's file or symlink at its path, as the user when mine."""
+    if item.link is not None:
+        call("symlink", item.path, item.link, item.uid, item.gid, as_user=mine)
+    else:
+        call("write", item.path, item.data, item.mode, item.uid, item.gid, as_user=mine)
 
 
 def node_dir_of(repo: Path, node: str, root: Path) -> Path:
@@ -160,6 +173,8 @@ class Item:
     data: bytes = b""  # a file's contents in the node, a template's filled
     machine_data: bytes = b""  # and on the machine
     missing: tuple[str, ...] = ()  # the values a template lacks; data is empty then
+    link: str | None = None  # a symlink's target in the node
+    machine_link: str | None = None  # and on the machine, when it has a symlink there
 
 
 def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
@@ -167,7 +182,8 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
     from the node and the machine; a template is filled with values."""
     files = sorted(
         rel
-        for rel in (str(p.relative_to(node_dir)) for p in node_dir.rglob("*") if p.is_file())
+        for rel in (str(p.relative_to(node_dir)) for p in node_dir.rglob("*")
+                    if p.is_symlink() or p.is_file())
         if rel not in OWN
     )
     meta: dict[str, tuple[int, str, str]] = {}  # path -> (mode, user, group)
@@ -176,6 +192,8 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
         user, _, group = owner.partition(":")
         if key.startswith("/") or ".." in PurePosixPath(key).parts:
             raise Error(f"{node_dir / '.meta'}: not a path inside the node: {key}")
+        if (node_dir / key.rstrip("/")).is_symlink():
+            raise Error(f"{node_dir / '.meta'}: a symlink has no owner or mode: {key}")
         if not user or not group:
             raise Error(f"{node_dir / '.meta'}: bad owner: {line}")
         if not (node_dir / key).exists() or key.endswith("/") != (node_dir / key).is_dir():
@@ -201,6 +219,15 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
         items.append(Item(key, path, *wanted(key, 0o755), key in meta, st))
 
     for rel in files:
+        if (node_dir / rel).is_symlink():
+            if rel.endswith(template.SUFFIX):
+                raise Error(f"a symlink cannot be a template: {rel}")
+            path = str(root / rel)
+            st = call("stat", path)
+            items.append(Item(rel, path, *wanted(rel, 0o777), False, st,
+                              machine_data=machine_data(st, path),
+                              link=os.readlink(node_dir / rel), machine_link=machine_link(st, path)))
+            continue
         target = rel.removesuffix(template.SUFFIX)
         if target != rel and target in files:
             raise Error(f"{node_dir}: both {target} and its template {rel}")
@@ -212,11 +239,23 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
         path = str(root / target)
         git_mode = 0o755 if (node_dir / rel).stat().st_mode & 0o100 else 0o644
         st = call("stat", path)
-        if st is not None and not stat.S_ISREG(st.mode):
-            raise Error(f"{not_a(st, 'a regular file')}: {path}")
         items.append(Item(rel, path, *wanted(rel, git_mode), rel in meta, st,
-                          data, call("read", path) if st else b"", missing))
+                          data, machine_data(st, path), missing, machine_link=machine_link(st, path)))
     return items
+
+
+def machine_data(st: Stat | None, path: str) -> bytes:
+    """The contents of the file at path; empty when it is not a regular file."""
+    return call("read", path) if st is not None and stat.S_ISREG(st.mode) else b""
+
+
+def machine_link(st: Stat | None, path: str) -> str | None:
+    """The target of the symlink at path, None when it is a file or missing."""
+    if st is None or stat.S_ISREG(st.mode):
+        return None
+    if not stat.S_ISLNK(st.mode):
+        raise Error(f"not a symlink or a regular file: {path}")
+    return call("readlink", path)
 
 
 def make_plan(node_dir: Path, root: Path, values: dict[str, str], run: Path,
@@ -237,6 +276,7 @@ def make_plan(node_dir: Path, root: Path, values: dict[str, str], run: Path,
     for item in items:
         path, mode, uid, gid = item.path, item.mode, item.uid, item.gid
         mine = (uid, gid) == me
+        arrow = f" -> {item.link}" if item.link is not None else ""
         if item.key.endswith("/"):
             if item.st is None:
                 plan.append((f"created {path}/", functools.partial(
@@ -247,14 +287,15 @@ def make_plan(node_dir: Path, root: Path, values: dict[str, str], run: Path,
             plan.append((f"unfilled {path} ({', '.join(item.missing)})", lambda: None))
         elif item.st is None:
             written.append(item.key.removesuffix(template.SUFFIX))
-            plan.append((f"installed {path}", functools.partial(
-                call, "write", path, item.data, mode, uid, gid, as_user=mine)))
-        elif item.machine_data != item.data:
+            plan.append((f"installed {path}{arrow}", functools.partial(put, item, mine)))
+        elif item.link is not None and item.machine_link == item.link:
+            pass  # A symlink's owner is never compared.
+        elif (item.link is not None or item.machine_link is not None
+              or item.machine_data != item.data):
             rel = item.key.removesuffix(template.SUFFIX)  # the machine's file, not the template
             written.append(rel)
-            plan.append((f"updated {path} (backup {run / rel})", functools.partial(
-                replace, path, item.data, mode, uid, gid, mine, backups, run, rel,
-                item.machine_data, item.st)))
+            plan.append((f"updated {path}{arrow} (backup {run / rel})", functools.partial(
+                replace, item, mine, backups, run, rel)))
         else:
             plan += changes(path, item)
     commands = [command for pattern, command in hooks or []
@@ -268,7 +309,7 @@ def make_plan(node_dir: Path, root: Path, values: dict[str, str], run: Path,
 
 
 def not_a(st: Stat, what: str) -> str:
-    return "symlinks are not supported" if stat.S_ISLNK(st.mode) else f"not {what}"
+    return f"a symlink, not {what}" if stat.S_ISLNK(st.mode) else f"not {what}"
 
 
 def changes(label: str, item: Item):

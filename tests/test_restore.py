@@ -9,9 +9,11 @@ from test_install import (  # noqa: F401
     REPO,
     ROOT,
     STAMP,
+    as_root,
     machine,
     make,
     node_file,
+    node_link,
     read,
     state,
 )
@@ -49,6 +51,19 @@ def test_puts_back_what_install_replaced(monkeypatch, capsys):
         f"updated /etc/x (backup {later}/etc/x)\n"
         f"updated /home/alice/y (backup {later}/home/alice/y)\n")
     assert read(f"{later}/etc/x") == b"new\n"
+
+
+def test_puts_back_a_replaced_symlink(monkeypatch, capsys):
+    as_root(os.symlink)("/usr/share/zoneinfo/A", "/etc/localtime")
+    node_link("etc/localtime", "/usr/share/zoneinfo/B")
+    installed(monkeypatch, capsys)
+
+    restore(REPO, "hyper", None, ["/etc/localtime"])
+
+    later = f"/repo/.backups/hyper/{LATER}"
+    assert os.readlink("/etc/localtime") == "/usr/share/zoneinfo/A"
+    assert capsys.readouterr().out == (
+        f"updated /etc/localtime -> /usr/share/zoneinfo/A (backup {later}/etc/localtime)\n")
 
 
 def test_puts_back_only_the_paths_given(monkeypatch, capsys):

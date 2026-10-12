@@ -37,7 +37,8 @@ def restore(repo: Path, node: str, run: str | None = None, paths: list[str] | No
     if paths:
         keys = {path.lstrip("/") for path in paths}
         for path in paths:
-            if not path.startswith("/") or not (run_dir / path.lstrip("/")).is_file():
+            held = run_dir / path.lstrip("/")
+            if not path.startswith("/") or not (held.is_file() or held.is_symlink()):
                 raise Error(f"not in backup {node}/{run}: {path}")
     new_run = backup_run(repo, node)
     if new_run == run_dir:
