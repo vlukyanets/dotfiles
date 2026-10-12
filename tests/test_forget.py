@@ -85,6 +85,7 @@ def test_dry_run_changes_nothing(capsys):
     ("hyper", "etc/ssh/ssh_host_ed25519_key", "not in node hyper: etc/ssh/ssh_host_ed25519_key"),
     ("hyper", "/etc/ssh", "not in node hyper: /etc/ssh"),
     ("hyper", "/.meta", "not in node hyper: /.meta"),
+    ("hyper", "/.hooks", "not in node hyper: /.hooks"),
     ("hyper", "/../hyper/.meta", "not in node hyper: /../hyper/.meta"),
 ])
 def test_refuses(node, path, message):

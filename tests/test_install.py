@@ -530,3 +530,75 @@ def test_a_file_and_its_template_cannot_both_be_kept():
 
     with pytest.raises(Error, match="both etc/x and its template etc/x.tmpl"):
         run()
+
+
+@pytest.fixture
+def hooks(monkeypatch):
+    """The commands the hooks ran, here, instead of running them."""
+    ran = []
+    monkeypatch.setattr(install_module, "run_hook", ran.append)
+    return ran
+
+
+def node_hooks(*lines):
+    (NODE / ".hooks").write_text("".join(line + "\n" for line in lines))
+
+
+def test_runs_each_hook_of_a_file_written_once_after_the_writes(hooks, capsys):
+    make("/etc/x", 0o644, ROOT, b"old\n")
+    make("/etc/same", 0o600, ROOT, b"new\n")
+    node_file("etc/x")
+    node_file("etc/y")
+    node_file("etc/same")
+    node_file("home/alice/z.tmpl", b"{{ z }}\n")
+    template.save_value(VALUES, "z", "1")
+    node_hooks(
+        "# one line per pattern",
+        "",
+        "etc/*   sudo systemctl reload x",
+        "etc/same  sudo never",  # only its mode changes
+        "home/alice/z  systemctl --user restart z",
+        "etc/y sudo systemctl reload x",
+    )
+
+    run()
+
+    assert hooks == ["sudo systemctl reload x", "systemctl --user restart z"]
+    assert not Path("/.hooks").exists()
+    assert capsys.readouterr().out.endswith(
+        "ran sudo systemctl reload x\nran systemctl --user restart z\n")
+
+
+def test_dry_run_runs_no_hook(hooks, capsys):
+    node_file("etc/x")
+    node_hooks("etc/x sudo systemctl reload x")
+
+    run(dry_run=True)
+
+    assert hooks == []
+    assert capsys.readouterr().out == "installed /etc/x\nran sudo systemctl reload x\n"
+
+
+def test_runs_no_hook_under_another_root(hooks, capsys):
+    make("/srv", 0o755, ALICE)
+    node_file("home/alice/x")
+    node_hooks("home/alice/x systemctl --user restart x")
+
+    run(root=Path("/srv"))
+
+    assert hooks == []
+    assert capsys.readouterr().out.endswith("skipped systemctl --user restart x (the root is /srv)\n")
+
+
+def test_a_hook_line_without_a_command_is_an_error(hooks):
+    node_file("etc/x")
+    node_hooks("etc/x")
+    with pytest.raises(Error, match=r"/repo/nodes/hyper/.hooks:1: not `<pattern> <command>`"):
+        run()
+    assert not Path("/etc/x").exists()
+
+
+def test_a_failed_hook_is_an_error():
+    install_module.run_hook("true")
+    with pytest.raises(Error, match="^exit 3: exited with 3$"):
+        install_module.run_hook("exit 3")

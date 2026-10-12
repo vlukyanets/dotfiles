@@ -158,6 +158,29 @@ changes nothing else. Run twice, the second run prints nothing.
 It does not remove what the node lacks, show diffs, or install packages and
 services.
 
+### Running commands after a file changes
+
+`nodes/<node>/.hooks` names a command to run when `install` writes a file,
+one line each: a pattern of paths from `/`, then the command.
+
+```
+# nodes/hyper/.hooks
+etc/ssh/sshd_config.d/*          sudo systemctl reload sshd
+etc/systemd/system/*             sudo systemctl daemon-reload
+home/valentinl/.config/waybar/*  systemctl --user restart waybar
+```
+
+- After the last write, each command whose pattern matches a file
+  installed or updated runs once, in the order of the file, printing
+  `ran <command>`. A change of owner or mode alone runs nothing.
+- A template matches by its path without `.tmpl`. The pattern is
+  [fnmatch](https://docs.python.org/3/library/fnmatch.html)'s, so `*`
+  matches a slash too; empty lines and lines starting with `#` are skipped.
+- A command runs as you, by the shell; write `sudo` where it needs root.
+  One that fails stops the command with an error, the files already written.
+- `--dry-run` prints the commands and runs none; with `--root` other than
+  `/`, they are printed as `skipped`, since that is not the running system.
+
 ## Templates
 
 A file that holds a secret, or a value only the machine knows, is kept as a
@@ -268,7 +291,8 @@ restore can be undone too. Files the run does not hold are left alone.
 
 - An argument that starts with `/` is a path; the other one, if any, is the
   run. A path the run does not hold is an error.
-- `--dry-run` and `--root DIR` work as they do for `install`.
+- `--dry-run` and `--root DIR` work as they do for `install`, and so do the
+  node's `.hooks`.
 
 ## Removing backups
 

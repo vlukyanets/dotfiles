@@ -10,6 +10,7 @@ first change.
 |---|---|
 | `nodes/<node>/` | One machine: its files at their paths from `/`, one to one (`nodes/hyper/etc/ssh/sshd_config.d/10-local.conf`) |
 | `nodes/<node>/.meta` | Only the files and directories whose owner or mode differ from the defaults below, one per line: `0600 root:root etc/ssh/ssh_host_ed25519_key`; a directory's path ends in a slash: `0700 valentinl:valentinl home/valentinl/` |
+| `nodes/<node>/.hooks` | The commands to run when `install` writes a file, one per line: `etc/ssh/sshd_config.d/* sudo systemctl reload sshd` |
 | `dotfiles/` | The Python package behind the `dotfiles` command: a subcommand for each job (adding files, installing a node, filling templates, checking what drifted) |
 | `tests/` | The tests: `tests/test_add.py` checks `dotfiles add` |
 | `secret_leaks.toml` | The secret rules, read by `dotfiles scan` and `dotfiles add` |

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from dotfiles import install
 from dotfiles.add import Error
-from dotfiles.install import apply, backup_run, make_plan
+from dotfiles.install import apply, backup_run, make_plan, read_hooks
 
 
 def restore(repo: Path, node: str, run: str | None = None, paths: list[str] | None = None,
@@ -43,6 +43,7 @@ def restore(repo: Path, node: str, run: str | None = None, paths: list[str] | No
     if new_run == run_dir:
         raise Error(f"backup {node}/{run} was made this second; run restore again")
     try:
-        apply(make_plan(run_dir, root, {}, new_run, keys), dry_run)
+        hooks = read_hooks(repo / "nodes" / node / ".hooks")
+        apply(make_plan(run_dir, root, {}, new_run, keys, hooks), dry_run)
     finally:
         install.sudo.close()

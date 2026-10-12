@@ -19,6 +19,7 @@ from dotfiles.machine import Error, Stat, Sudo
 from dotfiles.template import SUFFIX
 
 sudo = Sudo()
+OWN = (".meta", ".hooks")  # the files of a node that are its own, not the machine's
 
 
 def user_name(uid: int) -> str:
@@ -96,6 +97,8 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
     for path in paths:
         if not path.startswith("/"):
             raise Error(f"not an absolute path: {path}")
+        if path.lstrip("/") in OWN:
+            raise Error(f"a node keeps its own {path.lstrip('/')} there: {path}")
         st_mode = mode_and_ids(root / path.lstrip("/")).mode
         if stat.S_ISLNK(st_mode):
             raise Error(f"symlinks are not supported: {path}")
