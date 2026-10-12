@@ -14,11 +14,12 @@ import pwd
 import re
 import stat
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from dotfiles.add import Error, default_owner, group_name, read_meta, user_name
-from dotfiles.machine import Local, Sudo
+from dotfiles.machine import Local, Stat, Sudo
 
 local = Local()
 sudo = Sudo()
@@ -77,17 +78,23 @@ def replace(path: str, data: bytes, mode: int, uid: int, gid: int, mine: bool,
     call("write", path, data, mode, uid, gid, as_user=mine)
 
 
+def node_dir_of(repo: Path, node: str, root: Path) -> Path:
+    """repo/nodes/<node>/, once it and root are checked."""
+    node_dir = repo / "nodes" / node
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", node) or not node_dir.is_dir():
+        raise Error(f"no such node: {node}")
+    if not root.is_dir():
+        raise Error(f"no such directory: {root}")
+    return node_dir
+
+
 def install(repo: Path, node: str, root: Path = Path("/"), dry_run: bool = False) -> None:
     """Puts each file of repo/nodes/<node>/ at its path under root, with its
     owner and mode, and fixes the directories that have a .meta line.
 
     Prints each change; with dry_run, prints them and changes nothing.
     """
-    node_dir = repo / "nodes" / node
-    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", node) or not node_dir.is_dir():
-        raise Error(f"no such node: {node}")
-    if not root.is_dir():
-        raise Error(f"no such directory: {root}")
+    node_dir = node_dir_of(repo, node, root)
     try:
         plan = make_plan(node_dir, root)
         for line, action in plan:
@@ -98,8 +105,23 @@ def install(repo: Path, node: str, root: Path = Path("/"), dry_run: bool = False
         sudo.close()
 
 
-def make_plan(node_dir: Path, root: Path) -> list[tuple[str, Callable[[], None]]]:
-    """The lines to print and the actions to do, from reading the node and the machine."""
+@dataclass
+class Item:
+    """A path of the node: what the node wants there, and what the machine has."""
+    key: str  # its path in the node; a directory's ends in a slash
+    path: str  # its path on the machine
+    mode: int
+    uid: int
+    gid: int
+    in_meta: bool
+    st: Stat | None  # None when the machine does not have it
+    data: bytes | None = None  # a file's contents in the node
+    machine_data: bytes | None = None  # and on the machine
+
+
+def survey(node_dir: Path, root: Path) -> list[Item]:
+    """Every directory of the node, parents first, then every file, read
+    from the node and the machine."""
     files = sorted(
         rel
         for rel in (str(p.relative_to(node_dir)) for p in node_dir.rglob("*") if p.is_file())
@@ -121,62 +143,72 @@ def make_plan(node_dir: Path, root: Path) -> list[tuple[str, Callable[[], None]]
         mode, user, group = meta.get(key, (default_mode, *default_owner(key).split(":")))
         return mode, uid_of(user), gid_of(group)
 
-    me = (os.getuid(), os.getgid())
-    stamp = now().strftime("%Y%m%d-%H%M%S")  # the start, so one run has one directory
-    backups = node_dir.parents[1] / ".backups"
-    plan = []
-
+    items = []
     meta_dirs = [key for key in meta if key.endswith("/")]
     dirs = {f"{parent}/" for rel in files + meta_dirs
             for parent in PurePosixPath(rel).parents if str(parent) != "."}
     for key in sorted(dirs | set(meta_dirs)):
         path = str(root / key)
-        mode, uid, gid = wanted(key, 0o755)
         st = call("stat", path)
-        if st is None:
-            plan.append((f"created {path}/", functools.partial(
-                call, "mkdir", path, mode, uid, gid, as_user=(uid, gid) == me)))
-        elif not stat.S_ISDIR(st[0]):
+        if st is not None and not stat.S_ISDIR(st[0]):
             raise Error(f"{not_a(st, 'a directory')}: {path}")
-        elif key in meta:
-            plan += changes(f"{path}/", path, st, mode, uid, gid)
+        items.append(Item(key, path, *wanted(key, 0o755), key in meta, st))
 
     for rel in files:
         path = str(root / rel)
-        data = (node_dir / rel).read_bytes()
         git_mode = 0o755 if (node_dir / rel).stat().st_mode & 0o100 else 0o644
-        mode, uid, gid = wanted(rel, git_mode)
-        mine = (uid, gid) == me
         st = call("stat", path)
-        if st is None:
-            plan.append((f"installed {path}", functools.partial(
-                call, "write", path, data, mode, uid, gid, as_user=mine)))
-        elif not stat.S_ISREG(st[0]):
+        if st is not None and not stat.S_ISREG(st[0]):
             raise Error(f"{not_a(st, 'a regular file')}: {path}")
-        elif (old := call("read", path)) != data:
+        items.append(Item(rel, path, *wanted(rel, git_mode), rel in meta, st,
+                          (node_dir / rel).read_bytes(), call("read", path) if st else None))
+    return items
+
+
+def make_plan(node_dir: Path, root: Path) -> list[tuple[str, Callable[[], None]]]:
+    """The lines to print and the actions to do, from reading the node and the machine."""
+    me = (os.getuid(), os.getgid())
+    stamp = now().strftime("%Y%m%d-%H%M%S")  # the start, so one run has one directory
+    backups = node_dir.parents[1] / ".backups"
+    plan = []
+    for item in survey(node_dir, root):
+        path, mode, uid, gid = item.path, item.mode, item.uid, item.gid
+        mine = (uid, gid) == me
+        if item.key.endswith("/"):
+            if item.st is None:
+                plan.append((f"created {path}/", functools.partial(
+                    call, "mkdir", path, mode, uid, gid, as_user=mine)))
+            elif item.in_meta:
+                plan += changes(f"{path}/", item)
+        elif item.st is None:
+            plan.append((f"installed {path}", functools.partial(
+                call, "write", path, item.data, mode, uid, gid, as_user=mine)))
+        elif item.machine_data != item.data:
             run = backups / node_dir.name / stamp
-            plan.append((f"updated {path} (backup {run / rel})", functools.partial(
-                replace, path, data, mode, uid, gid, mine, backups, run, rel, old, st)))
+            plan.append((f"updated {path} (backup {run / item.key})", functools.partial(
+                replace, path, item.data, mode, uid, gid, mine, backups, run, item.key,
+                item.machine_data, item.st)))
         else:
-            plan += changes(path, path, st, mode, uid, gid)
+            plan += changes(path, item)
     return plan
 
 
-def not_a(st: tuple[int, int, int], what: str) -> str:
+def not_a(st: Stat, what: str) -> str:
     return "symlinks are not supported" if stat.S_ISLNK(st[0]) else f"not {what}"
 
 
-def changes(label: str, path: str, st, mode: int, uid: int, gid: int):
-    """The chown and chmod that bring path, stat st, to the wanted owner and mode."""
+def changes(label: str, item: Item):
+    """The chown and chmod that bring item's path to its wanted owner and mode."""
     plan = []
+    st, path = item.st, item.path
     current = st[0] & 0o7777
-    if (st[1], st[2]) != (uid, gid):
+    if (st[1], st[2]) != (item.uid, item.gid):
         if stat.S_ISREG(st[0]):
             # A chown clears a file's setuid, and its setgid if the group may run it.
             current &= ~(0o4000 | (0o2000 if current & 0o010 else 0))
-        plan.append((f"owner {label} {owner_text(st[1], st[2])} → {owner_text(uid, gid)}",
-                     functools.partial(call, "chown", path, uid, gid)))
-    if current != mode:
-        plan.append((f"mode {label} {current:04o} → {mode:04o}",
-                     functools.partial(call, "chmod", path, mode)))
+        plan.append((f"owner {label} {owner_text(st[1], st[2])} → {owner_text(item.uid, item.gid)}",
+                     functools.partial(call, "chown", path, item.uid, item.gid)))
+    if current != item.mode:
+        plan.append((f"mode {label} {current:04o} → {item.mode:04o}",
+                     functools.partial(call, "chmod", path, item.mode)))
     return plan
