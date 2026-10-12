@@ -47,15 +47,35 @@ def test_local_write_sets_contents_owner_and_mode():
     assert os.listdir("/d") == ["x"]
 
 
+def refuse(*args, **kwargs):
+    raise PermissionError(1, "Operation not permitted")
+
+
 def test_local_write_keeps_the_old_file_when_it_fails(monkeypatch):
     Path("/d/x").write_bytes(b"old")
-
-    def refuse(*args):
-        raise PermissionError(1, "Operation not permitted")
-
     monkeypatch.setattr(os, "chown", refuse)
     with pytest.raises(PermissionError):
         Local().write("/d/x", BYTES, 0o600, ALICE, ALICE)
+
+    assert Path("/d/x").read_bytes() == b"old"
+    assert os.listdir("/d") == ["x"]
+
+
+def test_local_symlink_replaces_the_path_with_its_owner():
+    Path("/d/x").write_bytes(b"old")
+    Local().symlink("/d/x", "/nowhere", ALICE, ALICE)
+
+    st = os.lstat("/d/x")
+    assert stat.S_ISLNK(st.st_mode) and (st.st_uid, st.st_gid) == (ALICE, ALICE)
+    assert os.readlink("/d/x") == "/nowhere"
+    assert os.listdir("/d") == ["x"]
+
+
+def test_local_symlink_keeps_the_old_path_when_it_fails(monkeypatch):
+    Path("/d/x").write_bytes(b"old")
+    monkeypatch.setattr(os, "chown", refuse)
+    with pytest.raises(PermissionError):
+        Local().symlink("/d/x", "/nowhere", ALICE, ALICE)
 
     assert Path("/d/x").read_bytes() == b"old"
     assert os.listdir("/d") == ["x"]
@@ -90,6 +110,14 @@ def test_serve_answers_each_operation():
     assert answers[4:6] == [{"ok": None}] * 2
     assert answers[6]["ok"] == {"mode": stat.S_IFREG | 0o640, "uid": ROOT, "gid": ROOT}
     assert os.lstat("/d/sub ё").st_mode & 0o777 == 0o700
+
+
+def test_serve_answers_readlink_and_symlink():
+    answers = ask(
+        {"op": "symlink", "path": PATH, "target": "rel/t", "uid": ALICE, "gid": ALICE},
+        {"op": "readlink", "path": PATH},
+    )
+    assert answers == [{"ok": None}, {"ok": "rel/t"}]
 
 
 def test_serve_answers_an_error():
@@ -137,6 +165,8 @@ def test_sudo_starts_one_helper(popen):
 
     assert sudo.read(PATH) == BYTES
     assert sudo.stat(PATH) == Stat(stat.S_IFREG | 0o600, ALICE, ALICE)
+    sudo.symlink("/d/l", "t", ALICE, ALICE)
+    assert sudo.readlink("/d/l") == "t"
     assert popen.started == [["sudo", "/py", "-I", "-B", "-m", "dotfiles.machine"]]
 
 
