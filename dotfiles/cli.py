@@ -64,6 +64,10 @@ def main(argv: list[str] | None = None) -> int:
         "init", help="clone the repository for an installed command, as chezmoi does"
     )
     init_parser.add_argument("--dry-run", action="store_true", help="print the changes, make none")
+    init_parser.add_argument(
+        "--slim", action="store_true",
+        help="leave the old versions of files on the server; git fetches them when asked",
+    )
     init_parser.add_argument("url", nargs="?", default=URL, help=f"the repository, {URL} by default")
 
     status_parser = commands.add_parser(
@@ -97,7 +101,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "init":
-            init(args.url, dry_run=args.dry_run)
+            init(args.url, dry_run=args.dry_run, slim=args.slim)
             return 0
         repo = find_repo()
         if args.command == "scan":

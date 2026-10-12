@@ -35,6 +35,9 @@ dotfiles install --dry-run hyper
 - `uv tool upgrade dotfiles` updates the command;
   `git -C ~/.local/share/dotfiles pull` updates the nodes.
 - `add` writes into the clone; commit and push from there.
+- `dotfiles init --slim` leaves the old versions of files on GitHub;
+  git fetches one when a command needs it (`git log -p`, `git blame`), and
+  commit, push and pull work as usual.
 
 **In a clone of your own**, to work on the command itself:
 
