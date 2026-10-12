@@ -16,6 +16,7 @@ from pathlib import Path, PurePosixPath
 
 from dotfiles import secrets
 from dotfiles.machine import Error, Sudo
+from dotfiles.template import SUFFIX
 
 sudo = Sudo()
 
@@ -96,6 +97,11 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
             raise Error(f"symlinks are not supported: {path}")
         if not stat.S_ISREG(st_mode):
             raise Error(f"not a regular file: {path}")
+        if path.endswith(SUFFIX):
+            raise Error(f"a node reads a file ending in {SUFFIX} as a template: {path}")
+        kept = f"nodes/{node}/{path.lstrip('/')}{SUFFIX}"
+        if (repo / kept).exists():
+            raise Error(f"{path} is kept as a template, {kept}; change that instead")
 
     config = secrets.load(repo / "secret_leaks.toml")
     contents = {}

@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
+from dotfiles import template
 from dotfiles.add import Error, default_owner, group_name, read_meta, user_name
 from dotfiles.machine import Local, Stat, Sudo
 
@@ -96,7 +97,7 @@ def install(repo: Path, node: str, root: Path = Path("/"), dry_run: bool = False
     """
     node_dir = node_dir_of(repo, node, root)
     try:
-        plan = make_plan(node_dir, root)
+        plan = make_plan(node_dir, root, template.values_for(node_dir, ask=not dry_run))
         for line, action in plan:
             print(line)
             if not dry_run:
@@ -115,13 +116,14 @@ class Item:
     gid: int
     in_meta: bool
     st: Stat | None  # None when the machine does not have it
-    data: bytes | None = None  # a file's contents in the node
+    data: bytes | None = None  # a file's contents in the node, a template's filled
     machine_data: bytes | None = None  # and on the machine
+    missing: tuple[str, ...] = ()  # the values a template lacks; data is None then
 
 
-def survey(node_dir: Path, root: Path) -> list[Item]:
+def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
     """Every directory of the node, parents first, then every file, read
-    from the node and the machine."""
+    from the node and the machine; a template is filled with values."""
     files = sorted(
         rel
         for rel in (str(p.relative_to(node_dir)) for p in node_dir.rglob("*") if p.is_file())
@@ -155,23 +157,31 @@ def survey(node_dir: Path, root: Path) -> list[Item]:
         items.append(Item(key, path, *wanted(key, 0o755), key in meta, st))
 
     for rel in files:
-        path = str(root / rel)
+        target = rel.removesuffix(template.SUFFIX)
+        if target != rel and target in files:
+            raise Error(f"{node_dir}: both {target} and its template {rel}")
+        data, missing = (node_dir / rel).read_bytes(), ()
+        if target != rel:
+            text = template.text_of(node_dir / rel)
+            missing = tuple(name for name in template.names(text) if name not in values)
+            data = None if missing else template.fill(text, values).encode()
+        path = str(root / target)
         git_mode = 0o755 if (node_dir / rel).stat().st_mode & 0o100 else 0o644
         st = call("stat", path)
         if st is not None and not stat.S_ISREG(st[0]):
             raise Error(f"{not_a(st, 'a regular file')}: {path}")
         items.append(Item(rel, path, *wanted(rel, git_mode), rel in meta, st,
-                          (node_dir / rel).read_bytes(), call("read", path) if st else None))
+                          data, call("read", path) if st else None, missing))
     return items
 
 
-def make_plan(node_dir: Path, root: Path) -> list[tuple[str, Callable[[], None]]]:
+def make_plan(node_dir: Path, root: Path, values: dict[str, str]) -> list[tuple[str, Callable[[], None]]]:
     """The lines to print and the actions to do, from reading the node and the machine."""
     me = (os.getuid(), os.getgid())
     stamp = now().strftime("%Y%m%d-%H%M%S")  # the start, so one run has one directory
     backups = node_dir.parents[1] / ".backups"
     plan = []
-    for item in survey(node_dir, root):
+    for item in survey(node_dir, root, values):
         path, mode, uid, gid = item.path, item.mode, item.uid, item.gid
         mine = (uid, gid) == me
         if item.key.endswith("/"):
@@ -180,13 +190,16 @@ def make_plan(node_dir: Path, root: Path) -> list[tuple[str, Callable[[], None]]
                     call, "mkdir", path, mode, uid, gid, as_user=mine)))
             elif item.in_meta:
                 plan += changes(f"{path}/", item)
+        elif item.missing:  # Only in a dry run: a real one has asked for them.
+            plan.append((f"unfilled {path} ({', '.join(item.missing)})", lambda: None))
         elif item.st is None:
             plan.append((f"installed {path}", functools.partial(
                 call, "write", path, item.data, mode, uid, gid, as_user=mine)))
         elif item.machine_data != item.data:
             run = backups / node_dir.name / stamp
-            plan.append((f"updated {path} (backup {run / item.key})", functools.partial(
-                replace, path, item.data, mode, uid, gid, mine, backups, run, item.key,
+            rel = item.key.removesuffix(template.SUFFIX)  # the machine's file, not the template
+            plan.append((f"updated {path} (backup {run / rel})", functools.partial(
+                replace, path, item.data, mode, uid, gid, mine, backups, run, rel,
                 item.machine_data, item.st)))
         else:
             plan += changes(path, item)

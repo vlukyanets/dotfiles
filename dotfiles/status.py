@@ -9,13 +9,14 @@ from pathlib import Path
 
 from dotfiles import install
 from dotfiles.install import Item, node_dir_of, owner_text, survey
+from dotfiles.template import SUFFIX, read_values, values_path
 
 
 def status(repo: Path, node: str, root: Path = Path("/"), verbose: bool = False) -> None:
     """Prints what differs; with verbose, a diff of each modified file too."""
     node_dir = node_dir_of(repo, node, root)
     try:
-        items = survey(node_dir, root)
+        items = survey(node_dir, root, read_values(values_path(node)))
     finally:
         install.sudo.close()
 
@@ -28,7 +29,9 @@ def status(repo: Path, node: str, root: Path = Path("/"), verbose: bool = False)
             continue
         label = f"{item.path}/" if is_dir else item.path
         lines = dirs if is_dir and not item.in_meta else changed
-        if not is_dir and item.machine_data != item.data:
+        if item.missing:
+            changed.append(("unfilled", f"{label}  ({', '.join(item.missing)})"))
+        elif not is_dir and item.machine_data != item.data:
             changed.append(("modified", label))
             modified.append(item)
         mode, uid, gid = item.st[0] & 0o7777, item.st[1], item.st[2]
@@ -60,6 +63,9 @@ def print_lines(lines: list[tuple[str, str]]) -> None:
 
 
 def print_diff(name: str, item: Item) -> None:
+    if item.key.endswith(SUFFIX):  # Its diff would show the values filled in.
+        print(f"Template {name} and {item.path} differ; the diff would show its values")
+        return
     try:
         old, new = item.data.decode(), item.machine_data.decode()
     except UnicodeDecodeError:

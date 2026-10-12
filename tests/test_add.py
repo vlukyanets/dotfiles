@@ -261,3 +261,18 @@ def test_force_copies_a_secret_and_warns(capsys):
     err = capsys.readouterr().err
     assert "/etc/conf:1: github-oauth" in err
     assert GITHUB_SAMPLE not in err
+
+
+def test_refuses_a_file_kept_as_a_template():
+    (REPO / "nodes/hyper/etc").mkdir(parents=True)
+    (REPO / "nodes/hyper/etc/hosts.tmpl").write_text("{{ hosts }}\n")
+
+    with pytest.raises(Error, match="kept as a template, nodes/hyper/etc/hosts.tmpl"):
+        run("/etc/hosts")
+    assert not (REPO / "nodes/hyper/etc/hosts").exists()
+
+
+def test_refuses_a_file_named_like_a_template():
+    make("/etc/x.tmpl", 0o644, ROOT, b"x\n")
+    with pytest.raises(Error, match="ending in .tmpl as a template: /etc/x.tmpl"):
+        run("/etc/x.tmpl")

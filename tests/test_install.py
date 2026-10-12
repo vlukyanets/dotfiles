@@ -1,5 +1,6 @@
 """Tests for dotfiles install, on a fake filesystem with fake owners."""
 
+import io
 import os
 from datetime import datetime
 from pathlib import Path
@@ -8,6 +9,7 @@ import pytest
 from pyfakefs import helpers
 
 from dotfiles import install as install_module
+from dotfiles import template
 from dotfiles.add import Error
 from dotfiles.install import install
 from dotfiles.machine import Local
@@ -62,6 +64,7 @@ def machine(fs, monkeypatch):
     monkeypatch.setattr(install_module, "group_name", NAMES.__getitem__)
     monkeypatch.setattr(install_module, "now", lambda: datetime(2026, 10, 11, 21, 30, 0))
     monkeypatch.setattr(install_module, "sudo", FakeSudo())
+    monkeypatch.setenv("XDG_CONFIG_HOME", "/home/alice/.config")
 
     make("/etc", 0o755, ROOT)
     make("/home", 0o755, ROOT)
@@ -455,4 +458,73 @@ def test_a_failed_operation_is_an_error(monkeypatch):
     monkeypatch.setattr(install_module.local, "write", refuse)
 
     with pytest.raises(Error, match="write /home/alice/y: Read-only file system"):
+        run()
+
+
+VALUES = Path("/home/alice/.config/dotfiles/hyper.toml")
+
+
+class Terminal(io.StringIO):
+    def isatty(self):
+        return True
+
+
+def test_installs_a_filled_template(capsys):
+    template.save_value(VALUES, "psk", "s3cret")
+    node_file("etc/wifi.tmpl", b"psk={{ psk }}\n")
+    node_meta("0600 root:root etc/wifi.tmpl")
+
+    run()
+
+    assert read("/etc/wifi") == b"psk=s3cret\n"
+    assert state("/etc/wifi") == (0o600, ROOT, ROOT)
+    assert capsys.readouterr().out == "installed /etc/wifi\n"
+
+    run()
+
+    assert capsys.readouterr().out == ""
+
+
+def test_asks_for_a_missing_value_and_never_prints_it(monkeypatch, capsys):
+    node_file("etc/wifi.tmpl", b"psk={{ psk }}\n")
+    monkeypatch.setattr(template.sys, "stdin", Terminal())
+    monkeypatch.setattr(template.getpass, "getpass", lambda prompt: "s3cret")
+
+    run()
+
+    assert read("/etc/wifi") == b"psk=s3cret\n"
+    assert template.read_values(VALUES) == {"psk": "s3cret"}
+    out, err = capsys.readouterr()
+    assert "s3cret" not in out + err
+
+
+def test_dry_run_names_what_it_cannot_fill_and_asks_nothing(monkeypatch, capsys):
+    node_file("etc/wifi.tmpl", b"psk={{ psk }}\n")
+    monkeypatch.setattr(template.getpass, "getpass", lambda prompt: pytest.fail("asked"))
+
+    run(dry_run=True)
+
+    assert capsys.readouterr().out == "unfilled /etc/wifi (psk)\n"
+    assert not os.path.exists("/etc/wifi")
+    assert not VALUES.exists()
+
+
+def test_backs_up_a_templated_file_under_its_own_name():
+    template.save_value(VALUES, "psk", "new")
+    make("/etc/wifi", 0o600, ROOT, b"psk=old\n")
+    node_file("etc/wifi.tmpl", b"psk={{ psk }}\n")
+    node_meta("0600 root:root etc/wifi.tmpl")
+
+    run()
+
+    run_dir = REPO / f".backups/hyper/{STAMP}"
+    assert read(str(run_dir / "etc/wifi")) == b"psk=old\n"
+    assert (run_dir / ".meta").read_text() == "0600 root:root etc/wifi\n"
+
+
+def test_a_file_and_its_template_cannot_both_be_kept():
+    node_file("etc/x")
+    node_file("etc/x.tmpl")
+
+    with pytest.raises(Error, match="both etc/x and its template etc/x.tmpl"):
         run()
