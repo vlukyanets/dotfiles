@@ -13,7 +13,7 @@ first change.
 | `dotfiles/` | The Python package behind the `dotfiles` command: a subcommand for each job (adding files, installing a node, filling templates, checking what drifted) |
 | `tests/` | The tests: `tests/test_add.py` checks `dotfiles add` |
 | `secret_leaks.toml` | The secret rules, read by `dotfiles scan` and `dotfiles add` |
-| `.githooks/`, `.github/workflows/` | The pre-commit hook, which checks for secrets, and CI, which checks for secrets and runs the tests |
+| `.githooks/`, `.github/workflows/` | The pre-commit hook, which checks for secrets, and CI, which checks for secrets, runs the tests and checks the lint and the types |
 | `pyproject.toml`, `uv.lock` | The package and its dependencies, pinned; everything runs through `uv` |
 | `docs/` | How it works now, the decisions with why, and plans |
 
@@ -186,8 +186,9 @@ The agent the owner talks to is the **lead**; the agents it starts are
 Run this checklist before every commit.
 
 1. The tests pass: `uv run pytest`.
-2. No secret is staged: `git diff --cached` holds no private key, token or
+2. The lint and the types are clean: `uv run ruff check` and `uv run mypy`.
+3. No secret is staged: `git diff --cached` holds no private key, token or
    password.
-3. Every staged file is in English, except the copies of a machine's
+4. Every staged file is in English, except the copies of a machine's
    files, which stay as they are.
-4. `docs/` and `docs/decisions.md` still agree with what changed.
+5. `docs/` and `docs/decisions.md` still agree with what changed.
