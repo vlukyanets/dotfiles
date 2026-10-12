@@ -64,13 +64,14 @@ This repository is public, so the command refuses a file that looks like it
 holds a secret: a known token format (GitHub, AWS, Slack, API keys), a
 private key, or a line like `psk=…` or `password: …`. It names the file,
 the line and the kind of secret, never the value. Keep such a file as a
-template instead. It also warns about a file that others cannot read, since
+template instead: `--template`, below. It also warns about a file that others cannot read, since
 it may hold a secret too. A file or directory closed to you is read
 through one `sudo` helper, started at the first need, so the password is
 asked once.
 
 - `--dry-run` prints what would change and changes nothing.
 - `--force` copies a file even if it looks like it holds a secret.
+- `--template` keeps each file as a template; see [Templates](#templates).
 - `--root DIR` reads the files from `DIR` instead of `/`.
 
 Only regular files are supported; a directory or a symlink is an error.
@@ -152,6 +153,28 @@ psk={{ wifi_home_psk }}
   other file, so one left in it is still caught.
 - A node cannot keep both `x` and `x.tmpl`, and `add` refuses a file kept
   as a template, or one whose name ends in `.tmpl`.
+
+```sh
+uv run dotfiles add --template hyper /etc/NetworkManager/system-connections/home.nmconnection
+```
+
+`add --template` makes the template from the machine's file:
+
+- Each secret the rules find is named by you, asked in the terminal with
+  its place but never its value:
+  `/etc/x:12: wifi-psk, name for it:`. The secret goes into the values
+  file and `{{ name }}` into the template, everywhere the secret is in
+  the file.
+- A secret the values file already has keeps its name, unasked, so a
+  password in two files has one name, and running it again changes
+  nothing.
+- The template is checked for secrets again; if any is left, nothing is
+  written. So is a secret found but not in its line as it is (decoded
+  from base64, say): make that template by hand.
+- A file with no secret is copied as it is, to put placeholders in by hand.
+- `--dry-run` asks nothing: `added nodes/hyper/etc/x.tmpl (2 values to name)`.
+- A file kept as a plain copy is not turned into a template; `git rm` it
+  first.
 
 ## Checking what drifted
 

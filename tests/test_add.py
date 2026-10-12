@@ -1,5 +1,7 @@
 """Tests for dotfiles add, on a fake filesystem with fake owners."""
 
+import base64
+import io
 import os
 from pathlib import Path
 
@@ -7,6 +9,7 @@ import pytest
 from pyfakefs import helpers
 
 from dotfiles import add as add_module
+from dotfiles import template
 from dotfiles.add import Error, add
 from test_install import FakeSudo
 
@@ -23,6 +26,7 @@ def machine(fs, monkeypatch):
     monkeypatch.setattr(add_module, "user_name", NAMES.__getitem__)
     monkeypatch.setattr(add_module, "group_name", NAMES.__getitem__)
     monkeypatch.setattr(add_module, "sudo", FakeSudo())
+    monkeypatch.setenv("XDG_CONFIG_HOME", "/home/alice/.config")
 
     make("/etc", 0o755, ROOT)
     make("/home", 0o755, ROOT)
@@ -276,3 +280,109 @@ def test_refuses_a_file_named_like_a_template():
     make("/etc/x.tmpl", 0o644, ROOT, b"x\n")
     with pytest.raises(Error, match="ending in .tmpl as a template: /etc/x.tmpl"):
         run("/etc/x.tmpl")
+
+
+VALUES = Path("/home/alice/.config/dotfiles/hyper.toml")
+CONF = f"# a config\npsk={GITHUB_SAMPLE}\n".encode()
+
+
+class Terminal(io.StringIO):
+    def isatty(self):
+        return True
+
+
+def names_given(monkeypatch, *answers):
+    """Answers each name asked for in turn, noting the prompts."""
+    left, prompts = list(answers), []
+    monkeypatch.setattr(add_module.sys, "stdin", Terminal())
+
+    def ask(prompt):
+        prompts.append(prompt)
+        return left.pop(0)
+    monkeypatch.setattr("builtins.input", ask)
+    return prompts
+
+
+def test_template_names_each_secret(monkeypatch, capsys):
+    make("/etc/conf", 0o600, ROOT, CONF)
+    prompts = names_given(monkeypatch, "gh_token")
+
+    run("/etc/conf", as_template=True)
+
+    node = REPO / "nodes/hyper"
+    assert (node / "etc/conf.tmpl").read_text() == "# a config\npsk={{ gh_token }}\n"
+    assert not (node / "etc/conf").exists()
+    assert template.read_values(VALUES) == {"gh_token": GITHUB_SAMPLE}
+    assert prompts == ["/etc/conf:2: github-oauth, name for it: "]
+    assert meta() == ["0600 root:root etc/conf.tmpl"]
+    out, err = capsys.readouterr()
+    assert out.splitlines()[0] == "added nodes/hyper/etc/conf.tmpl"
+    assert GITHUB_SAMPLE not in out + err
+
+
+def test_template_takes_the_name_a_value_already_has(monkeypatch, capsys):
+    template.save_value(VALUES, "gh_token", GITHUB_SAMPLE)
+    make("/etc/conf", 0o644, ROOT, CONF)
+    prompts = names_given(monkeypatch)
+
+    run("/etc/conf", as_template=True)
+    capsys.readouterr()
+    run("/etc/conf", as_template=True)
+
+    assert prompts == []
+    assert (REPO / "nodes/hyper/etc/conf.tmpl").read_text() == "# a config\npsk={{ gh_token }}\n"
+    assert capsys.readouterr().out == "unchanged nodes/hyper/etc/conf.tmpl\n"
+
+
+def test_asks_again_for_a_bad_or_taken_name(monkeypatch, capsys):
+    template.save_value(VALUES, "taken", "other")
+    make("/etc/conf", 0o644, ROOT, CONF)
+    prompts = names_given(monkeypatch, "Bad!", "taken", "fresh")
+
+    run("/etc/conf", as_template=True)
+
+    assert len(prompts) == 3
+    assert template.read_values(VALUES) == {"taken": "other", "fresh": GITHUB_SAMPLE}
+    assert "taken is taken" in capsys.readouterr().err
+
+
+def test_template_dry_run_asks_and_writes_nothing(monkeypatch, capsys):
+    make("/etc/conf", 0o644, ROOT, CONF)
+    prompts = names_given(monkeypatch)
+
+    run("/etc/conf", as_template=True, dry_run=True)
+
+    assert prompts == []
+    assert capsys.readouterr().out == "added nodes/hyper/etc/conf.tmpl (1 values to name)\n"
+    assert not (REPO / "nodes").exists()
+    assert not VALUES.exists()
+
+
+def test_template_names_are_asked_only_in_a_terminal(monkeypatch):
+    make("/etc/conf", 0o644, ROOT, CONF)
+    monkeypatch.setattr(add_module.sys, "stdin", io.StringIO())
+
+    with pytest.raises(Error, match="/etc/conf:2: github-oauth: the secret's name is asked in a terminal"):
+        run("/etc/conf", as_template=True)
+    assert not (REPO / "nodes").exists()
+
+
+def test_template_of_a_file_without_secrets_is_its_copy():
+    run("/etc/hosts", as_template=True)
+    assert (REPO / "nodes/hyper/etc/hosts.tmpl").read_bytes() == b"127.0.0.1 localhost\n"
+
+
+def test_template_refuses_a_file_kept_as_a_plain_copy():
+    run("/etc/hosts")
+    with pytest.raises(Error, match="kept as a plain copy, nodes/hyper/etc/hosts; git rm it first"):
+        run("/etc/hosts", as_template=True)
+
+
+def test_template_refuses_a_secret_not_in_its_line_as_it_is(monkeypatch):
+    encoded = base64.b64encode(f"token = {GITHUB_SAMPLE}".encode()).decode()
+    make("/etc/conf", 0o644, ROOT, f"blob: {encoded}\n".encode())
+    names_given(monkeypatch)
+
+    with pytest.raises(Error, match="/etc/conf:1: .*not in the line as it is"):
+        run("/etc/conf", as_template=True)
+    assert not (REPO / "nodes").exists()
