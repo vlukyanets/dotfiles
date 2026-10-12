@@ -46,11 +46,25 @@ def test_family_from_usr_lib(fs):
     assert packages.family() == "arch"
 
 
-@pytest.mark.parametrize("os_release, name", [("ID=fedora\n", "fedora"), ("", "unknown")])
+@pytest.mark.parametrize("os_release, name", [("ID=fedora\n", "fedora"), (None, "one without /etc/os-release")])
 def test_family_unknown_is_an_error(fs, os_release, name):
-    fs.create_file("/etc/os-release", contents=os_release)
-    with pytest.raises(Error, match=f"not supported on this distribution: {name}$"):
+    if os_release is not None:
+        fs.create_file("/etc/os-release", contents=os_release)
+    with pytest.raises(Error, match=f"^only Arch, Debian and the distributions like them are supported, not {name}$"):
         packages.family()
+
+
+@pytest.mark.parametrize("command", [["add", "hyper", "/etc/x"], ["install", "hyper"],
+                                     ["restore", "hyper"], ["status", "hyper"]])
+def test_commands_on_the_machine_refuse_another_distribution(fs, monkeypatch, capsys, command):
+    from dotfiles.cli import main
+
+    fs.create_file("/etc/os-release", contents="ID=fedora\n")
+    fs.create_file("/repo/secret_leaks.toml")
+    monkeypatch.setenv("DOTFILES_REPO", "/repo")
+    monkeypatch.setattr("os.geteuid", lambda: 1000)
+    assert main(command) == 1
+    assert "not fedora" in capsys.readouterr().err
 
 
 def test_installed_on_arch(machine):

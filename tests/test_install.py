@@ -72,6 +72,7 @@ def machine(fs, monkeypatch):
     make("/home/alice", 0o755, ALICE)
     fs.create_dir(NODE)
     fs.create_file(REPO / "secret_leaks.toml")
+    fs.create_file("/usr/lib/os-release", contents="ID=arch\n")  # where /etc lists only what tests put
     yield
     helpers.reset_ids()
 
