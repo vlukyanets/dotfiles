@@ -18,15 +18,37 @@ Why it is built this way: [docs/decisions.md](docs/decisions.md).
 
 ## Setting up
 
+The command works on a clone of this repository. There are two ways to
+have one.
+
+**Installed, like chezmoi.** uv installs the command from GitHub, and
+`init` clones the repository into `~/.local/share/dotfiles` (under
+`$XDG_DATA_HOME` when it is set, or into `$DOTFILES_REPO`):
+
 ```sh
-sudo pacman -S python uv
+sudo pacman -S git uv
+uv tool install git+https://github.com/vlukyanets/dotfiles
+dotfiles init
+dotfiles install --dry-run hyper
+```
+
+- `uv tool upgrade dotfiles` updates the command;
+  `git -C ~/.local/share/dotfiles pull` updates the nodes.
+- `add` writes into the clone; commit and push from there.
+
+**In a clone of your own**, to work on the command itself:
+
+```sh
+sudo pacman -S git uv
+git clone https://github.com/vlukyanets/dotfiles && cd dotfiles
 uv sync
 git config core.hooksPath .githooks
 ```
 
-The last line turns on the pre-commit hook in `.githooks/`. Cloning does
-not turn it on; that is up to you. Without it, nothing stops a secret
-before it is pushed.
+Here `uv run dotfiles …` works on this clone, whatever `$DOTFILES_REPO`
+says. The last line turns on the pre-commit hook in `.githooks/`, in
+either clone. Cloning does not turn it on; that is up to you. Without it,
+nothing stops a secret before it is pushed.
 
 ## Checking for secrets
 
