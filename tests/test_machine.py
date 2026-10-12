@@ -13,7 +13,7 @@ from pyfakefs import helpers
 
 from dotfiles import machine
 from dotfiles.add import Error
-from dotfiles.machine import Local, Sudo, serve
+from dotfiles.machine import Local, Stat, Sudo, serve
 
 ROOT, ALICE = 0, 1000
 PATH = "/d/a b ё"
@@ -68,8 +68,8 @@ def test_local_stat_of_a_missing_path_is_none():
 def test_local_stat_follows_a_symlink_only_when_asked():
     Path(PATH).write_bytes(BYTES)
     os.symlink(PATH, "/d/link")
-    assert stat.S_ISLNK(Local().stat("/d/link")[0])
-    assert stat.S_ISREG(Local().stat("/d/link", follow=True)[0])
+    assert stat.S_ISLNK(Local().stat("/d/link").mode)
+    assert stat.S_ISREG(Local().stat("/d/link", follow=True).mode)
 
 
 def test_serve_answers_each_operation():
@@ -88,8 +88,7 @@ def test_serve_answers_each_operation():
     assert answers[3] == {"ok": b64}
     assert base64.b64decode(answers[3]["ok"]) == BYTES
     assert answers[4:6] == [{"ok": None}] * 2
-    mode, uid, gid = answers[6]["ok"]
-    assert (mode & 0o777, uid, gid) == (0o640, ROOT, ROOT)
+    assert answers[6]["ok"] == {"mode": stat.S_IFREG | 0o640, "uid": ROOT, "gid": ROOT}
     assert os.lstat("/d/sub ё").st_mode & 0o777 == 0o700
 
 
@@ -137,7 +136,7 @@ def test_sudo_starts_one_helper(popen):
     sudo.write(PATH, BYTES, 0o600, ALICE, ALICE)
 
     assert sudo.read(PATH) == BYTES
-    assert sudo.stat(PATH)[1:] == (ALICE, ALICE)
+    assert sudo.stat(PATH) == Stat(stat.S_IFREG | 0o600, ALICE, ALICE)
     assert popen.started == [["sudo", "/py", "-I", "-B", "-m", "dotfiles.machine"]]
 
 

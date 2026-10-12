@@ -37,7 +37,7 @@ def status(repo: Path, node: str, root: Path = Path("/"), verbose: bool = False)
         elif not is_dir and item.machine_data != item.data:
             changed.append(("modified", label))
             modified.append(item)
-        mode, uid, gid = item.st[0] & 0o7777, item.st[1], item.st[2]
+        mode, uid, gid = item.st.mode & 0o7777, item.st.uid, item.st.gid
         if (uid, gid) != (item.uid, item.gid):
             lines.append(("owner", f"{label}  {owner_text(item.uid, item.gid)} → {owner_text(uid, gid)}"))
         if mode != item.mode:
