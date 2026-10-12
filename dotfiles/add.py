@@ -147,6 +147,8 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
         if link:
             raise Error(f"a symlink in the node, not a directory: nodes/{node}/{link};"
                         " dotfiles forget it first")
+        if (repo / plain).is_dir() and not (repo / plain).is_symlink():
+            raise Error(f"{plain} is a directory in the node; dotfiles forget its files first")
         if stat.S_ISLNK(st_mode):
             if as_template:
                 raise Error(f"a symlink cannot be a template: {path}")

@@ -377,6 +377,12 @@ def a_meta_line_for_a_symlink():
     node_meta("0644 root:root etc/l")
 
 
+def a_meta_line_under_a_symlinked_directory_of_the_node():
+    node_file("etc/real/x")
+    node_link("etc/d", str(NODE / "etc/real"))
+    node_meta("0600 root:root etc/d/x")
+
+
 def a_symlink_named_like_a_template():
     node_link("etc/x.tmpl", "/y")
 
@@ -431,6 +437,7 @@ def a_meta_line_with_a_dotdot_part():
         (a_symlink_on_the_way, "a symlink, not a directory: /etc/d"),
         (a_directory_where_a_symlink_goes, "not a symlink or a regular file: /etc/x"),
         (a_meta_line_for_a_symlink, "a symlink has no owner or mode: etc/l"),
+        (a_meta_line_under_a_symlinked_directory_of_the_node, "under a symlink in the node: etc/d/x"),
         (a_symlink_named_like_a_template, "a symlink cannot be a template: etc/x.tmpl"),
         (a_directory_where_a_file_goes, "/etc/x"),
         (a_file_where_a_directory_goes, "/etc/d"),
