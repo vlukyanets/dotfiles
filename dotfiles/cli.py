@@ -8,6 +8,7 @@ from pathlib import Path
 
 from dotfiles import secrets
 from dotfiles.add import Error, add
+from dotfiles.cleanup import cleanup
 from dotfiles.install import install
 
 REPO = Path(__file__).resolve().parents[1]
@@ -39,6 +40,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     install_parser.add_argument("node", help="the node's name, as in nodes/<node>/")
 
+    cleanup_parser = commands.add_parser(
+        "cleanup", help="remove the backups dotfiles install keeps in .backups/"
+    )
+    cleanup_parser.add_argument("--dry-run", action="store_true", help="print the changes, make none")
+    which = cleanup_parser.add_mutually_exclusive_group()
+    which.add_argument("--keep", type=int, metavar="N", help="keep the last N runs of each node")
+    which.add_argument("--older-than", type=int, metavar="DAYS", help="remove only runs older than DAYS")
+
     scan_parser = commands.add_parser(
         "scan", help="find what looks like a secret, by the rules in secret_leaks.toml"
     )
@@ -56,8 +65,10 @@ def main(argv: list[str] | None = None) -> int:
             raise Error("run as your user; sudo is used when needed")
         if args.command == "add":
             add(REPO, args.node, args.paths, root=args.root, dry_run=args.dry_run, force=args.force)
-        else:
+        elif args.command == "install":
             install(REPO, args.node, root=args.root, dry_run=args.dry_run)
+        else:
+            cleanup(REPO, keep=args.keep, older_than=args.older_than, dry_run=args.dry_run)
     except Error as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

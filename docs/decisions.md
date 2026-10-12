@@ -19,3 +19,4 @@ edited row.
 | 12 | `dotfiles install` writes at once and has a `--dry-run`, like `add` | One habit for every command that changes something; the dry run shows what a run would do |
 | 13 | `dotfiles install` changes an existing directory only when `.meta` has its line | A system directory such as `/etc` is never changed by accident |
 | 14 | `dotfiles install` runs as the user, and what the user cannot write goes through one sudo helper over pipes | The password is asked once, and the command itself never runs as root |
+| 15 | `dotfiles cleanup` removes backups by whole runs: all of them, all but the last N of each node (`--keep N`), or those older than N days (`--older-than N`) | Backups are never removed by `install`, so `.backups/` would only grow |
