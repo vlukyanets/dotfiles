@@ -159,25 +159,33 @@ changes nothing else. Run twice, the second run prints nothing.
 | Missing directory | Created | `created /etc/x/` |
 | Directory with a `.meta` line | Owner and mode set to that line | `mode /home/alice/.ssh/ 0755 → 0700` |
 | Directory without one | Left alone | Nothing |
+| Missing symlink | Made | `installed /etc/localtime -> /usr/share/zoneinfo/UTC` |
+| Symlink to the same target | Nothing | Nothing |
+| Symlink to another target, or a file where the node has a symlink, or the other way round | The old one is kept as a backup, then replaced | `updated /etc/localtime -> /usr/share/zoneinfo/UTC (backup …)` |
 
 - A file is written to a temporary file beside it and renamed over the
-  target, so it is never missing or half-written.
+  target, so it is never missing or half-written. So is a symlink.
+- A symlink in the node is put as it is, its target not rewritten and not
+  needed to exist. Its owner is the default, set when it is made and never
+  compared; it has no mode and no `.meta` line. Why:
+  [decision 30](docs/decisions.md).
 - The backup is a copy of the old file, made before it is replaced, in
   `.backups/<node>/<YYYYmmdd-HHMMSS>/` of this repository, at the file's
   path from `/`. The time is when the run started, in local time, so one
   run keeps all its backups in one directory. A copy is yours and 0600;
   the old file's owner and mode are in that directory's `.meta`, a line
-  for each file, in the format of a node's. `.backups/` is closed to others (0700) and ignored by
+  for each file, in the format of a node's. A symlink is kept as a
+  symlink, with no line. `.backups/` is closed to others (0700) and ignored by
   git; `dotfiles restore` puts it back, and `dotfiles cleanup` removes what
   you no longer need.
 - The command runs as you. What you cannot write goes through one
   `sudo` helper, started at the first need, so the password is asked once.
 - The whole plan is built before the first write. The command stops with an
   error, having changed nothing, when a user or group does not exist on the
-  machine, when a target or a directory on the way is a symlink, when a file
-  is not a regular file or a directory is not a directory, when a `.meta`
-  line names a path the node does not have, or when the node or the root
-  does not exist.
+  machine, when a directory on the way is a symlink, when a target is not a
+  regular file or a symlink or a directory is not a directory, when a
+  `.meta` line names a path the node does not have or a symlink, or when
+  the node or the root does not exist.
 - `--dry-run` prints the same lines and changes nothing. It may still read
   through `sudo`.
 - `--root DIR` installs under `DIR` instead of `/`.
@@ -194,11 +202,14 @@ one line each: a pattern of paths from `/`, then the command.
 etc/ssh/sshd_config.d/*          sudo systemctl reload sshd
 etc/systemd/system/*             sudo systemctl daemon-reload
 home/valentinl/.config/waybar/*  systemctl --user restart waybar
+etc/systemd/system/*.wants/*     sudo systemctl daemon-reload
 ```
 
 - After the last write, each command whose pattern matches a file
   installed or updated runs once, in the order of the file, printing
-  `ran <command>`. A change of owner or mode alone runs nothing.
+  `ran <command>`. A change of owner or mode alone runs nothing. A symlink
+  made counts as written; one in `*.wants/` starts nothing by itself, since
+  systemd reads it on `daemon-reload` or at boot.
 - A template matches by its path without `.tmpl`. The pattern is
   [fnmatch](https://docs.python.org/3/library/fnmatch.html)'s, so `*`
   matches a slash too; empty lines and lines starting with `#` are skipped.
@@ -284,6 +295,7 @@ Changes on the machine:
         mode:      /etc/ssh/sshd_config.d/10-local.conf  0600 → 0644
         owner:     /etc/x  root:root → alice:alice
         missing:   /etc/y
+        target:    /etc/localtime  /usr/share/zoneinfo/UTC → /usr/share/zoneinfo/Europe/Berlin
 
 Directories off their defaults, with no .meta line:
   (dotfiles add records them with the next file added under them)
@@ -295,6 +307,9 @@ Directories off their defaults, with no .meta line:
 - A missing directory shows as its missing files.
 - The packages of the node the machine lacks are listed after the changes,
   as `package:   niri`; not with `--root`.
+- `target:` is a symlink pointing elsewhere, or a symlink on one side and a
+  file, shown as `(a file)`, on the other. A symlink's owner and mode are
+  not compared, and a target that does not exist is no difference.
 - The second list is what `install` leaves alone: a directory without a
   `.meta` line whose owner or mode is not the default.
 - `-v` prints the machine's files, secrets and all, except the known
@@ -314,8 +329,8 @@ uv run dotfiles restore hyper /etc/x /etc/y        # only these files, from the 
 A run's directory in `.backups/<node>/` is laid out like a node, its
 `.meta` holding a line for every file, so `restore` puts it back the way
 `install` puts a node: each file at its path with its old owner and mode,
-printing the same lines. The files it replaces are kept in a new run, so a
-restore can be undone too. Files the run does not hold are left alone.
+printing the same lines, a symlink put back as a symlink. The files it
+replaces are kept in a new run, so a restore can be undone too. Files the run does not hold are left alone.
 
 - An argument that starts with `/` is a path; the other one, if any, is the
   run. A path the run does not hold is an error.

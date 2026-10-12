@@ -11,7 +11,9 @@ from test_install import (  # noqa: F401
     machine,
     make,
     node_file,
+    node_link,
     node_meta,
+    own_link,
     snapshot,
 )
 
@@ -141,11 +143,36 @@ def test_compares_another_root(capsys):
 
 
 def test_stops_on_what_install_stops_on():
-    as_root(os.symlink)("hosts", "/etc/x")
-    node_file("etc/x")
+    make("/srv", 0o755, 0)
+    as_root(os.symlink)("/srv", "/etc/d")
+    node_file("etc/d/x")
 
-    with pytest.raises(Error, match="symlinks are not supported: /etc/x"):
+    with pytest.raises(Error, match="a symlink, not a directory: /etc/d"):
         run()
+
+
+def test_shows_where_a_symlink_points(capsys):
+    as_root(os.symlink)("/y", "/etc/a")
+    node_link("etc/a", "/x")
+    make("/etc/b", 0o644, 0, b"new\n")
+    node_link("etc/b", "/x")
+    make("/etc/secret", 0o600, 0, b"secret\n")
+    as_root(os.symlink)("/etc/secret", "/etc/c")
+    node_file("etc/c")
+    node_link("etc/d", "/x")
+    as_root(os.symlink)("/dangling", "/etc/e")
+    own_link("/etc/e", 1000)
+    node_link("etc/e", "/dangling")
+
+    run()
+
+    assert capsys.readouterr().out.endswith(
+        "        target:    /etc/a  /x → /y\n"
+        "        target:    /etc/b  /x → (a file)\n"
+        "        target:    /etc/c  (a file) → /etc/secret\n"
+        "        missing:   /etc/d\n"
+    )
+    assert "read" not in install_module.sudo.calls
 
 
 def test_command_runs_status(capsys):

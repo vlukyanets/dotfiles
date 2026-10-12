@@ -32,6 +32,11 @@ def status(repo: Path, node: str, root: Path = Path("/"), verbose: bool = False)
                 changed.append(("missing", item.path))
             continue
         label = f"{item.path}/" if is_dir else item.path
+        if item.link is not None or item.machine_link is not None:
+            if item.link != item.machine_link:  # A symlink's owner and mode are never compared.
+                node_side, machine_side = item.link or "(a file)", item.machine_link or "(a file)"
+                changed.append(("target", f"{label}  {node_side} → {machine_side}"))
+            continue
         lines = dirs if is_dir and not item.in_meta else changed
         if item.missing:
             changed.append(("unfilled", f"{label}  ({', '.join(item.missing)})"))
