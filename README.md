@@ -147,8 +147,10 @@ psk={{ wifi_home_psk }}
   error instead. `--dry-run` asks nothing and prints
   `unfilled /etc/x (wifi_home_psk)`.
 - `status` fills a template with the values it has and compares the result;
-  one it cannot fill is `unfilled`. `-v` shows no diff of a template, since
-  it would show the values.
+  one it cannot fill is `unfilled`. `-v` diffs the template as it is
+  against the machine's file with each of its values put back as its
+  placeholder (`+++ /etc/x (values hidden)`), so the values it knows are
+  not shown. A value changed on the machine is not one it knows, and shows.
 - A value is never printed. A template is checked for secrets like any
   other file, so one left in it is still caught.
 - A node cannot keep both `x` and `x.tmpl`, and `add` refuses a file kept
@@ -207,8 +209,9 @@ Directories off their defaults, with no .meta line:
 - A missing directory shows as its missing files.
 - The second list is what `install` leaves alone: a directory without a
   `.meta` line whose owner or mode is not the default.
-- `-v` prints the machine's files, secrets and all; a binary file is only
-  named. An agent runs it on a real machine only when the owner asks.
+- `-v` prints the machine's files, secrets and all, except the known
+  values of a template; a binary file is only named. An agent runs it on a
+  real machine only when the owner asks.
 - `--root DIR` compares `DIR` instead of `/`.
 
 ## Removing backups
