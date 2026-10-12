@@ -4,6 +4,7 @@ import base64
 import io
 import json
 import os
+import stat
 from pathlib import Path
 
 import pytest
@@ -61,6 +62,13 @@ def test_local_write_keeps_the_old_file_when_it_fails(monkeypatch):
 
 def test_local_stat_of_a_missing_path_is_none():
     assert Local().stat("/d/missing") is None
+
+
+def test_local_stat_follows_a_symlink_only_when_asked():
+    Path(PATH).write_bytes(BYTES)
+    os.symlink(PATH, "/d/link")
+    assert stat.S_ISLNK(Local().stat("/d/link")[0])
+    assert stat.S_ISREG(Local().stat("/d/link", follow=True)[0])
 
 
 def test_serve_answers_each_operation():

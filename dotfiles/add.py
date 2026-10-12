@@ -11,15 +11,13 @@ import grp
 import pwd
 import re
 import stat
-import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 
 from dotfiles import secrets
+from dotfiles.machine import Error, Sudo
 
-
-class Error(Exception):
-    """A problem with the input or the machine, reported to the user."""
+sudo = Sudo()
 
 
 def user_name(uid: int) -> str:
@@ -30,22 +28,6 @@ def group_name(gid: int) -> str:
     return grp.getgrgid(gid).gr_name
 
 
-def sudo(*args: str) -> bytes:
-    try:
-        return subprocess.run(["sudo", *args], check=True, capture_output=True).stdout
-    except subprocess.CalledProcessError as e:
-        raise Error(f"sudo {' '.join(args)}: {e.stderr.decode().strip()}") from e
-
-
-def sudo_read(path: Path) -> bytes:
-    return sudo("cat", "--", str(path))
-
-
-def sudo_stat(path: Path, follow: bool) -> tuple[int, int, int]:
-    fields = sudo("stat", *(["-L"] if follow else []), "-c", "%f %u %g", "--", str(path)).split()
-    return int(fields[0], 16), int(fields[1]), int(fields[2])
-
-
 def mode_and_ids(path: Path, follow: bool = False) -> tuple[int, int, int]:
     """The st_mode, uid and gid of path, through sudo when a directory on the
     way is closed to the user. Without follow, a symlink is not followed."""
@@ -54,7 +36,10 @@ def mode_and_ids(path: Path, follow: bool = False) -> tuple[int, int, int]:
     except FileNotFoundError:
         raise Error(f"no such file: {path}") from None
     except PermissionError:
-        return sudo_stat(path, follow)
+        found = sudo.stat(str(path), follow)
+        if found is None:
+            raise Error(f"no such file: {path}") from None
+        return found
     return st.st_mode, st.st_uid, st.st_gid
 
 
@@ -92,7 +77,15 @@ def add(
 
     Prints each change; with dry_run, prints them and changes nothing.
     Refuses files that look like they hold a secret, unless force is set.
+    What the user cannot read goes to one sudo helper (machine.Sudo).
     """
+    try:
+        copy(repo, node, paths, root, dry_run, force)
+    finally:
+        sudo.close()
+
+
+def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, force: bool) -> None:
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", node):
         raise Error(f"bad node name: {node}")
     for path in paths:
@@ -115,7 +108,7 @@ def add(
         try:
             contents[path] = src.read_bytes()
         except PermissionError:
-            contents[path] = sudo_read(src)
+            contents[path] = sudo.read(str(src))
         found += secrets.report(path, secrets.find_secrets(config, contents[path], path))
     if found and not force:
         raise Error("these look like secrets; keep the file as a template, "
