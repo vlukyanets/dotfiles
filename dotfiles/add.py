@@ -15,7 +15,7 @@ import sys
 from pathlib import Path, PurePosixPath
 
 from dotfiles import secrets, template
-from dotfiles.machine import Error, Sudo
+from dotfiles.machine import Error, Stat, Sudo
 from dotfiles.template import SUFFIX
 
 sudo = Sudo()
@@ -29,7 +29,7 @@ def group_name(gid: int) -> str:
     return grp.getgrgid(gid).gr_name
 
 
-def mode_and_ids(path: Path, follow: bool = False) -> tuple[int, int, int]:
+def mode_and_ids(path: Path, follow: bool = False) -> Stat:
     """The st_mode, uid and gid of path, through sudo when a directory on the
     way is closed to the user. Without follow, a symlink is not followed."""
     try:
@@ -41,7 +41,7 @@ def mode_and_ids(path: Path, follow: bool = False) -> tuple[int, int, int]:
         if found is None:
             raise Error(f"no such file: {path}") from None
         return found
-    return st.st_mode, st.st_uid, st.st_gid
+    return Stat(st.st_mode, st.st_uid, st.st_gid)
 
 
 def default_owner(key: str) -> str:
@@ -96,7 +96,7 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
     for path in paths:
         if not path.startswith("/"):
             raise Error(f"not an absolute path: {path}")
-        st_mode = mode_and_ids(root / path.lstrip("/"))[0]
+        st_mode = mode_and_ids(root / path.lstrip("/")).mode
         if stat.S_ISLNK(st_mode):
             raise Error(f"symlinks are not supported: {path}")
         if not stat.S_ISREG(st_mode):
@@ -118,7 +118,7 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
     found = []
     for path in paths:
         src = root / path.lstrip("/")
-        if not mode_and_ids(src)[0] & 0o004:
+        if not mode_and_ids(src).mode & 0o004:
             print(f"warning: {path} is closed to others; it may hold a secret, "
                   "check it before committing", file=sys.stderr)
         try:
@@ -153,7 +153,7 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
         rel = path.lstrip("/")
         src = root / rel
         key = rel + SUFFIX if as_template else rel
-        mode = mode_and_ids(src)[0] & 0o7777
+        mode = mode_and_ids(src).mode & 0o7777
         data = contents[path]
         git_mode = 0o755 if mode & 0o100 else 0o644
 
@@ -185,12 +185,11 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
 
 
 def update_meta(
-    meta: dict[str, str], key: str, ids: tuple[int, int, int], default_mode: int
+    meta: dict[str, str], key: str, st: Stat, default_mode: int
 ) -> None:
     """Sets, keeps or removes the line for key, printing a change."""
-    st_mode, uid, gid = ids
-    mode = st_mode & 0o7777
-    owner = f"{user_name(uid)}:{group_name(gid)}"
+    mode = st.mode & 0o7777
+    owner = f"{user_name(st.uid)}:{group_name(st.gid)}"
     if mode == default_mode and owner == default_owner(key):
         if meta.pop(key, None) is not None:
             print(f"meta: removed {key}")

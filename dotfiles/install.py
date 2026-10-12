@@ -69,14 +69,14 @@ def owner_text(uid: int, gid: int) -> str:
 
 
 def replace(path: str, data: bytes, mode: int, uid: int, gid: int, mine: bool,
-            backups: Path, run: Path, rel: str, old: bytes, st) -> None:
+            backups: Path, run: Path, rel: str, old: bytes, st: Stat) -> None:
     """Copies the old file to run/rel as the user's, closed to others, and
     notes its owner and mode in run/.meta; then writes path."""
     backups.mkdir(mode=0o700, exist_ok=True)  # closed: a backup may hold a secret
     (run / rel).parent.mkdir(parents=True, exist_ok=True)
     call("write", str(run / rel), old, 0o600, os.getuid(), os.getgid())
     with open(run / ".meta", "a") as meta:
-        meta.write(f"{st[0] & 0o7777:04o} {owner_text(st[1], st[2])} {rel}\n")
+        meta.write(f"{st.mode & 0o7777:04o} {owner_text(st.uid, st.gid)} {rel}\n")
     call("write", path, data, mode, uid, gid, as_user=mine)
 
 
@@ -167,7 +167,7 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
     for key in sorted(dirs | set(meta_dirs)):
         path = str(root / key)
         st = call("stat", path)
-        if st is not None and not stat.S_ISDIR(st[0]):
+        if st is not None and not stat.S_ISDIR(st.mode):
             raise Error(f"{not_a(st, 'a directory')}: {path}")
         items.append(Item(key, path, *wanted(key, 0o755), key in meta, st))
 
@@ -183,7 +183,7 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
         path = str(root / target)
         git_mode = 0o755 if (node_dir / rel).stat().st_mode & 0o100 else 0o644
         st = call("stat", path)
-        if st is not None and not stat.S_ISREG(st[0]):
+        if st is not None and not stat.S_ISREG(st.mode):
             raise Error(f"{not_a(st, 'a regular file')}: {path}")
         items.append(Item(rel, path, *wanted(rel, git_mode), rel in meta, st,
                           data, call("read", path) if st else b"", missing))
@@ -227,7 +227,7 @@ def make_plan(node_dir: Path, root: Path, values: dict[str, str], run: Path,
 
 
 def not_a(st: Stat, what: str) -> str:
-    return "symlinks are not supported" if stat.S_ISLNK(st[0]) else f"not {what}"
+    return "symlinks are not supported" if stat.S_ISLNK(st.mode) else f"not {what}"
 
 
 def changes(label: str, item: Item):
@@ -235,12 +235,12 @@ def changes(label: str, item: Item):
     plan: list[tuple[str, Callable[[], None]]] = []
     st, path = item.st, item.path
     assert st is not None  # Only a path the machine has is changed.
-    current = st[0] & 0o7777
-    if (st[1], st[2]) != (item.uid, item.gid):
-        if stat.S_ISREG(st[0]):
+    current = st.mode & 0o7777
+    if (st.uid, st.gid) != (item.uid, item.gid):
+        if stat.S_ISREG(st.mode):
             # A chown clears a file's setuid, and its setgid if the group may run it.
             current &= ~(0o4000 | (0o2000 if current & 0o010 else 0))
-        plan.append((f"owner {label} {owner_text(st[1], st[2])} → {owner_text(item.uid, item.gid)}",
+        plan.append((f"owner {label} {owner_text(st.uid, st.gid)} → {owner_text(item.uid, item.gid)}",
                      functools.partial(call, "chown", path, item.uid, item.gid)))
     if current != item.mode:
         plan.append((f"mode {label} {current:04o} → {item.mode:04o}",

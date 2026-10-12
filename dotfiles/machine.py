@@ -11,6 +11,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from dataclasses import asdict, dataclass
 from typing import BinaryIO
 
 
@@ -18,7 +19,11 @@ class Error(Exception):
     """A problem with the input or the machine, reported to the user."""
 
 
-Stat = tuple[int, int, int]  # st_mode (file type bits included), uid, gid
+@dataclass(frozen=True)
+class Stat:
+    mode: int  # st_mode, the file type bits included
+    uid: int
+    gid: int
 
 
 class Local:
@@ -28,7 +33,7 @@ class Local:
             st = os.stat(path, follow_symlinks=follow)
         except FileNotFoundError:
             return None
-        return st.st_mode, st.st_uid, st.st_gid
+        return Stat(st.st_mode, st.st_uid, st.st_gid)
 
     def read(self, path: str) -> bytes:
         with open(path, "rb") as f:
@@ -70,6 +75,8 @@ def serve(machine: Local, requests: BinaryIO, answers: BinaryIO) -> None:
             result = getattr(machine, op)(**request)
             if isinstance(result, bytes):
                 result = base64.b64encode(result).decode()
+            elif isinstance(result, Stat):
+                result = asdict(result)
             answer = {"ok": result}
         except OSError as e:
             answer = {"error": f"{op} {request['path']}: {e.strerror}"}
@@ -110,7 +117,7 @@ class Sudo:
 
     def stat(self, path: str, follow: bool = False) -> Stat | None:
         result = self.call("stat", path=path, follow=follow)
-        return None if result is None else tuple(result)
+        return None if result is None else Stat(**result)
 
     def read(self, path: str) -> bytes:
         return base64.b64decode(self.call("read", path=path))
