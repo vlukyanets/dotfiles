@@ -283,6 +283,13 @@ def test_refuses_a_file_named_like_a_template():
         run("/etc/x.tmpl")
 
 
+
+@pytest.mark.parametrize("name", [".meta", ".hooks"])
+def test_refuses_a_file_named_like_the_nodes_own(name):
+    make(f"/{name}", 0o644, ROOT, b"x\n")
+    with pytest.raises(Error, match=f"a node keeps its own {name} there: /{name}"):
+        run(f"/{name}")
+
 VALUES = Path("/home/alice/.config/dotfiles/hyper.toml")
 CONF = f"# a config\npsk={GITHUB_SAMPLE}\n".encode()
 

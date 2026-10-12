@@ -7,19 +7,21 @@ it again completes it. What the user may do is done as the user; the rest
 goes to one sudo helper (machine.Sudo).
 """
 
+import fnmatch
 import functools
 import grp
 import os
 import pwd
 import re
 import stat
+import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from dotfiles import template
-from dotfiles.add import Error, default_owner, group_name, read_meta, user_name
+from dotfiles.add import OWN, Error, default_owner, group_name, read_meta, user_name
 from dotfiles.machine import Local, Stat, Sudo
 
 local = Local()
@@ -99,7 +101,8 @@ def install(repo: Path, node: str, root: Path = Path("/"), dry_run: bool = False
     node_dir = node_dir_of(repo, node, root)
     try:
         values = template.values_for(node_dir, ask=not dry_run)
-        apply(make_plan(node_dir, root, values, backup_run(repo, node)), dry_run)
+        apply(make_plan(node_dir, root, values, backup_run(repo, node),
+                        hooks=read_hooks(node_dir / ".hooks")), dry_run)
     finally:
         sudo.close()
 
@@ -108,6 +111,30 @@ def backup_run(repo: Path, node: str) -> Path:
     """Where a run keeps the files it replaces, named by its start, so one
     run has one directory."""
     return repo / ".backups" / node / now().strftime(STAMP)
+
+
+def read_hooks(path: Path) -> list[tuple[str, str]]:
+    """The lines of a .hooks file, as (pattern, command): the command runs
+    once install writes a file whose path, from the root and without .tmpl,
+    matches the pattern; fnmatch's, so * matches a slash too."""
+    if not path.exists():
+        return []
+    hooks = []
+    for number, line in enumerate(path.read_text().splitlines(), 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        fields = line.split(None, 1)
+        if len(fields) != 2:
+            raise Error(f"{path}:{number}: not `<pattern> <command>`")
+        hooks.append((fields[0], fields[1].strip()))
+    return hooks
+
+
+def run_hook(command: str) -> None:
+    """Runs command by the shell, as the user; sudo is the command's to ask for."""
+    code = subprocess.run(command, shell=True, check=False).returncode
+    if code:
+        raise Error(f"{command}: exited with {code}")
 
 
 def apply(plan: list[tuple[str, Callable[[], None]]], dry_run: bool) -> None:
@@ -139,7 +166,7 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
     files = sorted(
         rel
         for rel in (str(p.relative_to(node_dir)) for p in node_dir.rglob("*") if p.is_file())
-        if rel != ".meta"
+        if rel not in OWN
     )
     meta: dict[str, tuple[int, str, str]] = {}  # path -> (mode, user, group)
     for key, line in read_meta(node_dir / ".meta").items():
@@ -191,13 +218,16 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
 
 
 def make_plan(node_dir: Path, root: Path, values: dict[str, str], run: Path,
-              keys: set[str] | None = None) -> list[tuple[str, Callable[[], None]]]:
+              keys: set[str] | None = None, hooks: list[tuple[str, str]] | None = None,
+              ) -> list[tuple[str, Callable[[], None]]]:
     """The lines to print and the actions to do, from reading the node and
     the machine; a file replaced is kept in run. With keys, only those files
-    of the node, and the directories above them."""
+    of the node, and the directories above them. Last, each of the hooks
+    whose pattern matches a file written, once."""
     me = (os.getuid(), os.getgid())
     backups = run.parents[1]
     plan: list[tuple[str, Callable[[], None]]] = []
+    written: list[str] = []  # the paths of the files written, from the root
     items = survey(node_dir, root, values)
     if keys is not None:
         items = [item for item in items if item.key in keys
@@ -214,15 +244,24 @@ def make_plan(node_dir: Path, root: Path, values: dict[str, str], run: Path,
         elif item.missing:  # Only in a dry run: a real one has asked for them.
             plan.append((f"unfilled {path} ({', '.join(item.missing)})", lambda: None))
         elif item.st is None:
+            written.append(item.key.removesuffix(template.SUFFIX))
             plan.append((f"installed {path}", functools.partial(
                 call, "write", path, item.data, mode, uid, gid, as_user=mine)))
         elif item.machine_data != item.data:
             rel = item.key.removesuffix(template.SUFFIX)  # the machine's file, not the template
+            written.append(rel)
             plan.append((f"updated {path} (backup {run / rel})", functools.partial(
                 replace, path, item.data, mode, uid, gid, mine, backups, run, rel,
                 item.machine_data, item.st)))
         else:
             plan += changes(path, item)
+    commands = [command for pattern, command in hooks or []
+                if any(fnmatch.fnmatchcase(rel, pattern) for rel in written)]
+    for command in dict.fromkeys(commands):
+        if str(root) != "/":  # Another root is not this machine's running system.
+            plan.append((f"skipped {command} (the root is {root})", lambda: None))
+        else:
+            plan.append((f"ran {command}", functools.partial(run_hook, command)))
     return plan
 
 

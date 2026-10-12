@@ -88,6 +88,20 @@ def test_puts_back_the_last_run_by_default(monkeypatch, capsys):
     assert read("/etc/x") == b"second\n"
 
 
+def test_runs_the_hooks_of_the_node(monkeypatch, capsys):
+    make("/etc/x", 0o644, ROOT, b"old\n")
+    node_file("etc/x")
+    (REPO / "nodes/hyper/.hooks").write_text("etc/x sudo systemctl reload x\n")
+    monkeypatch.setattr(install_module, "run_hook", lambda command: None)
+    installed(monkeypatch, capsys)
+    ran = []
+    monkeypatch.setattr(install_module, "run_hook", ran.append)
+
+    restore(REPO, "hyper")
+
+    assert ran == ["sudo systemctl reload x"]
+
+
 def test_dry_run_changes_nothing(monkeypatch, capsys):
     make("/etc/x", 0o644, ROOT, b"old\n")
     node_file("etc/x")

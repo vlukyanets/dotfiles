@@ -8,7 +8,7 @@ import re
 import shutil
 from pathlib import Path, PurePosixPath
 
-from dotfiles.add import Error, read_meta, write_meta
+from dotfiles.add import OWN, Error, read_meta, write_meta
 from dotfiles.template import SUFFIX
 
 
@@ -24,7 +24,7 @@ def forget(repo: Path, node: str, paths: list[str], dry_run: bool = False) -> No
     for path in paths:
         rel = path.lstrip("/")
         key = next((key for key in (rel, rel + SUFFIX) if (node_dir / key).is_file()), None)
-        if not path.startswith("/") or ".." in PurePosixPath(rel).parts or rel == ".meta" or not key:
+        if not path.startswith("/") or ".." in PurePosixPath(rel).parts or rel in OWN or not key:
             raise Error(f"not in node {node}: {path}")
         if key not in keys:
             keys.append(key)
