@@ -98,3 +98,39 @@ def print_diff(name: str, item: Item, node_dir: Path, values: dict[str, str]) ->
     for line in difflib.unified_diff(old.splitlines(keepends=True), new.splitlines(keepends=True),
                                      name, machine):
         print(line, end="" if line.endswith("\n") else "\n\\ No newline at end of file\n")
+
+
+def drifted(repo: Path, node: str, root: Path = Path("/")) -> tuple[list[str], list[str]]:
+    """The paths, from /, of the files and symlinks of the node that changed
+    on the machine and that add can take back as they are; and a line for
+    each change it cannot: a file missing on the machine, or a template."""
+    node_dir = node_dir_of(repo, node, root)
+    try:
+        items = survey(node_dir, root, read_values(values_path(node)))
+    finally:
+        install.sudo.close()
+    paths: list[str] = []
+    skipped: list[str] = []
+    for item in items:
+        if item.key.endswith("/"):
+            continue
+        path = "/" + item.key.removesuffix(SUFFIX)
+        if item.st is None:
+            skipped.append(f"skipped {path}: missing on the machine; dotfiles forget {node} {path} drops it")
+        elif not differs(item):
+            continue
+        elif item.key.endswith(SUFFIX):
+            skipped.append(f"skipped {path}: a template; dotfiles add --template {node} {path} remakes it")
+        else:
+            paths.append(path)
+    return paths, skipped
+
+
+def differs(item: Item) -> bool:
+    """Whether the machine's file or symlink at item's path differs from the node's."""
+    st = item.st
+    assert st is not None  # Only a path the machine has is compared.
+    if item.link is not None or item.machine_link is not None:
+        return item.link != item.machine_link  # A symlink's owner and mode are never compared.
+    return (bool(item.missing) or item.machine_data != item.data
+            or (st.uid, st.gid) != (item.uid, item.gid) or st.mode & 0o7777 != item.mode)

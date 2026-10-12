@@ -88,6 +88,8 @@ def add(
 ) -> None:
     """Copies each path from root into repo/nodes/<node>/ and updates .meta,
     then adds each of packages, which must be installed, to its .packages.
+    With neither, copies each file and symlink of the node that changed on
+    the machine, and names the changes it cannot copy (status.drifted).
 
     Prints each change; with dry_run, prints them and changes nothing.
     Refuses files that look like they hold a secret, unless force is set.
@@ -97,6 +99,17 @@ def add(
     """
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", node):
         raise Error(f"bad node name: {node}")
+    if not paths and not packages:  # Everything that changed on the machine, as status shows it.
+        if as_template:
+            raise Error("--template needs the paths to make templates of")
+        # Imported here: status imports install, which imports add.
+        from dotfiles.status import drifted
+        paths, skipped = drifted(repo, node, root)
+        for line in skipped:
+            print(line)
+        if not paths:
+            print("nothing differs from the node")
+            return
     if packages:
         have = node_packages.installed()
         if lacking := [name for name in packages if name not in have]:
