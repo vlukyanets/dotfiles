@@ -32,19 +32,21 @@ def find_repo() -> Path:
     return repo
 
 
-def init(url: str = URL, dry_run: bool = False) -> None:
-    """Clones url into clone_dir(), which must be missing or empty.
+def init(url: str = URL, dry_run: bool = False, slim: bool = False) -> None:
+    """Clones url into clone_dir(), which must be missing or empty; with
+    slim, without the old versions of files, which git fetches when asked.
 
     Prints what it does; with dry_run, prints it and does nothing.
     """
     target = clone_dir()
     if target.exists() and (not target.is_dir() or any(target.iterdir())):
         raise Error(f"already there, and not empty: {target}")
-    print(f"cloned {url} into {target}")
+    print(f"cloned {url} into {target}{' (slim)' if slim else ''}")
     if dry_run:
         return
     try:
-        subprocess.run(["git", "clone", "--quiet", url, str(target)],
+        subprocess.run(["git", "clone", "--quiet", *(["--filter=blob:none"] if slim else []),
+                        url, str(target)],
                        check=True, capture_output=True, text=True)
     except FileNotFoundError:
         raise Error("git is needed to clone the repository") from None

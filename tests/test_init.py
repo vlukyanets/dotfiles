@@ -54,6 +54,14 @@ def test_init_clones_into_the_default_place(no_checkout, git, capsys):
     assert capsys.readouterr().out == f"cloned {URL} into {target}\n"
 
 
+def test_init_slim_leaves_old_versions_on_the_server(no_checkout, git, capsys):
+    init(slim=True)
+
+    target = str(clone_dir())
+    assert git == [["git", "clone", "--quiet", "--filter=blob:none", URL, target]]
+    assert capsys.readouterr().out == f"cloned {URL} into {target} (slim)\n"
+
+
 def test_init_dry_run_clones_nothing(no_checkout, git, capsys):
     init("https://example.org/other", dry_run=True)
 
