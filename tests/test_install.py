@@ -65,11 +65,13 @@ def machine(fs, monkeypatch):
     monkeypatch.setattr(install_module, "now", lambda: datetime(2026, 10, 11, 21, 30, 0))
     monkeypatch.setattr(install_module, "sudo", FakeSudo())
     monkeypatch.setenv("XDG_CONFIG_HOME", "/home/alice/.config")
+    monkeypatch.setenv("DOTFILES_REPO", str(REPO))  # for the command, see dotfiles.init
 
     make("/etc", 0o755, ROOT)
     make("/home", 0o755, ROOT)
     make("/home/alice", 0o755, ALICE)
     fs.create_dir(NODE)
+    fs.create_file(REPO / "secret_leaks.toml")
     yield
     helpers.reset_ids()
 

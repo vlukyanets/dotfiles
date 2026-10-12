@@ -27,6 +27,7 @@ def machine(fs, monkeypatch):
     monkeypatch.setattr(add_module, "group_name", NAMES.__getitem__)
     monkeypatch.setattr(add_module, "sudo", FakeSudo())
     monkeypatch.setenv("XDG_CONFIG_HOME", "/home/alice/.config")
+    monkeypatch.setenv("DOTFILES_REPO", str(REPO))  # for the command, see dotfiles.init
 
     make("/etc", 0o755, ROOT)
     make("/home", 0o755, ROOT)
@@ -241,7 +242,7 @@ def test_command_reports_an_error(capsys):
     from dotfiles.cli import main
 
     assert main(["add", "hyper", "etc/hosts"]) == 1
-    assert capsys.readouterr().err.startswith("error: ")
+    assert capsys.readouterr().err == "error: not an absolute path: etc/hosts\n"
 
 
 # Built from pieces, so that secret scanners do not flag this file. The

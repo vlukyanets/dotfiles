@@ -9,11 +9,10 @@ from pathlib import Path
 from dotfiles import secrets
 from dotfiles.add import Error, add
 from dotfiles.cleanup import cleanup
+from dotfiles.init import URL, find_repo, init
 from dotfiles.install import install
 from dotfiles.restore import restore
 from dotfiles.status import status
-
-REPO = Path(__file__).resolve().parents[1]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -61,6 +60,12 @@ def main(argv: list[str] | None = None) -> int:
              " then the absolute paths to put back, all of them if none is given",
     )
 
+    init_parser = commands.add_parser(
+        "init", help="clone the repository for an installed command, as chezmoi does"
+    )
+    init_parser.add_argument("--dry-run", action="store_true", help="print the changes, make none")
+    init_parser.add_argument("url", nargs="?", default=URL, help=f"the repository, {URL} by default")
+
     status_parser = commands.add_parser(
         "status", help="show what on the machine differs from nodes/<node>/"
     )
@@ -90,38 +95,42 @@ def main(argv: list[str] | None = None) -> int:
                       help="a file, or a directory to scan file by file")
 
     args = parser.parse_args(argv)
-    if args.command == "scan":
-        return scan(args)
     try:
+        if args.command == "init":
+            init(args.url, dry_run=args.dry_run)
+            return 0
+        repo = find_repo()
+        if args.command == "scan":
+            return scan(args, repo)
         if os.geteuid() == 0:
             raise Error("run as your user; sudo is used when needed")
         if args.command == "add":
-            add(REPO, args.node, args.paths, root=args.root, dry_run=args.dry_run, force=args.force,
+            add(repo, args.node, args.paths, root=args.root, dry_run=args.dry_run, force=args.force,
                 as_template=args.template)
         elif args.command == "install":
-            install(REPO, args.node, root=args.root, dry_run=args.dry_run)
+            install(repo, args.node, root=args.root, dry_run=args.dry_run)
         elif args.command == "restore":
             runs = [arg for arg in args.backup if not arg.startswith("/")]
             if len(runs) > 1:
                 raise Error(f"one run at most: {' '.join(runs)}")
-            restore(REPO, args.node, runs[0] if runs else None,
+            restore(repo, args.node, runs[0] if runs else None,
                     [arg for arg in args.backup if arg.startswith("/")],
                     root=args.root, dry_run=args.dry_run)
         elif args.command == "status":
-            status(REPO, args.node, root=args.root, verbose=args.verbose)
+            status(repo, args.node, root=args.root, verbose=args.verbose)
         else:
-            cleanup(REPO, keep=args.keep, older_than=args.older_than, dry_run=args.dry_run)
+            cleanup(repo, keep=args.keep, older_than=args.older_than, dry_run=args.dry_run)
     except Error as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     return 0
 
 
-def scan(args: argparse.Namespace) -> int:
-    config = secrets.load(REPO / "secret_leaks.toml")
+def scan(args: argparse.Namespace, repo: Path) -> int:
+    config = secrets.load(repo / "secret_leaks.toml")
     if args.staged or args.history:
         try:
-            findings = (secrets.scan_staged if args.staged else secrets.scan_history)(config, REPO)
+            findings = (secrets.scan_staged if args.staged else secrets.scan_history)(config, repo)
         except subprocess.CalledProcessError as e:
             print(f"error: git: {e.stderr.strip()}", file=sys.stderr)
             return 2
