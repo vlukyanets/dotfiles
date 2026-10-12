@@ -50,7 +50,7 @@ def decode_base64(value: str) -> str:
     if not any(c in "0123456789+/-_" for c in value):
         return ""
     # Go's StdEncoding, then RawURLEncoding (no padding allowed).
-    tries = [(value, None)]
+    tries: list[tuple[str, bytes | None]] = [(value, None)]
     if not any(c in "+/=" for c in value):
         tries.append((value + "=" * (-len(value) % 4), b"-_"))
     for text, altchars in tries:
@@ -77,7 +77,7 @@ def decode_unicode(value: str) -> str:
     # A run the encodings pattern finds is all U+XXXX code points or all
     # \uXXXX escapes, so there is no one-at-a-time fallback.
     for pattern, decode in (
-        (MULTI_CODE_POINT, lambda s: "".join(rune(int(cp[2:], 16)) for cp in s.split()
+        (MULTI_CODE_POINT, lambda s: "".join(rune(int(cp.removeprefix("U+"), 16)) for cp in s.split()
                                              if cp.startswith("U+") and len(cp) >= 6)),
         (MULTI_ESCAPE, lambda s: "".join(rune(int(h, 16)) for h in ESCAPE.findall(s))),
     ):

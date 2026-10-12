@@ -260,7 +260,7 @@ def test_scan_history_finds_a_secret_a_later_commit_removed(tmp_path):
     git(tmp_path, "add", "conf")
     git(tmp_path, *commit)
     first = subprocess.run(["git", "-C", str(tmp_path), "rev-parse", "HEAD"],
-                           capture_output=True, text=True).stdout[:12]
+                           check=True, capture_output=True, text=True).stdout[:12]
     (tmp_path / "conf").write_text("ok\n")
     git(tmp_path, "add", "conf")
     git(tmp_path, *commit)

@@ -6,6 +6,7 @@ import json
 import os
 import stat
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from pyfakefs import helpers
@@ -101,7 +102,7 @@ def test_serve_answers_an_error():
 class FakePopen:
     """A sudo helper whose pipes run serve on the fake filesystem."""
 
-    started = []
+    started: ClassVar[list[list[str]]] = []
     returncode = None
 
     def __init__(self, argv, stdin, stdout):

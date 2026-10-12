@@ -14,9 +14,8 @@ import stat
 import sys
 from pathlib import Path, PurePosixPath
 
-from dotfiles import secrets
+from dotfiles import secrets, template
 from dotfiles.machine import Error, Sudo
-from dotfiles import template
 from dotfiles.template import SUFFIX
 
 sudo = Sudo()

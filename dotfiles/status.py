@@ -21,7 +21,9 @@ def status(repo: Path, node: str, root: Path = Path("/"), verbose: bool = False)
     finally:
         install.sudo.close()
 
-    changed, dirs, modified = [], [], []
+    changed: list[tuple[str, str]] = []
+    dirs: list[tuple[str, str]] = []
+    modified: list[Item] = []
     for item in items:
         is_dir = item.key.endswith("/")
         if item.st is None:
@@ -70,8 +72,8 @@ def print_diff(name: str, item: Item, node_dir: Path, values: dict[str, str]) ->
     try:
         old, new = item.data.decode(), item.machine_data.decode()
     except UnicodeDecodeError:
-        old = new = None
-    if old is None or "\0" in old + new:
+        old = new = "\0"
+    if "\0" in old + new:
         print(f"Binary files {name} and {item.path} differ")
         return
     machine = item.path

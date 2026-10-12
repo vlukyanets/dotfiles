@@ -116,9 +116,9 @@ class Item:
     gid: int
     in_meta: bool
     st: Stat | None  # None when the machine does not have it
-    data: bytes | None = None  # a file's contents in the node, a template's filled
-    machine_data: bytes | None = None  # and on the machine
-    missing: tuple[str, ...] = ()  # the values a template lacks; data is None then
+    data: bytes = b""  # a file's contents in the node, a template's filled
+    machine_data: bytes = b""  # and on the machine
+    missing: tuple[str, ...] = ()  # the values a template lacks; data is empty then
 
 
 def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
@@ -129,7 +129,7 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
         for rel in (str(p.relative_to(node_dir)) for p in node_dir.rglob("*") if p.is_file())
         if rel != ".meta"
     )
-    meta = {}  # path -> (mode, user, group)
+    meta: dict[str, tuple[int, str, str]] = {}  # path -> (mode, user, group)
     for key, line in read_meta(node_dir / ".meta").items():
         mode, owner, _ = line.split(" ", 2)
         user, _, group = owner.partition(":")
@@ -142,7 +142,10 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
         meta[key] = (int(mode, 8), user, group)
 
     def wanted(key: str, default_mode: int) -> tuple[int, int, int]:
-        mode, user, group = meta.get(key, (default_mode, *default_owner(key).split(":")))
+        if key in meta:
+            mode, user, group = meta[key]
+        else:
+            mode, (user, group) = default_mode, default_owner(key).split(":")
         return mode, uid_of(user), gid_of(group)
 
     items = []
@@ -160,18 +163,18 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
         target = rel.removesuffix(template.SUFFIX)
         if target != rel and target in files:
             raise Error(f"{node_dir}: both {target} and its template {rel}")
-        data, missing = (node_dir / rel).read_bytes(), ()
+        data, missing = (node_dir / rel).read_bytes(), tuple[str, ...]()
         if target != rel:
             text = template.text_of(node_dir / rel)
             missing = tuple(name for name in template.names(text) if name not in values)
-            data = None if missing else template.fill(text, values).encode()
+            data = b"" if missing else template.fill(text, values).encode()
         path = str(root / target)
         git_mode = 0o755 if (node_dir / rel).stat().st_mode & 0o100 else 0o644
         st = call("stat", path)
         if st is not None and not stat.S_ISREG(st[0]):
             raise Error(f"{not_a(st, 'a regular file')}: {path}")
         items.append(Item(rel, path, *wanted(rel, git_mode), rel in meta, st,
-                          data, call("read", path) if st else None, missing))
+                          data, call("read", path) if st else b"", missing))
     return items
 
 
@@ -180,7 +183,7 @@ def make_plan(node_dir: Path, root: Path, values: dict[str, str]) -> list[tuple[
     me = (os.getuid(), os.getgid())
     stamp = now().strftime("%Y%m%d-%H%M%S")  # the start, so one run has one directory
     backups = node_dir.parents[1] / ".backups"
-    plan = []
+    plan: list[tuple[str, Callable[[], None]]] = []
     for item in survey(node_dir, root, values):
         path, mode, uid, gid = item.path, item.mode, item.uid, item.gid
         mine = (uid, gid) == me
@@ -212,8 +215,9 @@ def not_a(st: Stat, what: str) -> str:
 
 def changes(label: str, item: Item):
     """The chown and chmod that bring item's path to its wanted owner and mode."""
-    plan = []
+    plan: list[tuple[str, Callable[[], None]]] = []
     st, path = item.st, item.path
+    assert st is not None  # Only a path the machine has is changed.
     current = st[0] & 0o7777
     if (st[1], st[2]) != (item.uid, item.gid):
         if stat.S_ISREG(st[0]):

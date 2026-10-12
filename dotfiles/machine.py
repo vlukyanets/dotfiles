@@ -94,6 +94,7 @@ class Sudo:
         if "data" in args:
             args["data"] = base64.b64encode(args["data"]).decode()
         line = json.dumps({"op": op, **args}).encode() + b"\n"
+        assert self.helper.stdin and self.helper.stdout  # Both are pipes, so never None.
         try:
             self.helper.stdin.write(line)
             self.helper.stdin.flush()
@@ -129,7 +130,8 @@ class Sudo:
     def close(self) -> None:
         if self.helper is not None:
             try:
-                self.helper.stdin.close()
+                if self.helper.stdin:
+                    self.helper.stdin.close()
             except BrokenPipeError:  # the helper is gone; its unsent bytes are moot
                 pass
             self.helper.wait()

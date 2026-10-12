@@ -9,7 +9,14 @@ import pytest
 
 from dotfiles import template
 from dotfiles.add import Error
-from dotfiles.template import fill, names, read_values, save_value, toml_string, values_for
+from dotfiles.template import (
+    fill,
+    names,
+    read_values,
+    save_value,
+    toml_string,
+    values_for,
+)
 
 CONFIG = Path("/home/alice/.config")
 VALUES = CONFIG / "dotfiles/hyper.toml"

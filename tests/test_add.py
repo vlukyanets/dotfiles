@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 from pyfakefs import helpers
+from test_install import FakeSudo
 
 from dotfiles import add as add_module
 from dotfiles import template
 from dotfiles.add import Error, add
-from test_install import FakeSudo
 
 REPO = Path("/repo")
 ROOT, ALICE = 0, 1000
