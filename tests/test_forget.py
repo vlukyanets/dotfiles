@@ -103,3 +103,27 @@ def test_command(monkeypatch, fs, capsys):
     monkeypatch.setattr(os, "geteuid", lambda: 1000)
     assert main(["forget", "--dry-run", "hyper", "/etc/ssh/ssh_host_ed25519_key"]) == 0
     assert capsys.readouterr().out.startswith("removed nodes/hyper/etc/ssh/ssh_host_ed25519_key\n")
+
+
+def test_removes_packages(capsys):
+    (NODE / ".packages").write_text("niri\nparu\n")
+
+    forget(REPO, "hyper", [], packages=["niri"])
+    assert (NODE / ".packages").read_text() == "paru\n"
+    forget(REPO, "hyper", [], packages=["paru"])
+    assert not (NODE / ".packages").exists()
+    assert capsys.readouterr().out == "removed package niri\nremoved package paru\n"
+
+
+def test_refuses_a_package_not_listed():
+    (NODE / ".packages").write_text("niri\n")
+    with pytest.raises(Error, match="^not in node hyper: package nope$"):
+        forget(REPO, "hyper", ["/etc/ssh/ssh_host_ed25519_key"], packages=["niri", "nope"])
+    assert (NODE / ".packages").read_text() == "niri\n"
+    assert (NODE / "etc/ssh/ssh_host_ed25519_key").exists()
+
+
+def test_dry_run_keeps_packages(capsys):
+    (NODE / ".packages").write_text("niri\n")
+    forget(REPO, "hyper", [], packages=["niri"], dry_run=True)
+    assert (NODE / ".packages").read_text() == "niri\n"

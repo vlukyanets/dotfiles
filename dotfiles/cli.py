@@ -36,14 +36,18 @@ def main(argv: list[str] | None = None) -> int:
         "--root", type=Path, default=Path("/"), help="read the files from ROOT instead of /"
     )
     add_parser.add_argument("node", help="the node's name, as in nodes/<node>/")
-    add_parser.add_argument("paths", nargs="+", metavar="path", help="an absolute path on the machine")
+    add_parser.add_argument("paths", nargs="*", metavar="path", help="an absolute path on the machine")
+    add_parser.add_argument("--package", nargs="+", default=[], metavar="name", dest="packages",
+                            help="add installed packages to nodes/<node>/.packages; after the paths")
 
     forget_parser = commands.add_parser(
         "forget", help="remove files from nodes/<node>/ and their .meta lines; the machine keeps them"
     )
     forget_parser.add_argument("--dry-run", action="store_true", help="print the changes, make none")
     forget_parser.add_argument("node", help="the node's name, as in nodes/<node>/")
-    forget_parser.add_argument("paths", nargs="+", metavar="path", help="an absolute path on the machine")
+    forget_parser.add_argument("paths", nargs="*", metavar="path", help="an absolute path on the machine")
+    forget_parser.add_argument("--package", nargs="+", default=[], metavar="name", dest="packages",
+                               help="remove packages from nodes/<node>/.packages; after the paths")
 
     install_parser = commands.add_parser(
         "install", help="put nodes/<node>/ onto the machine, with its owners and modes"
@@ -107,6 +111,8 @@ def main(argv: list[str] | None = None) -> int:
                       help="a file, or a directory to scan file by file")
 
     args = parser.parse_args(argv)
+    if args.command in ("add", "forget") and not args.paths and not args.packages:
+        parser.error(f"{args.command}: give a path or --package")
     try:
         if args.command == "init":
             init(args.url, dry_run=args.dry_run, slim=args.slim)
@@ -118,9 +124,9 @@ def main(argv: list[str] | None = None) -> int:
             raise Error("run as your user; sudo is used when needed")
         if args.command == "add":
             add(repo, args.node, args.paths, root=args.root, dry_run=args.dry_run, force=args.force,
-                as_template=args.template)
+                as_template=args.template, packages=args.packages)
         elif args.command == "forget":
-            forget(repo, args.node, args.paths, dry_run=args.dry_run)
+            forget(repo, args.node, args.paths, dry_run=args.dry_run, packages=args.packages)
         elif args.command == "install":
             install(repo, args.node, root=args.root, dry_run=args.dry_run)
         elif args.command == "restore":

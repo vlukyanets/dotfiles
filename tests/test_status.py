@@ -195,3 +195,28 @@ def test_verbose_shows_a_template_diff_with_its_values_hidden(capsys):
         "-mode=a\n"
         "+mode=b\n"
     )
+
+
+def test_lists_the_packages_the_machine_lacks(monkeypatch, capsys):
+    from dotfiles import packages
+    monkeypatch.setattr(packages, "installed", lambda: {"base"})
+    (REPO / "nodes/hyper/.packages").write_text("base\nniri\n")
+
+    run()
+
+    assert capsys.readouterr().out == (
+        "Node hyper, root /\n"
+        "\nPackages the machine lacks:\n"
+        "  (dotfiles install hyper installs them; dotfiles forget hyper --package <name> drops them)\n"
+        "        package:   niri\n")
+
+
+def test_another_root_has_no_packages_to_lack(monkeypatch, capsys):
+    from dotfiles import packages
+    monkeypatch.setattr(packages, "installed", lambda: set())
+    (REPO / "nodes/hyper/.packages").write_text("niri\n")
+    make("/srv", 0o755, 0)
+
+    run(root=Path("/srv"))
+
+    assert capsys.readouterr().out.endswith("Nothing differs from the node.\n")

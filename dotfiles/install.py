@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
-from dotfiles import template
+from dotfiles import packages, template
 from dotfiles.add import OWN, Error, default_owner, group_name, read_meta, user_name
 from dotfiles.machine import Local, Stat, Sudo
 
@@ -99,6 +99,8 @@ def install(repo: Path, node: str, root: Path = Path("/"), dry_run: bool = False
     Prints each change; with dry_run, prints them and changes nothing.
     """
     node_dir = node_dir_of(repo, node, root)
+    # First, as a package may bring a user or a directory the files need.
+    apply(packages.plan(node_dir, root), dry_run)
     try:
         values = template.values_for(node_dir, ask=not dry_run)
         apply(make_plan(node_dir, root, values, backup_run(repo, node),

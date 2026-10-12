@@ -7,7 +7,7 @@ from what the node has to what the machine has. Nothing is written.
 import difflib
 from pathlib import Path
 
-from dotfiles import install
+from dotfiles import install, packages
 from dotfiles.install import Item, node_dir_of, owner_text, survey
 from dotfiles.template import SUFFIX, names, read_values, text_of, values_path
 
@@ -20,6 +20,7 @@ def status(repo: Path, node: str, root: Path = Path("/"), verbose: bool = False)
         items = survey(node_dir, root, values)
     finally:
         install.sudo.close()
+    lacking = packages.missing(node_dir) if str(root) == "/" else []
 
     changed: list[tuple[str, str]] = []
     dirs: list[tuple[str, str]] = []
@@ -44,12 +45,17 @@ def status(repo: Path, node: str, root: Path = Path("/"), verbose: bool = False)
             lines.append(("mode", f"{label}  {item.mode:04o} → {mode:04o}"))
 
     print(f"Node {node}, root {root}")
-    if not changed and not dirs:
+    if not changed and not dirs and not lacking:
         print("Nothing differs from the node.")
     if changed:
         print(f"\nChanges on the machine:\n"
               f"  (dotfiles add {node} <path> keeps them; dotfiles install {node} undoes them)")
         print_lines(changed)
+    if lacking:
+        print(f"\nPackages the machine lacks:\n"
+              f"  (dotfiles install {node} installs them;"
+              f" dotfiles forget {node} --package <name> drops them)")
+        print_lines([("package", name) for name in lacking])
     if dirs:
         print("\nDirectories off their defaults, with no .meta line:\n"
               "  (dotfiles add records them with the next file added under them)")

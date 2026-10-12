@@ -112,6 +112,31 @@ with its line in `.meta`, and so does it for each directory of the node
 left with no files. The machine keeps the file. `--dry-run` prints what
 would change and changes nothing.
 
+## Packages
+
+`nodes/<node>/.packages` lists the packages of the node, a name per line.
+A node is one machine, so the names are those of its distribution:
+
+| Distribution, by `ID` or `ID_LIKE` in `/etc/os-release` | Installed | Installed with |
+|---|---|---|
+| `arch` | `pacman -Qq` | `paru -S --needed`, as you; without paru, `sudo pacman -S --needed` |
+| `debian` (Ubuntu too) | `dpkg-query -W`, status `ii` | `sudo apt-get install` |
+
+```sh
+uv run dotfiles add hyper --package niri paru     # must be installed
+uv run dotfiles forget hyper --package niri       # the machine keeps it
+uv run dotfiles add hyper /etc/hosts --package vim  # paths first
+```
+
+- `install` installs the packages the machine lacks first, in one command,
+  printing `installed packages niri waybar`, since a package may bring a
+  user or a directory the files need. With `--dry-run` it only prints;
+  with `--root` other than `/` it prints `skipped packages`.
+- A package the machine has and the list lacks is left alone and is not
+  listed: cleaning packages up is yours.
+- paru and apt ask before they install; nothing answers for you.
+- An AUR package needs paru; without it, pacman fails on it.
+
 ## Installing a node
 
 ```sh
@@ -155,8 +180,7 @@ changes nothing else. Run twice, the second run prints nothing.
   through `sudo`.
 - `--root DIR` installs under `DIR` instead of `/`.
 
-It does not remove what the node lacks, show diffs, or install packages and
-services.
+It does not remove what the node lacks, show diffs, or enable services.
 
 ### Running commands after a file changes
 
@@ -267,6 +291,8 @@ Directories off their defaults, with no .meta line:
 - It reads what `install` reads, through `sudo` when needed, and stops on
   the same errors.
 - A missing directory shows as its missing files.
+- The packages of the node the machine lacks are listed after the changes,
+  as `package:   niri`; not with `--root`.
 - The second list is what `install` leaves alone: a directory without a
   `.meta` line whose owner or mode is not the default.
 - `-v` prints the machine's files, secrets and all, except the known

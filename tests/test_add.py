@@ -394,3 +394,41 @@ def test_template_refuses_a_secret_not_in_its_line_as_it_is(monkeypatch):
     with pytest.raises(Error, match="/etc/conf:1: .*not in the line as it is"):
         run("/etc/conf", as_template=True)
     assert not (REPO / "nodes").exists()
+
+
+@pytest.fixture
+def installed(monkeypatch):
+    """The packages of this machine."""
+    from dotfiles import packages
+    monkeypatch.setattr(packages, "installed", lambda: {"niri", "paru", "vim"})
+
+
+def test_adds_installed_packages(installed, capsys):
+    run(packages=["paru", "niri"])
+    run("/etc/hosts", packages=["vim", "niri", "vim"])
+
+    assert (REPO / "nodes/hyper/.packages").read_text() == "niri\nparu\nvim\n"
+    assert (REPO / "nodes/hyper/etc/hosts").exists()
+    assert capsys.readouterr().out == (
+        "added package paru\nadded package niri\n"
+        "added nodes/hyper/etc/hosts\nadded package vim\nunchanged package niri\n")
+
+
+def test_refuses_a_package_not_installed(installed):
+    with pytest.raises(Error, match="^not installed: nope, gone$"):
+        run("/etc/hosts", packages=["niri", "nope", "gone"])
+    assert not (REPO / "nodes/hyper").exists()
+
+
+def test_dry_run_adds_no_package(installed, capsys):
+    run(packages=["niri"], dry_run=True)
+    assert not (REPO / "nodes/hyper").exists()
+    assert capsys.readouterr().out == "added package niri\n"
+
+
+def test_command_needs_a_path_or_a_package(capsys):
+    from dotfiles.cli import main
+
+    with pytest.raises(SystemExit):
+        main(["add", "hyper"])
+    assert "give a path or --package" in capsys.readouterr().err
