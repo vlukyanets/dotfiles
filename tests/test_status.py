@@ -4,12 +4,21 @@ import os
 from pathlib import Path
 
 import pytest
+from test_install import (  # noqa: F401
+    REPO,
+    VALUES,
+    as_root,
+    machine,
+    make,
+    node_file,
+    node_meta,
+    snapshot,
+)
 
 from dotfiles import install as install_module
 from dotfiles import template
 from dotfiles.add import Error
 from dotfiles.status import status
-from test_install import REPO, VALUES, as_root, machine, make, node_file, node_meta, snapshot  # noqa: F401
 
 
 def run(**kwargs):

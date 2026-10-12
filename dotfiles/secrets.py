@@ -151,7 +151,7 @@ def find_values(config: Config, text: str, path: str) -> list[tuple[int, str, st
         return []
     newlines = [m.start() for m in re.finditer("\n", text)]
     findings: list[tuple[int, str, str]] = []  # line, rule id, secret
-    current, segments = text, []
+    current, segments = text, list[decode.Segment]()
     decoder = decode.Decoder()
     for depth in range(MAX_DECODE_DEPTH + 1):
         lower = current.lower()
@@ -241,9 +241,9 @@ def added_hunks(diff: str) -> Iterator[tuple[str, int, str]]:
     `git diff -U0` adds."""
     path = ""
     header = False  # Between `diff --git` and the first hunk, where +++ is the path.
-    start, lines = 0, []
+    start, lines = 0, list[str]()
     for line in diff.splitlines():
-        if line.startswith("diff --git ") or line.startswith("@@ "):
+        if line.startswith(("diff --git ", "@@ ")):
             if lines:
                 yield path, start, "\n".join(lines)
             lines = []
@@ -257,7 +257,8 @@ def added_hunks(diff: str) -> Iterator[tuple[str, int, str]]:
         elif line.startswith("@@ "):
             header = False
             # @@ -old[,count] +new[,count] @@
-            start = int(re.match(r"@@ -\S+ \+(\d+)", line)[1])
+            hunk = re.match(r"@@ -\S+ \+(\d+)", line)
+            start = int(hunk[1]) if hunk else 0
         elif not header and line.startswith("+"):
             lines.append(line[1:])
     if lines:
