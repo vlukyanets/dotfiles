@@ -9,14 +9,15 @@ from pathlib import Path
 
 from dotfiles import install
 from dotfiles.install import Item, node_dir_of, owner_text, survey
-from dotfiles.template import SUFFIX, read_values, values_path
+from dotfiles.template import SUFFIX, names, read_values, text_of, values_path
 
 
 def status(repo: Path, node: str, root: Path = Path("/"), verbose: bool = False) -> None:
     """Prints what differs; with verbose, a diff of each modified file too."""
     node_dir = node_dir_of(repo, node, root)
     try:
-        items = survey(node_dir, root, read_values(values_path(node)))
+        values = read_values(values_path(node))
+        items = survey(node_dir, root, values)
     finally:
         install.sudo.close()
 
@@ -54,7 +55,7 @@ def status(repo: Path, node: str, root: Path = Path("/"), verbose: bool = False)
     if verbose:
         for item in modified:
             print()
-            print_diff(f"nodes/{node}/{item.key}", item)
+            print_diff(f"nodes/{node}/{item.key}", item, node_dir, values)
 
 
 def print_lines(lines: list[tuple[str, str]]) -> None:
@@ -62,10 +63,10 @@ def print_lines(lines: list[tuple[str, str]]) -> None:
         print(f"        {kind + ':':<11}{text}")
 
 
-def print_diff(name: str, item: Item) -> None:
-    if item.key.endswith(SUFFIX):  # Its diff would show the values filled in.
-        print(f"Template {name} and {item.path} differ; the diff would show its values")
-        return
+def print_diff(name: str, item: Item, node_dir: Path, values: dict[str, str]) -> None:
+    """A unified diff from the node's file to the machine's. For a template,
+    from the template as it is to the machine's file with each of its values
+    put back as its placeholder, so no value it knows is shown."""
     try:
         old, new = item.data.decode(), item.machine_data.decode()
     except UnicodeDecodeError:
@@ -73,6 +74,14 @@ def print_diff(name: str, item: Item) -> None:
     if old is None or "\0" in old + new:
         print(f"Binary files {name} and {item.path} differ")
         return
+    machine = item.path
+    if item.key.endswith(SUFFIX):
+        old = text_of(node_dir / item.key)
+        # The longest first, so a value inside another one is not put back alone.
+        for placeholder in sorted(names(old), key=lambda n: len(values[n]), reverse=True):
+            if values[placeholder]:
+                new = new.replace(values[placeholder], f"{{{{ {placeholder} }}}}")
+        machine += " (values hidden)"
     for line in difflib.unified_diff(old.splitlines(keepends=True), new.splitlines(keepends=True),
-                                     name, item.path):
+                                     name, machine):
         print(line, end="" if line.endswith("\n") else "\n\\ No newline at end of file\n")

@@ -167,15 +167,22 @@ def test_a_template_without_its_values(capsys):
     assert "        mode:      /etc/wifi  0644 → 0600\n" in out
 
 
-def test_verbose_shows_no_diff_of_a_template(capsys):
+def test_verbose_shows_a_template_diff_with_its_values_hidden(capsys):
     template.save_value(VALUES, "psk", "s3cret")
-    make("/etc/wifi", 0o644, 0, b"psk=other\n")
-    node_file("etc/wifi.tmpl", b"psk={{ psk }}\n")
+    template.save_value(VALUES, "psk_long", "s3cret-and-more")
+    make("/etc/wifi", 0o644, 0, b"psk=s3cret\nlong=s3cret-and-more\nmode=b\n")
+    node_file("etc/wifi.tmpl", b"psk={{ psk }}\nlong={{ psk_long }}\nmode=a\n")
 
     run(verbose=True)
 
     out = capsys.readouterr().out
-    assert "        modified:  /etc/wifi\n" in out
-    assert out.endswith("\nTemplate nodes/hyper/etc/wifi.tmpl and /etc/wifi differ;"
-                        " the diff would show its values\n")
-    assert "s3cret" not in out and "other" not in out
+    assert "s3cret" not in out
+    assert out.endswith(
+        "\n--- nodes/hyper/etc/wifi.tmpl\n"
+        "+++ /etc/wifi (values hidden)\n"
+        "@@ -1,3 +1,3 @@\n"
+        " psk={{ psk }}\n"
+        " long={{ psk_long }}\n"
+        "-mode=a\n"
+        "+mode=b\n"
+    )
