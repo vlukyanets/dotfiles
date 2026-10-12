@@ -9,6 +9,7 @@ from pathlib import Path
 from dotfiles import secrets
 from dotfiles.add import Error, add
 from dotfiles.cleanup import cleanup
+from dotfiles.forget import forget
 from dotfiles.init import URL, find_repo, init
 from dotfiles.install import install
 from dotfiles.restore import restore
@@ -36,6 +37,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     add_parser.add_argument("node", help="the node's name, as in nodes/<node>/")
     add_parser.add_argument("paths", nargs="+", metavar="path", help="an absolute path on the machine")
+
+    forget_parser = commands.add_parser(
+        "forget", help="remove files from nodes/<node>/ and their .meta lines; the machine keeps them"
+    )
+    forget_parser.add_argument("--dry-run", action="store_true", help="print the changes, make none")
+    forget_parser.add_argument("node", help="the node's name, as in nodes/<node>/")
+    forget_parser.add_argument("paths", nargs="+", metavar="path", help="an absolute path on the machine")
 
     install_parser = commands.add_parser(
         "install", help="put nodes/<node>/ onto the machine, with its owners and modes"
@@ -111,6 +119,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "add":
             add(repo, args.node, args.paths, root=args.root, dry_run=args.dry_run, force=args.force,
                 as_template=args.template)
+        elif args.command == "forget":
+            forget(repo, args.node, args.paths, dry_run=args.dry_run)
         elif args.command == "install":
             install(repo, args.node, root=args.root, dry_run=args.dry_run)
         elif args.command == "restore":

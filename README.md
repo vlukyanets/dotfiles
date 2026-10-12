@@ -101,6 +101,17 @@ asked once.
 
 Only regular files are supported; a directory or a symlink is an error.
 
+## Forgetting a file
+
+```sh
+uv run dotfiles forget hyper /etc/ssh/sshd_config.d/10-local.conf
+```
+
+The command removes the file's copy, or its template, from `nodes/hyper/`
+with its line in `.meta`, and so does it for each directory of the node
+left with no files. The machine keeps the file. `--dry-run` prints what
+would change and changes nothing.
+
 ## Installing a node
 
 ```sh

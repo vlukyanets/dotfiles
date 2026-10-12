@@ -177,11 +177,16 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
             update_meta(meta, f"{parent}/", mode_and_ids(root / parent, follow=True), 0o755)
 
     if meta != old_meta and not dry_run:
-        if meta:
-            node_dir.mkdir(parents=True, exist_ok=True)
-            meta_path.write_text("".join(meta[key] + "\n" for key in sorted(meta)))
-        else:
-            meta_path.unlink()
+        write_meta(meta_path, meta)
+
+
+def write_meta(path: Path, meta: dict[str, str]) -> None:
+    """Writes the lines of meta sorted by path, or removes path when there are none."""
+    if meta:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("".join(meta[key] + "\n" for key in sorted(meta)))
+    else:
+        path.unlink()
 
 
 def update_meta(
