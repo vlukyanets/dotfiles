@@ -36,7 +36,9 @@ def main(argv: list[str] | None = None) -> int:
         "--root", type=Path, default=Path("/"), help="read the files from ROOT instead of /"
     )
     add_parser.add_argument("node", help="the node's name, as in nodes/<node>/")
-    add_parser.add_argument("paths", nargs="*", metavar="path", help="an absolute path on the machine")
+    add_parser.add_argument("paths", nargs="*", metavar="path",
+                            help="an absolute path on the machine; with none and no --package,"
+                                 " each file of the node that changed on the machine")
     add_parser.add_argument("--package", nargs="+", default=[], metavar="name", dest="packages",
                             help="add installed packages to nodes/<node>/.packages; after the paths")
 
@@ -111,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
                       help="a file, or a directory to scan file by file")
 
     args = parser.parse_args(argv)
-    if args.command in ("add", "forget") and not args.paths and not args.packages:
+    if args.command == "forget" and not args.paths and not args.packages:
         parser.error(f"{args.command}: give a path or --package")
     try:
         if args.command == "init":

@@ -10,6 +10,7 @@ from pyfakefs import helpers
 from test_install import FakeSudo
 
 from dotfiles import add as add_module
+from dotfiles import install as install_module
 from dotfiles import template
 from dotfiles.add import Error, add
 
@@ -429,11 +430,11 @@ def test_dry_run_adds_no_package(installed, capsys):
     assert capsys.readouterr().out == "added package niri\n"
 
 
-def test_command_needs_a_path_or_a_package(capsys):
+def test_forget_command_needs_a_path_or_a_package(capsys):
     from dotfiles.cli import main
 
     with pytest.raises(SystemExit):
-        main(["add", "hyper"])
+        main(["forget", "hyper"])
     assert "give a path or --package" in capsys.readouterr().err
 
 
@@ -564,3 +565,113 @@ def test_dry_run_writes_no_symlink(capsys):
 
     assert not (REPO / "nodes").exists()
     assert capsys.readouterr().out == "added nodes/hyper/etc/l -> /y\n"
+
+
+@pytest.fixture
+def surveyed(monkeypatch):
+    """The node read against the machine, as status reads it, with fake owners."""
+    ids = {"root": ROOT, "alice": ALICE}
+    monkeypatch.setattr(install_module, "uid_of", ids.__getitem__)
+    monkeypatch.setattr(install_module, "gid_of", ids.__getitem__)
+    monkeypatch.setattr(install_module, "user_name", NAMES.__getitem__)
+    monkeypatch.setattr(install_module, "group_name", NAMES.__getitem__)
+    monkeypatch.setattr(install_module, "sudo", FakeSudo())
+
+
+def test_without_paths_adds_what_changed_on_the_machine(surveyed, capsys):
+    as_root(os.symlink)("/a", "/etc/localtime")
+    run("/etc/hosts", "/etc/localtime", "/home/alice/.config/plain", "/home/alice/.config/run")
+    make("/etc/hosts", 0o644, ROOT, b"changed\n")
+    as_root(os.unlink)("/etc/localtime")
+    as_root(os.symlink)("/b", "/etc/localtime")
+    make("/home/alice/.config/plain", 0o600, ALICE, b"plain\n")
+    capsys.readouterr()
+
+    run()
+
+    assert (NODE / "etc/hosts").read_bytes() == b"changed\n"
+    assert os.readlink(NODE / "etc/localtime") == "/b"
+    assert meta() == ["0600 alice:alice home/alice/.config/plain"]
+    assert capsys.readouterr().out == (
+        "updated nodes/hyper/etc/hosts\n"
+        "updated nodes/hyper/etc/localtime -> /b\n"
+        "unchanged nodes/hyper/home/alice/.config/plain\n"
+        "meta: set 0600 alice:alice home/alice/.config/plain\n")
+
+
+def test_without_paths_skips_a_missing_file_and_a_template(surveyed, capsys):
+    make("/etc/gone", 0o644, ROOT, b"x\n")
+    run("/etc/gone")
+    as_root(os.unlink)("/etc/gone")
+    (NODE / "etc/t.tmpl").write_text("{{ v }}\n")
+    template.save_value(template.values_path("hyper"), "v", "1")
+    make("/etc/t", 0o644, ROOT, b"2\n")
+    before = sorted(str(p) for p in NODE.rglob("*")), (NODE / "etc/t.tmpl").read_text()
+    capsys.readouterr()
+
+    run()
+
+    assert (sorted(str(p) for p in NODE.rglob("*")), (NODE / "etc/t.tmpl").read_text()) == before
+    assert capsys.readouterr().out == (
+        "skipped /etc/gone: missing on the machine; dotfiles forget hyper /etc/gone drops it\n"
+        "skipped /etc/t: a template; dotfiles add --template hyper /etc/t remakes it\n"
+        "nothing differs from the node\n")
+
+
+def test_without_paths_skips_a_template_it_cannot_fill(surveyed, capsys):
+    (NODE / "etc").mkdir(parents=True)
+    (NODE / "etc/t.tmpl").write_text("{{ unknown }}\n")
+    make("/etc/t", 0o644, ROOT, b"2\n")
+
+    run()
+
+    assert capsys.readouterr().out == (
+        "skipped /etc/t: a template; dotfiles add --template hyper /etc/t remakes it\n"
+        "nothing differs from the node\n")
+
+
+def test_without_paths_when_nothing_differs(surveyed, capsys):
+    run("/etc/hosts")
+    capsys.readouterr()
+
+    run()
+
+    assert capsys.readouterr().out == "nothing differs from the node\n"
+
+
+def test_without_paths_refuses_a_secret(surveyed):
+    run("/etc/hosts")
+    make("/etc/hosts", 0o644, ROOT, f"psk={GITHUB_SAMPLE}\n".encode())
+
+    with pytest.raises(Error, match="/etc/hosts:1: github-oauth"):
+        run()
+    assert (NODE / "etc/hosts").read_bytes() == b"127.0.0.1 localhost\n"
+
+
+def test_without_paths_dry_run_writes_nothing(surveyed, capsys):
+    run("/etc/hosts")
+    make("/etc/hosts", 0o644, ROOT, b"changed\n")
+    capsys.readouterr()
+
+    run(dry_run=True)
+
+    assert (NODE / "etc/hosts").read_bytes() == b"127.0.0.1 localhost\n"
+    assert capsys.readouterr().out == "updated nodes/hyper/etc/hosts\n"
+
+
+def test_without_paths_a_template_needs_its_paths(surveyed):
+    with pytest.raises(Error, match="--template needs the paths to make templates of"):
+        run(as_template=True)
+
+
+def test_with_packages_only_adds_no_file(surveyed, monkeypatch, capsys):
+    from dotfiles import packages
+    monkeypatch.setattr(packages, "installed", lambda: {"vim"})
+    run("/etc/hosts")
+    make("/etc/hosts", 0o644, ROOT, b"changed\n")
+    capsys.readouterr()
+
+    run(packages=["vim"])
+
+    assert (NODE / "etc/hosts").read_bytes() == b"127.0.0.1 localhost\n"
+    assert capsys.readouterr().out == "added package vim\n"

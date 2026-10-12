@@ -108,6 +108,20 @@ it cannot be a template. A directory, or a path through a symlinked
 directory on the machine or in the node, is an error; so is forgetting a
 path through a symlinked directory in the node.
 
+### Taking back what changed
+
+```sh
+uv run dotfiles add hyper              # each file of the node changed on the machine
+```
+
+With no path and no `--package`, the command adds each file and symlink of
+the node that `status` lists as changed on the machine: `modified`,
+`target:`, `mode:` or `owner:`. It skips, with a line for each, a file
+missing on the machine, which `forget` drops, and a template, which
+`add --template` with its path remakes. Why:
+[decision 31](docs/decisions.md). `--dry-run`, `--force` and `--root` work
+as above; `--template` needs its paths.
+
 ## Forgetting a file
 
 ```sh
