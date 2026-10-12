@@ -231,11 +231,13 @@ directory there is not named like a run.
 
 ```sh
 uv run pytest
+uv run ruff check                      # lint, with ruff's default rules
+uv run mypy                            # types, of dotfiles/ and tests/
 ```
 
 The tests run on a fake filesystem (pyfakefs) with fake owners; they never
-touch the machine. CI runs them on every pull request, on Python 3.12, the
-oldest `pyproject.toml` allows.
+touch the machine. CI runs all three on every pull request, on Python 3.12,
+the oldest `pyproject.toml` allows.
 
 ## License
 
