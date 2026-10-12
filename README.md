@@ -105,7 +105,8 @@ changes nothing else. Run twice, the second run prints nothing.
   run keeps all its backups in one directory. A copy is yours and 0600;
   the old file's owner and mode are in that directory's `.meta`, a line
   for each file, in the format of a node's. `.backups/` is closed to others (0700) and ignored by
-  git; `dotfiles cleanup` removes what you no longer need.
+  git; `dotfiles restore` puts it back, and `dotfiles cleanup` removes what
+  you no longer need.
 - The command runs as you. What you cannot write goes through one
   `sudo` helper, started at the first need, so the password is asked once.
 - The whole plan is built before the first write. The command stops with an
@@ -213,6 +214,25 @@ Directories off their defaults, with no .meta line:
   values of a template; a binary file is only named. An agent runs it on a
   real machine only when the owner asks.
 - `--root DIR` compares `DIR` instead of `/`.
+
+## Restoring a backup
+
+```sh
+uv run dotfiles restore --dry-run hyper            # what it would put back
+uv run dotfiles restore hyper                      # the last run
+uv run dotfiles restore hyper 20261011-213000      # that run
+uv run dotfiles restore hyper /etc/x /etc/y        # only these files, from the last run
+```
+
+A run's directory in `.backups/<node>/` is laid out like a node, its
+`.meta` holding a line for every file, so `restore` puts it back the way
+`install` puts a node: each file at its path with its old owner and mode,
+printing the same lines. The files it replaces are kept in a new run, so a
+restore can be undone too. Files the run does not hold are left alone.
+
+- An argument that starts with `/` is a path; the other one, if any, is the
+  run. A path the run does not hold is an error.
+- `--dry-run` and `--root DIR` work as they do for `install`.
 
 ## Removing backups
 

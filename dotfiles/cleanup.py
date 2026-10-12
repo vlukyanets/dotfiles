@@ -9,8 +9,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from dotfiles.add import Error
-
-STAMP = "%Y%m%d-%H%M%S"
+from dotfiles.install import STAMP
 
 
 def now() -> datetime:
