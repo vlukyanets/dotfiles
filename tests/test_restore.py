@@ -66,6 +66,21 @@ def test_puts_back_a_replaced_symlink(monkeypatch, capsys):
         f"updated /etc/localtime -> /usr/share/zoneinfo/A (backup {later}/etc/localtime)\n")
 
 
+def test_puts_back_a_file_a_symlink_replaced(monkeypatch, capsys):
+    make("/etc/x", 0o600, ROOT, b"old\n")
+    node_link("etc/x", "/y")
+    installed(monkeypatch, capsys)
+
+    restore(REPO, "hyper")
+
+    later = f"/repo/.backups/hyper/{LATER}"
+    assert not os.path.islink("/etc/x")
+    assert read("/etc/x") == b"old\n"
+    assert state("/etc/x") == (0o600, ROOT, ROOT)
+    assert os.readlink(f"{later}/etc/x") == "/y"
+    assert capsys.readouterr().out == f"updated /etc/x (backup {later}/etc/x)\n"
+
+
 def test_puts_back_only_the_paths_given(monkeypatch, capsys):
     make("/etc/x", 0o644, ROOT, b"old\n")
     make("/etc/y", 0o644, ROOT, b"old\n")
