@@ -24,6 +24,7 @@ from dotfiles.machine import Local, Stat, Sudo
 
 local = Local()
 sudo = Sudo()
+STAMP = "%Y%m%d-%H%M%S"  # the name of a run in .backups/<node>/
 
 
 def uid_of(name: str) -> int:
@@ -97,13 +98,24 @@ def install(repo: Path, node: str, root: Path = Path("/"), dry_run: bool = False
     """
     node_dir = node_dir_of(repo, node, root)
     try:
-        plan = make_plan(node_dir, root, template.values_for(node_dir, ask=not dry_run))
-        for line, action in plan:
-            print(line)
-            if not dry_run:
-                action()
+        values = template.values_for(node_dir, ask=not dry_run)
+        apply(make_plan(node_dir, root, values, backup_run(repo, node)), dry_run)
     finally:
         sudo.close()
+
+
+def backup_run(repo: Path, node: str) -> Path:
+    """Where a run keeps the files it replaces, named by its start, so one
+    run has one directory."""
+    return repo / ".backups" / node / now().strftime(STAMP)
+
+
+def apply(plan: list[tuple[str, Callable[[], None]]], dry_run: bool) -> None:
+    """Prints each line of plan and, unless dry_run, does its action."""
+    for line, action in plan:
+        print(line)
+        if not dry_run:
+            action()
 
 
 @dataclass
@@ -178,13 +190,19 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
     return items
 
 
-def make_plan(node_dir: Path, root: Path, values: dict[str, str]) -> list[tuple[str, Callable[[], None]]]:
-    """The lines to print and the actions to do, from reading the node and the machine."""
+def make_plan(node_dir: Path, root: Path, values: dict[str, str], run: Path,
+              keys: set[str] | None = None) -> list[tuple[str, Callable[[], None]]]:
+    """The lines to print and the actions to do, from reading the node and
+    the machine; a file replaced is kept in run. With keys, only those files
+    of the node, and the directories above them."""
     me = (os.getuid(), os.getgid())
-    stamp = now().strftime("%Y%m%d-%H%M%S")  # the start, so one run has one directory
-    backups = node_dir.parents[1] / ".backups"
+    backups = run.parents[1]
     plan: list[tuple[str, Callable[[], None]]] = []
-    for item in survey(node_dir, root, values):
+    items = survey(node_dir, root, values)
+    if keys is not None:
+        items = [item for item in items if item.key in keys
+                 or item.key.endswith("/") and any(key.startswith(item.key) for key in keys)]
+    for item in items:
         path, mode, uid, gid = item.path, item.mode, item.uid, item.gid
         mine = (uid, gid) == me
         if item.key.endswith("/"):
@@ -199,7 +217,6 @@ def make_plan(node_dir: Path, root: Path, values: dict[str, str]) -> list[tuple[
             plan.append((f"installed {path}", functools.partial(
                 call, "write", path, item.data, mode, uid, gid, as_user=mine)))
         elif item.machine_data != item.data:
-            run = backups / node_dir.name / stamp
             rel = item.key.removesuffix(template.SUFFIX)  # the machine's file, not the template
             plan.append((f"updated {path} (backup {run / rel})", functools.partial(
                 replace, path, item.data, mode, uid, gid, mine, backups, run, rel,

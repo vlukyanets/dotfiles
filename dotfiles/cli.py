@@ -10,6 +10,7 @@ from dotfiles import secrets
 from dotfiles.add import Error, add
 from dotfiles.cleanup import cleanup
 from dotfiles.install import install
+from dotfiles.restore import restore
 from dotfiles.status import status
 
 REPO = Path(__file__).resolve().parents[1]
@@ -45,6 +46,20 @@ def main(argv: list[str] | None = None) -> int:
         "--root", type=Path, default=Path("/"), help="install under ROOT instead of /"
     )
     install_parser.add_argument("node", help="the node's name, as in nodes/<node>/")
+
+    restore_parser = commands.add_parser(
+        "restore", help="put back the files a run of install replaced, from .backups/<node>/"
+    )
+    restore_parser.add_argument("--dry-run", action="store_true", help="print the changes, make none")
+    restore_parser.add_argument(
+        "--root", type=Path, default=Path("/"), help="restore under ROOT instead of /"
+    )
+    restore_parser.add_argument("node", help="the node's name, as in .backups/<node>/")
+    restore_parser.add_argument(
+        "backup", nargs="*", metavar="run|path",
+        help="the run, as in .backups/<node>/<run>/, the last one if none is given;"
+             " then the absolute paths to put back, all of them if none is given",
+    )
 
     status_parser = commands.add_parser(
         "status", help="show what on the machine differs from nodes/<node>/"
@@ -85,6 +100,13 @@ def main(argv: list[str] | None = None) -> int:
                 as_template=args.template)
         elif args.command == "install":
             install(REPO, args.node, root=args.root, dry_run=args.dry_run)
+        elif args.command == "restore":
+            runs = [arg for arg in args.backup if not arg.startswith("/")]
+            if len(runs) > 1:
+                raise Error(f"one run at most: {' '.join(runs)}")
+            restore(REPO, args.node, runs[0] if runs else None,
+                    [arg for arg in args.backup if arg.startswith("/")],
+                    root=args.root, dry_run=args.dry_run)
         elif args.command == "status":
             status(REPO, args.node, root=args.root, verbose=args.verbose)
         else:
