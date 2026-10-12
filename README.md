@@ -119,6 +119,41 @@ changes nothing else. Run twice, the second run prints nothing.
 It does not remove what the node lacks, show diffs, or install packages and
 services.
 
+## Checking what drifted
+
+```sh
+uv run dotfiles status hyper           # what differs, like git status
+uv run dotfiles status -v hyper        # and a diff of each modified file
+```
+
+The node plays git's index and the machine its working tree; each arrow
+goes from the node to the machine. The command writes nothing, and exits
+with 0 whether or not something differs.
+
+```
+Node hyper, root /
+
+Changes on the machine:
+  (dotfiles add hyper <path> keeps them; dotfiles install hyper undoes them)
+        modified:  /etc/pacman.conf
+        mode:      /etc/ssh/sshd_config.d/10-local.conf  0600 → 0644
+        owner:     /etc/x  root:root → alice:alice
+        missing:   /etc/y
+
+Directories off their defaults, with no .meta line:
+  (dotfiles add records them with the next file added under them)
+        mode:      /home/alice/.ssh/  0755 → 0700
+```
+
+- It reads what `install` reads, through `sudo` when needed, and stops on
+  the same errors.
+- A missing directory shows as its missing files.
+- The second list is what `install` leaves alone: a directory without a
+  `.meta` line whose owner or mode is not the default.
+- `-v` prints the machine's files, secrets and all; a binary file is only
+  named. An agent runs it on a real machine only when the owner asks.
+- `--root DIR` compares `DIR` instead of `/`.
+
 ## Removing backups
 
 ```sh

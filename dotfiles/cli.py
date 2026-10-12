@@ -10,6 +10,7 @@ from dotfiles import secrets
 from dotfiles.add import Error, add
 from dotfiles.cleanup import cleanup
 from dotfiles.install import install
+from dotfiles.status import status
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -40,6 +41,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     install_parser.add_argument("node", help="the node's name, as in nodes/<node>/")
 
+    status_parser = commands.add_parser(
+        "status", help="show what on the machine differs from nodes/<node>/"
+    )
+    status_parser.add_argument(
+        "-v", "--verbose", action="store_true", help="show a diff of each modified file"
+    )
+    status_parser.add_argument(
+        "--root", type=Path, default=Path("/"), help="compare ROOT instead of /"
+    )
+    status_parser.add_argument("node", help="the node's name, as in nodes/<node>/")
+
     cleanup_parser = commands.add_parser(
         "cleanup", help="remove the backups dotfiles install keeps in .backups/"
     )
@@ -67,6 +79,8 @@ def main(argv: list[str] | None = None) -> int:
             add(REPO, args.node, args.paths, root=args.root, dry_run=args.dry_run, force=args.force)
         elif args.command == "install":
             install(REPO, args.node, root=args.root, dry_run=args.dry_run)
+        elif args.command == "status":
+            status(REPO, args.node, root=args.root, verbose=args.verbose)
         else:
             cleanup(REPO, keep=args.keep, older_than=args.older_than, dry_run=args.dry_run)
     except Error as e:
