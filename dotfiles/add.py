@@ -56,6 +56,13 @@ def default_owner(key: str) -> str:
     return "root:root"
 
 
+def symlink_on_the_way(node_dir: Path, rel: str) -> str | None:
+    """The first directory above rel in the node that is a symlink, so that
+    nothing is read, written or removed through it."""
+    return next((str(parent) for parent in reversed(PurePosixPath(rel).parents[:-1])
+                 if (node_dir / parent).is_symlink()), None)
+
+
 def read_meta(path: Path) -> dict[str, str]:
     """The lines of a .meta file by their path."""
     if not path.exists():
@@ -123,6 +130,10 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
         if path.endswith(SUFFIX):
             raise Error(f"a node reads a file ending in {SUFFIX} as a template: {path}")
         plain = f"nodes/{node}/{path.lstrip('/')}"
+        link = symlink_on_the_way(repo / "nodes" / node, path.lstrip("/"))
+        if link:
+            raise Error(f"a symlink in the node, not a directory: nodes/{node}/{link};"
+                        " dotfiles forget it first")
         if stat.S_ISLNK(st_mode):
             if as_template:
                 raise Error(f"a symlink cannot be a template: {path}")
