@@ -39,6 +39,7 @@ def machine(fs, monkeypatch):
     fs.create_dir(REPO)
     # The real rules, as the command reads them from the repository.
     fs.add_real_file(Path(__file__).parents[1] / "secret_leaks.toml", target_path=REPO / "secret_leaks.toml")
+    fs.create_file("/usr/lib/os-release", contents="ID=arch\n")  # where /etc lists only what tests put
     yield
     helpers.reset_ids()
 

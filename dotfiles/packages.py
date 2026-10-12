@@ -44,7 +44,8 @@ def family() -> str:
     for known in ("arch", "debian"):
         if known in ids:
             return known
-    raise Error(f"packages are not supported on this distribution: {fields.get('ID') or 'unknown'}")
+    raise Error(f"only Arch, Debian and the distributions like them are supported, "
+                f"not {fields.get('ID') or 'one without /etc/os-release'}")
 
 
 def run(command: list[str], capture: bool = False) -> str:

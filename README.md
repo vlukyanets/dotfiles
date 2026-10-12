@@ -18,8 +18,10 @@ Why it is built this way: [docs/decisions.md](docs/decisions.md).
 
 ## Setting up
 
-The command works on a clone of this repository. There are two ways to
-have one.
+The command runs on Arch, Debian and the distributions like them, by `ID`
+and `ID_LIKE` in `/etc/os-release`; `add`, `install`, `restore` and
+`status`, which read or write the machine, refuse another. It works on a
+clone of this repository. There are two ways to have one.
 
 **Installed, like chezmoi.** uv installs the command from GitHub, and
 `init` clones the repository into `~/.local/share/dotfiles` (under

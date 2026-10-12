@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from dotfiles import secrets
+from dotfiles import packages, secrets
 from dotfiles.add import Error, add
 from dotfiles.cleanup import cleanup
 from dotfiles.forget import forget
@@ -122,6 +122,8 @@ def main(argv: list[str] | None = None) -> int:
             return scan(args, repo)
         if os.geteuid() == 0:
             raise Error("run as your user; sudo is used when needed")
+        if args.command in ("add", "install", "restore", "status"):
+            packages.family()  # These read or write the machine, which must be one supported.
         if args.command == "add":
             add(repo, args.node, args.paths, root=args.root, dry_run=args.dry_run, force=args.force,
                 as_template=args.template, packages=args.packages)
