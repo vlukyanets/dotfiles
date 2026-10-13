@@ -10,3 +10,6 @@ dist/
 # Local settings of Claude Code and its plugins
 .claude/settings.local.json
 .superpowers/
+
+# Plans and task lists, kept on the machine only (CLAUDE.md)
+/.plans/

@@ -17,7 +17,7 @@ first change.
 | `secret_leaks.toml` | The secret rules, read by `dotfiles scan` and `dotfiles add` |
 | `.githooks/`, `.github/workflows/` | The pre-commit hook, which checks for secrets and the nodes, and CI, which checks for secrets and the nodes, runs the tests and checks the lint and the types |
 | `pyproject.toml`, `uv.lock` | The package and its dependencies, pinned; everything runs through `uv` |
-| `docs/` | How it works now, the decisions with why, and plans |
+| `docs/` | How it works now, and the decisions with why |
 
 - A file or directory under `nodes/<node>/home/<user>/`, and that directory
   itself, belongs to that user; any other belongs to `root:root`. A file's
@@ -151,7 +151,7 @@ The agent the owner talks to is the **lead**; the agents it starts are
 | What the repository is, how to use it | `README.md` | Permanent |
 | How the layout and the command work | `docs/` | Permanent |
 | Decisions, each with why | `docs/decisions.md` | Permanent; a changed decision is an edited row |
-| Plans and task lists | `docs/roadmap/` | Deleted when done |
+| Plans and task lists | `.plans/`, ignored by git: never committed | Deleted when done |
 
 - Docs describe how things are now; why lives in `docs/decisions.md`, and
   the docs link to its row instead of repeating it.
