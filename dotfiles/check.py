@@ -4,9 +4,9 @@ It reads only the repository, so it runs anywhere, as any user: in CI and
 in the pre-commit hook. Problems of the machine are install's to find.
 """
 
-import re
 from pathlib import Path
 
+from dotfiles.add import NODE_NAME
 from dotfiles.install import read_node
 from dotfiles.machine import Error
 
@@ -23,7 +23,7 @@ def check(repo: Path, nodes: list[str]) -> int:
             return 0
     code = 0
     for node in nodes:
-        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", node):
+        if not NODE_NAME.fullmatch(node):
             print(f"{node}: bad node name")
         elif not (nodes_dir / node).is_dir():
             print(f"{node}: no such node")

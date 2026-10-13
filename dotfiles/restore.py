@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 from dotfiles import install
-from dotfiles.add import Error
+from dotfiles.add import NODE_NAME, Error
 from dotfiles.install import apply, backup_run, make_plan, read_hooks
 
 
@@ -21,7 +21,7 @@ def restore(repo: Path, node: str, run: str | None = None, paths: list[str] | No
     Prints each change; with dry_run, prints them and changes nothing.
     """
     runs_dir = repo / ".backups" / node
-    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", node) or not runs_dir.is_dir():
+    if not NODE_NAME.fullmatch(node) or not runs_dir.is_dir():
         raise Error(f"no backups of {node}")
     if run is None:
         runs = sorted(p.name for p in runs_dir.iterdir() if p.is_dir())

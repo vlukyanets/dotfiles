@@ -21,6 +21,7 @@ from dotfiles.machine import Error, Stat, Sudo
 from dotfiles.template import SUFFIX
 
 sudo = Sudo()
+NODE_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")  # a node's name, matched whole
 OWN = (".meta", ".hooks", ".packages")  # the files of a node that are its own, not the machine's
 
 
@@ -109,7 +110,7 @@ def add(
     and moved to the node's values file (template.py).
     What the user cannot read goes to one sudo helper (machine.Sudo).
     """
-    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", node):
+    if not NODE_NAME.fullmatch(node):
         raise Error(f"bad node name: {node}")
     if not paths and not packages:  # Everything that changed on the machine, as status shows it.
         if as_template:
