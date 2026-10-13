@@ -1,8 +1,9 @@
 """The packages of a node: nodes/<node>/.packages, one name per line.
 
 A node is one machine, so the names are those of its distribution, which
-/etc/os-release names. Packages the machine has and the list lacks are
-not this command's business: it only installs what is missing.
+/etc/os-release names. install only installs what is missing; the
+packages installed on purpose that the list lacks are only listed, by
+status, and removing them is the owner's.
 """
 
 import functools
@@ -78,6 +79,13 @@ def installed() -> set[str]:
     return {line.split()[-1] for line in lines.splitlines() if line.startswith("ii ")}
 
 
+def explicit() -> set[str]:
+    """The names of the packages installed on purpose, not as a dependency."""
+    if family() == "arch":
+        return set(run(["pacman", "-Qqe"], capture=True).split())
+    return set(run(["apt-mark", "showmanual"], capture=True).split())
+
+
 def install_command(names: list[str]) -> list[str]:
     if family() == "debian":
         return ["sudo", "apt-get", "install", *names]
@@ -97,6 +105,13 @@ def missing(node_dir: Path) -> list[str]:
         return []
     have = installed()
     return [name for name in names if name not in have]
+
+
+def extra(node_dir: Path) -> list[str]:
+    """The packages this machine has on purpose and the node's list lacks,
+    sorted; none for a node without a list."""
+    names = read(node_dir)
+    return sorted(explicit() - set(names)) if names else []
 
 
 def plan(node_dir: Path, root: Path) -> list[tuple[str, Callable[[], None]]]:

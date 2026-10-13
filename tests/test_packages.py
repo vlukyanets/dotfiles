@@ -19,7 +19,8 @@ def machine(fs, monkeypatch):
     fs.create_dir(NODE)
     ran = []
     output = {"pacman": "base\nparu\n",
-              "dpkg-query": "ii  base\nrc  removed\nii  vim\n"}
+              "dpkg-query": "ii  base\nrc  removed\nii  vim\n",
+              "apt-mark": "vim\ngit\nbase\n"}
 
     def run(command, **kwargs):
         ran.append(command)
@@ -76,6 +77,30 @@ def test_installed_on_debian(machine, fs):
     Path("/etc/os-release").write_text("ID=debian\n")
     assert packages.installed() == {"base", "vim"}
     assert machine == [["dpkg-query", "-W", "-f=${db:Status-Abbrev} ${Package}\n"]]
+
+
+def test_explicit_on_arch(machine):
+    assert packages.explicit() == {"base", "paru"}
+    assert machine == [["pacman", "-Qqe"]]
+
+
+def test_explicit_on_debian(machine, fs):
+    Path("/etc/os-release").write_text("ID=debian\n")
+    assert packages.explicit() == {"base", "git", "vim"}
+    assert machine == [["apt-mark", "showmanual"]]
+
+
+def test_extra_lists_what_the_list_lacks_sorted(machine):
+    (NODE / ".packages").write_text("base\nniri\n")
+    machine.clear()
+    Path("/etc/os-release").write_text("ID=debian\n")
+
+    assert packages.extra(NODE) == ["git", "vim"]
+
+
+def test_extra_is_empty_without_a_list(machine):
+    assert packages.extra(NODE) == []
+    assert machine == []
 
 
 def test_install_command(machine, monkeypatch):

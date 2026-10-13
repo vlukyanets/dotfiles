@@ -170,10 +170,10 @@ prints what would change and changes nothing.
 `nodes/<node>/.packages` lists the packages of the node, a name per line.
 A node is one machine, so the names are those of its distribution:
 
-| Distribution, by `ID` or `ID_LIKE` in `/etc/os-release` | Installed | Installed with |
-|---|---|---|
-| `arch` | `pacman -Qq` | `paru -S --needed`, as you; without paru, `sudo pacman -S --needed` |
-| `debian` (Ubuntu too) | `dpkg-query -W`, status `ii` | `sudo apt-get install` |
+| Distribution, by `ID` or `ID_LIKE` in `/etc/os-release` | Installed | Installed on purpose | Installed with |
+|---|---|---|---|
+| `arch` | `pacman -Qq` | `pacman -Qqe` | `paru -S --needed`, as you; without paru, `sudo pacman -S --needed` |
+| `debian` (Ubuntu too) | `dpkg-query -W`, status `ii` | `apt-mark showmanual` | `sudo apt-get install` |
 
 ```sh
 uv run dotfiles add hyper --package niri paru     # must be installed
@@ -185,8 +185,9 @@ uv run dotfiles add hyper /etc/hosts --package vim  # paths first
   printing `installed packages niri waybar`, since a package may bring a
   user or a directory the files need. With `--dry-run` it only prints;
   with `--root` other than `/` it prints `skipped packages`.
-- A package the machine has and the list lacks is left alone and is not
-  listed: cleaning packages up is yours.
+- A package installed on purpose that the list lacks is left alone;
+  `status` lists it, if the node has a list. Removing it is yours. On
+  Debian, what the installer chose counts as on purpose too.
 - paru and apt ask before they install; nothing answers for you.
 - An AUR package needs paru; without it, pacman fails on it.
 
@@ -366,7 +367,8 @@ Directories off their defaults, with no .meta line:
   the same errors.
 - A missing directory shows as its missing files.
 - The packages of the node the machine lacks are listed after the changes,
-  as `package:   niri`; not with `--root`.
+  as `package:   niri`, then the packages installed on purpose that the
+  node's list lacks, if it has one; neither with `--root`.
 - `target:` is a symlink pointing elsewhere, or a symlink on one side and a
   file, shown as `(a file)`, on the other. A symlink's owner and mode are
   not compared, and a target that does not exist is no difference.
