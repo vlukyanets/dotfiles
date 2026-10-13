@@ -21,6 +21,17 @@ def read(node_dir: Path) -> list[str]:
     return [line.strip() for line in path.read_text().splitlines() if line.strip()] if path.exists() else []
 
 
+def problems(node_dir: Path) -> list[str]:
+    """A problem for each line of .packages that is not one name."""
+    path = node_dir / FILE
+    try:
+        text = path.read_bytes().decode() if path.exists() else ""
+    except UnicodeDecodeError:
+        return [f"{path}: not UTF-8 text"]
+    return [f"{path}:{number}: not one package name"
+            for number, line in enumerate(text.splitlines(), 1) if len(line.split()) > 1]
+
+
 def write(node_dir: Path, names: list[str]) -> None:
     """Writes names sorted, or removes the file when there are none."""
     path = node_dir / FILE

@@ -200,13 +200,21 @@ changes nothing else. Run twice, the second run prints nothing.
   you no longer need.
 - The command runs as you. What you cannot write goes through one
   `sudo` helper, started at the first need, so the password is asked once.
-- The whole plan is built before the first write. The command stops with an
-  error, having changed nothing, when a user or group does not exist on the
-  machine, when a directory on the way is a symlink, when a target is not a
-  regular file or a symlink or a directory is not a directory, when a
-  `.meta` line names a path the node does not have, a symlink or a path
-  under a symlinked directory of the node, or when the node or the root
-  does not exist.
+- The node is read first, before the packages, and the command stops with
+  an error, having changed nothing, listing every problem of the node at
+  once: a `.meta`, `.hooks` or `.packages` file that is not UTF-8, or a
+  line of it that does not parse; a `.meta` line for a path the node does
+  not have, a symlink or a path under a symlinked directory of the node; a
+  file kept beside its template; a symlink named like a template; a
+  template that is not UTF-8. `status` lists them the same way, and `add`
+  and `forget` every `.meta` line that does not parse. Why:
+  [decision 32](docs/decisions.md).
+- Then the whole plan is built before the first write. The command stops
+  with an error, having changed nothing, at the first problem of the
+  machine: a user or group that does not exist, a directory on the way
+  that is a symlink, a target that is not a regular file or a symlink or a
+  directory that is not a directory; or when the node or the root does not
+  exist.
 - `--dry-run` prints the same lines and changes nothing. It may still read
   through `sudo`.
 - `--root DIR` installs under `DIR` instead of `/`.

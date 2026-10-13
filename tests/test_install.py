@@ -765,3 +765,76 @@ def test_replaces_a_symlink_with_a_filled_template(capsys):
     assert read("/etc/x") == b"v=1\n"
     assert os.readlink(backup) == "/a"
     assert capsys.readouterr().out == f"updated /etc/x (backup {backup})\n"
+
+
+def test_shows_every_problem_of_a_node_at_once():
+    node_file("etc/x")
+    node_meta("bad", "0600 root:root etc/nope", "0600 root etc/x")
+    node_hooks("etc/x")
+    (NODE / ".packages").write_text("base\nniri git\n")
+    before = snapshot()
+
+    with pytest.raises(Error) as e:
+        run()
+
+    assert str(e.value) == "\n  ".join([
+        f"{NODE}/.meta:1: not `<mode> <owner>:<group> <path>`",
+        f"{NODE}/.meta: the node has no etc/nope",
+        f"{NODE}/.meta: bad owner: 0600 root etc/x",
+        f"{NODE}/.hooks:1: not `<pattern> <command>`",
+        f"{NODE}/.packages:2: not one package name",
+    ])
+    assert snapshot() == before
+
+
+def test_a_bad_owner_of_a_missing_path_is_one_problem():
+    node_file("etc/x")
+    node_meta("0600 root etc/nope")
+
+    with pytest.raises(Error) as e:
+        run()
+
+    assert str(e.value) == f"{NODE}/.meta: bad owner: 0600 root etc/nope"
+
+
+def test_shows_every_template_problem():
+    node_file("etc/x")
+    node_file("etc/x.tmpl")
+    node_link("etc/l.tmpl", "/y")
+    node_file("etc/bin.tmpl", b"\xff")
+
+    with pytest.raises(Error) as e:
+        run()
+
+    assert str(e.value) == "\n  ".join([
+        f"a template must be UTF-8 text: {NODE}/etc/bin.tmpl",
+        "a symlink cannot be a template: etc/l.tmpl",
+        f"{NODE}: both etc/x and its template etc/x.tmpl",
+    ])
+
+
+def test_a_broken_node_installs_no_package(monkeypatch):
+    from dotfiles import packages
+    installs = []
+    monkeypatch.setattr(packages, "installed", lambda: {"base"})
+    monkeypatch.setattr(packages, "install", installs.append)
+    (NODE / ".packages").write_text("base\nniri\n")
+    node_file("etc/x")
+    node_meta("bad")
+
+    with pytest.raises(Error):
+        run()
+
+    assert installs == []
+
+
+def test_a_node_file_not_utf8_is_a_problem():
+    node_file("etc/x")
+    for name in (".meta", ".hooks", ".packages"):
+        (NODE / name).write_bytes(b"\xff\n")
+
+    with pytest.raises(Error) as e:
+        run()
+
+    assert str(e.value) == "\n  ".join(
+        f"{NODE}/{name}: not UTF-8 text" for name in (".meta", ".hooks", ".packages"))

@@ -26,7 +26,7 @@ from dotfiles.add import (
     Error,
     default_owner,
     group_name,
-    read_meta,
+    parse_meta,
     symlink_on_the_way,
     user_name,
 )
@@ -120,9 +120,10 @@ def install(repo: Path, node: str, root: Path = Path("/"), dry_run: bool = False
     Prints each change; with dry_run, prints them and changes nothing.
     """
     node_dir = node_dir_of(repo, node, root)
-    # First, as a package may bring a user or a directory the files need.
-    apply(packages.plan(node_dir, root), dry_run)
     try:
+        read_node(node_dir)  # A broken node installs nothing, not even its packages.
+        # First, as a package may bring a user or a directory the files need.
+        apply(packages.plan(node_dir, root), dry_run)
         values = template.values_for(node_dir, ask=not dry_run)
         apply(make_plan(node_dir, root, values, backup_run(repo, node),
                         hooks=read_hooks(node_dir / ".hooks")), dry_run)
@@ -139,18 +140,31 @@ def backup_run(repo: Path, node: str) -> Path:
 def read_hooks(path: Path) -> list[tuple[str, str]]:
     """The lines of a .hooks file, as (pattern, command): the command runs
     once install writes a file whose path, from the root and without .tmpl,
-    matches the pattern; fnmatch's, so * matches a slash too."""
-    if not path.exists():
-        return []
+    matches the pattern; fnmatch's, so * matches a slash too. An error
+    lists every bad line."""
+    hooks, problems = parse_hooks(path)
+    if problems:
+        raise Error("\n  ".join(problems))
+    return hooks
+
+
+def parse_hooks(path: Path) -> tuple[list[tuple[str, str]], list[str]]:
+    """The good lines of a .hooks file, and a problem for each bad one."""
+    try:
+        text = path.read_bytes().decode() if path.exists() else ""
+    except UnicodeDecodeError:
+        return [], [f"{path}: not UTF-8 text"]
     hooks = []
-    for number, line in enumerate(path.read_text().splitlines(), 1):
+    problems = []
+    for number, line in enumerate(text.splitlines(), 1):
         if not line.strip() or line.startswith("#"):
             continue
         fields = line.split(None, 1)
         if len(fields) != 2:
-            raise Error(f"{path}:{number}: not `<pattern> <command>`")
-        hooks.append((fields[0], fields[1].strip()))
-    return hooks
+            problems.append(f"{path}:{number}: not `<pattern> <command>`")
+        else:
+            hooks.append((fields[0], fields[1].strip()))
+    return hooks, problems
 
 
 def run_hook(command: str) -> None:
@@ -185,30 +199,65 @@ class Item:
     machine_link: str | None = None  # and on the machine, when it has a symlink there
 
 
-def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
-    """Every directory of the node, parents first, then every file, read
-    from the node and the machine; a template is filled with values."""
+@dataclass
+class Node:
+    """What install reads from a node alone, without the machine."""
+    files: list[str]  # its files and symlinks, sorted, its own (OWN) left out
+    meta: dict[str, tuple[int, str, str]]  # path -> (mode, user, group)
+
+
+def read_node(node_dir: Path) -> Node:
+    """The node at node_dir, once every problem install would stop on that
+    needs no machine is found; an error lists them all."""
     files = sorted(
         rel
         for rel in (str(p.relative_to(node_dir)) for p in node_dir.rglob("*")
                     if p.is_symlink() or p.is_file())
         if rel not in OWN
     )
-    meta: dict[str, tuple[int, str, str]] = {}  # path -> (mode, user, group)
-    for key, line in read_meta(node_dir / ".meta").items():
+    lines, problems = parse_meta(node_dir / ".meta")
+    meta: dict[str, tuple[int, str, str]] = {}
+    for key, line in lines.items():
         mode, owner, _ = line.split(" ", 2)
         user, _, group = owner.partition(":")
+        # The first problem of a line only; a path outside the node is never read.
         if key.startswith("/") or ".." in PurePosixPath(key).parts:
-            raise Error(f"{node_dir / '.meta'}: not a path inside the node: {key}")
-        if (node_dir / key.rstrip("/")).is_symlink():
-            raise Error(f"{node_dir / '.meta'}: a symlink has no owner or mode: {key}")
-        if symlink_on_the_way(node_dir, key.rstrip("/")):
-            raise Error(f"{node_dir / '.meta'}: under a symlink in the node: {key}")
-        if not user or not group:
-            raise Error(f"{node_dir / '.meta'}: bad owner: {line}")
-        if not (node_dir / key).exists() or key.endswith("/") != (node_dir / key).is_dir():
-            raise Error(f"{node_dir / '.meta'}: the node has no {key}")
-        meta[key] = (int(mode, 8), user, group)
+            problems.append(f"{node_dir / '.meta'}: not a path inside the node: {key}")
+        elif (node_dir / key.rstrip("/")).is_symlink():
+            problems.append(f"{node_dir / '.meta'}: a symlink has no owner or mode: {key}")
+        elif symlink_on_the_way(node_dir, key.rstrip("/")):
+            problems.append(f"{node_dir / '.meta'}: under a symlink in the node: {key}")
+        elif not user or not group:
+            problems.append(f"{node_dir / '.meta'}: bad owner: {line}")
+        elif not (node_dir / key).exists() or key.endswith("/") != (node_dir / key).is_dir():
+            problems.append(f"{node_dir / '.meta'}: the node has no {key}")
+        else:
+            meta[key] = (int(mode, 8), user, group)
+    problems += parse_hooks(node_dir / ".hooks")[1]
+    problems += packages.problems(node_dir)
+    for rel in files:
+        target = rel.removesuffix(template.SUFFIX)
+        if target == rel:
+            continue
+        if (node_dir / rel).is_symlink():
+            problems.append(f"a symlink cannot be a template: {rel}")
+        elif target in files:
+            problems.append(f"{node_dir}: both {target} and its template {rel}")
+        else:
+            try:
+                template.text_of(node_dir / rel)
+            except Error as e:
+                problems.append(str(e))
+    if problems:
+        raise Error("\n  ".join(problems))
+    return Node(files, meta)
+
+
+def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
+    """Every directory of the node, parents first, then every file, read
+    from the node and the machine; a template is filled with values."""
+    node = read_node(node_dir)
+    files, meta = node.files, node.meta
 
     def wanted(key: str, default_mode: int) -> tuple[int, int, int]:
         if key in meta:
@@ -230,8 +279,6 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
 
     for rel in files:
         if (node_dir / rel).is_symlink():
-            if rel.endswith(template.SUFFIX):
-                raise Error(f"a symlink cannot be a template: {rel}")
             path = str(root / rel)
             st = call("stat", path)
             items.append(Item(rel, path, *wanted(rel, 0o777), False, st,
@@ -239,8 +286,6 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
                               link=os.readlink(node_dir / rel), machine_link=machine_link(st, path)))
             continue
         target = rel.removesuffix(template.SUFFIX)
-        if target != rel and target in files:
-            raise Error(f"{node_dir}: both {target} and its template {rel}")
         data, missing = (node_dir / rel).read_bytes(), tuple[str, ...]()
         if target != rel:
             text = template.text_of(node_dir / rel)

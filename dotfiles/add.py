@@ -63,16 +63,28 @@ def symlink_on_the_way(node_dir: Path, rel: str) -> str | None:
                  if (node_dir / parent).is_symlink()), None)
 
 
-def read_meta(path: Path) -> dict[str, str]:
-    """The lines of a .meta file by their path."""
-    if not path.exists():
-        return {}
-    lines = {}
-    for number, line in enumerate(path.read_text().splitlines(), 1):
+def parse_meta(path: Path) -> tuple[dict[str, str], list[str]]:
+    """The good lines of a .meta file by their path, and a problem for each bad one."""
+    try:
+        text = path.read_bytes().decode() if path.exists() else ""
+    except UnicodeDecodeError:
+        return {}, [f"{path}: not UTF-8 text"]
+    lines: dict[str, str] = {}
+    problems = []
+    for number, line in enumerate(text.splitlines(), 1):
         fields = line.split(" ", 2)
         if len(fields) != 3 or not re.fullmatch(r"[0-7]{4}", fields[0]):
-            raise Error(f"{path}:{number}: not `<mode> <owner>:<group> <path>`")
-        lines[fields[2]] = line
+            problems.append(f"{path}:{number}: not `<mode> <owner>:<group> <path>`")
+        else:
+            lines[fields[2]] = line
+    return lines, problems
+
+
+def read_meta(path: Path) -> dict[str, str]:
+    """The lines of a .meta file by their path; an error lists every bad one."""
+    lines, problems = parse_meta(path)
+    if problems:
+        raise Error("\n  ".join(problems))
     return lines
 
 
