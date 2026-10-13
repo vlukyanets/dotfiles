@@ -8,6 +8,7 @@ from pathlib import Path
 
 from dotfiles import packages, secrets
 from dotfiles.add import Error, add
+from dotfiles.check import check
 from dotfiles.cleanup import cleanup
 from dotfiles.forget import forget
 from dotfiles.init import URL, find_repo, init
@@ -112,6 +113,12 @@ def main(argv: list[str] | None = None) -> int:
     what.add_argument("paths", nargs="*", default=[], type=Path, metavar="path",
                       help="a file, or a directory to scan file by file")
 
+    check_parser = commands.add_parser(
+        "check", help="find what would stop install in each node, without a machine"
+    )
+    check_parser.add_argument("nodes", nargs="*", metavar="node",
+                              help="the node's name, as in nodes/<node>/; every node if none is given")
+
     args = parser.parse_args(argv)
     if args.command == "forget" and not args.paths and not args.packages:
         parser.error(f"{args.command}: give a path or --package")
@@ -122,6 +129,8 @@ def main(argv: list[str] | None = None) -> int:
         repo = find_repo()
         if args.command == "scan":
             return scan(args, repo)
+        if args.command == "check":
+            return check(repo, args.nodes)
         if os.geteuid() == 0:
             raise Error("run as your user; sudo is used when needed")
         if args.command in ("add", "install", "restore", "status"):

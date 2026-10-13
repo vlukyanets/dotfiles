@@ -52,8 +52,9 @@ git config core.hooksPath .githooks
 
 Here `uv run dotfiles …` works on this clone, whatever `$DOTFILES_REPO`
 says. The last line turns on the pre-commit hook in `.githooks/`, in
-either clone. Cloning does not turn it on; that is up to you. Without it,
-nothing stops a secret before it is pushed.
+either clone: it stops a commit that holds a secret or leaves a broken
+node. Cloning does not turn it on; that is up to you. Without it, nothing
+stops a secret before it is pushed.
 
 ## Checking for secrets
 
@@ -75,6 +76,36 @@ copies.
 
 The pre-commit hook runs `dotfiles scan --staged`; CI runs
 `dotfiles scan --history` on every pull request.
+
+## Checking the nodes
+
+```sh
+uv run dotfiles check          # every node in nodes/
+uv run dotfiles check hyper    # the nodes named
+```
+
+```
+hyper: ok
+laptop:
+  …/nodes/laptop/.meta:3: not `<mode> <owner>:<group> <path>`
+  …/nodes/laptop/.meta: the node has no etc/nope
+  …/nodes/laptop/.hooks:2: not `<pattern> <command>`
+```
+
+The command finds in each node what would stop `install` without a
+machine: what does not parse in `.meta`, `.hooks` and `.packages`, a
+`.meta` line for a path the node does not have, a symlink or a path under
+a symlinked directory of the node, a file kept beside its template, a
+symlink named like a template, a template that is not UTF-8, and a node
+name `install` refuses. It prints each node in name order, `ok` or its
+problems, and exits with 1 if a node has one. It reads only the
+repository, so it runs anywhere, as any user; whether a user, a group or
+a package exists is for `install` to find on the machine. Why:
+[decision 33](docs/decisions.md).
+
+The pre-commit hook runs it after `dotfiles scan --staged`, on the nodes
+as they are in the working tree; CI runs it on every pull request and on
+`master`.
 
 ## Adding a file
 
