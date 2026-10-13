@@ -689,3 +689,15 @@ def test_with_packages_only_adds_no_file(surveyed, monkeypatch, capsys):
 
     assert (NODE / "etc/hosts").read_bytes() == b"127.0.0.1 localhost\n"
     assert capsys.readouterr().out == "added package vim\n"
+
+
+def test_read_meta_shows_every_bad_line():
+    path = REPO / "nodes/hyper/.meta"
+    path.parent.mkdir(parents=True)
+    path.write_text("bad\n0600 root:root etc/x\n644 root:root etc/y\n")
+
+    with pytest.raises(Error) as e:
+        add_module.read_meta(path)
+
+    assert str(e.value) == (f"{path}:1: not `<mode> <owner>:<group> <path>`\n"
+                            f"  {path}:3: not `<mode> <owner>:<group> <path>`")

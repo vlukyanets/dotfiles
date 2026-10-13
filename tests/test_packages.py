@@ -133,3 +133,10 @@ def test_run_without_the_tool(monkeypatch):
     monkeypatch.setattr(packages.subprocess, "run", missing)
     with pytest.raises(Error, match="^dpkg-query is needed for packages$"):
         packages.run(["dpkg-query", "-W"])
+
+
+def test_problems_names_each_line_of_more_than_one_word(fs):
+    fs.create_dir(NODE)
+    assert packages.problems(NODE) == []
+    (NODE / ".packages").write_text("base\n\nniri git\n")
+    assert packages.problems(NODE) == [f"{NODE}/.packages:3: not one package name"]
