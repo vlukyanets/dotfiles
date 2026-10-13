@@ -15,7 +15,7 @@ first change.
 | `dotfiles/` | The Python package behind the `dotfiles` command: a subcommand for each job (adding files, installing a node, filling templates, checking what drifted) |
 | `tests/` | The tests: `tests/test_add.py` checks `dotfiles add` |
 | `secret_leaks.toml` | The secret rules, read by `dotfiles scan` and `dotfiles add` |
-| `.githooks/`, `.github/workflows/` | The pre-commit hook, which checks for secrets, and CI, which checks for secrets, runs the tests and checks the lint and the types |
+| `.githooks/`, `.github/workflows/` | The pre-commit hook, which checks for secrets and the nodes, and CI, which checks for secrets and the nodes, runs the tests and checks the lint and the types |
 | `pyproject.toml`, `uv.lock` | The package and its dependencies, pinned; everything runs through `uv` |
 | `docs/` | How it works now, the decisions with why, and plans |
 
