@@ -4,12 +4,18 @@ A directory of the node left with no files goes too, with its line. The
 machine is not touched: what install put there stays.
 """
 
-import re
 import shutil
 from pathlib import Path, PurePosixPath
 
 from dotfiles import packages as node_packages
-from dotfiles.add import OWN, Error, read_meta, symlink_on_the_way, write_meta
+from dotfiles.add import (
+    NODE_NAME,
+    OWN,
+    Error,
+    read_meta,
+    symlink_on_the_way,
+    write_meta,
+)
 from dotfiles.template import SUFFIX
 
 
@@ -21,7 +27,7 @@ def forget(repo: Path, node: str, paths: list[str], dry_run: bool = False,
     Prints each change; with dry_run, prints them and changes nothing.
     """
     node_dir = repo / "nodes" / node
-    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", node) or not node_dir.is_dir():
+    if not NODE_NAME.fullmatch(node) or not node_dir.is_dir():
         raise Error(f"no such node: {node}")
     keys = []
     for path in paths:

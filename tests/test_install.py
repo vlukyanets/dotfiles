@@ -468,6 +468,15 @@ def test_missing_node():
         install(REPO, "laptop")
 
 
+def test_bad_node_name():
+    node_file("etc/x")
+    (REPO / "nodes/Hyper").mkdir()
+
+    for name in ("Hyper", "../nodes/hyper"):
+        with pytest.raises(Error, match="no such node"):
+            install(REPO, name)
+
+
 def test_missing_root():
     node_file("etc/x")
 

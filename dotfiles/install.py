@@ -12,7 +12,6 @@ import functools
 import grp
 import os
 import pwd
-import re
 import stat
 import subprocess
 from collections.abc import Callable
@@ -22,6 +21,7 @@ from pathlib import Path, PurePosixPath
 
 from dotfiles import packages, template
 from dotfiles.add import (
+    NODE_NAME,
     OWN,
     Error,
     default_owner,
@@ -106,7 +106,7 @@ def put(item: "Item", mine: bool) -> None:
 def node_dir_of(repo: Path, node: str, root: Path) -> Path:
     """repo/nodes/<node>/, once it and root are checked."""
     node_dir = repo / "nodes" / node
-    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", node) or not node_dir.is_dir():
+    if not NODE_NAME.fullmatch(node) or not node_dir.is_dir():
         raise Error(f"no such node: {node}")
     if not root.is_dir():
         raise Error(f"no such directory: {root}")
