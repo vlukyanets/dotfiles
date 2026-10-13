@@ -227,6 +227,7 @@ def test_verbose_shows_a_template_diff_with_its_values_hidden(capsys):
 def test_lists_the_packages_the_machine_lacks(monkeypatch, capsys):
     from dotfiles import packages
     monkeypatch.setattr(packages, "installed", lambda: {"base"})
+    monkeypatch.setattr(packages, "explicit", lambda: {"base"})
     (REPO / "nodes/hyper/.packages").write_text("base\nniri\n")
 
     run()
@@ -238,9 +239,26 @@ def test_lists_the_packages_the_machine_lacks(monkeypatch, capsys):
         "        package:   niri\n")
 
 
+def test_lists_the_packages_not_in_the_node(monkeypatch, capsys):
+    from dotfiles import packages
+    monkeypatch.setattr(packages, "installed", lambda: {"base", "git", "niri", "vim"})
+    monkeypatch.setattr(packages, "explicit", lambda: {"base", "vim", "git"})
+    (REPO / "nodes/hyper/.packages").write_text("base\nniri\n")
+
+    run()
+
+    assert capsys.readouterr().out == (
+        "Node hyper, root /\n"
+        "\nPackages not in the node:\n"
+        "  (dotfiles add hyper --package <name> keeps them; removing them is yours)\n"
+        "        package:   git\n"
+        "        package:   vim\n")
+
+
 def test_another_root_has_no_packages_to_lack(monkeypatch, capsys):
     from dotfiles import packages
-    monkeypatch.setattr(packages, "installed", lambda: set())
+    monkeypatch.setattr(packages, "installed", lambda: {"vim"})
+    monkeypatch.setattr(packages, "explicit", lambda: {"vim"})
     (REPO / "nodes/hyper/.packages").write_text("niri\n")
     make("/srv", 0o755, 0)
 

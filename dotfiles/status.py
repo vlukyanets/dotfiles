@@ -21,6 +21,7 @@ def status(repo: Path, node: str, root: Path = Path("/"), verbose: bool = False)
     finally:
         install.sudo.close()
     lacking = packages.missing(node_dir) if str(root) == "/" else []
+    extra = packages.extra(node_dir) if str(root) == "/" else []
 
     changed: list[tuple[str, str]] = []
     dirs: list[tuple[str, str]] = []
@@ -50,7 +51,7 @@ def status(repo: Path, node: str, root: Path = Path("/"), verbose: bool = False)
             lines.append(("mode", f"{label}  {item.mode:04o} → {mode:04o}"))
 
     print(f"Node {node}, root {root}")
-    if not changed and not dirs and not lacking:
+    if not changed and not dirs and not lacking and not extra:
         print("Nothing differs from the node.")
     if changed:
         print(f"\nChanges on the machine:\n"
@@ -61,6 +62,10 @@ def status(repo: Path, node: str, root: Path = Path("/"), verbose: bool = False)
               f"  (dotfiles install {node} installs them;"
               f" dotfiles forget {node} --package <name> drops them)")
         print_lines([("package", name) for name in lacking])
+    if extra:
+        print(f"\nPackages not in the node:\n"
+              f"  (dotfiles add {node} --package <name> keeps them; removing them is yours)")
+        print_lines([("package", name) for name in extra])
     if dirs:
         print("\nDirectories off their defaults, with no .meta line:\n"
               "  (dotfiles add records them with the next file added under them)")
