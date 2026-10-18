@@ -8,11 +8,11 @@ from test_install import (  # noqa: F401
     REPO,
     VALUES,
     as_root,
+    host_file,
+    host_link,
+    host_meta,
     machine,
     make,
-    node_file,
-    node_link,
-    node_meta,
     own_link,
     snapshot,
 )
@@ -27,13 +27,13 @@ def run(**kwargs):
     status(REPO, "hyper", **kwargs)
 
 
-def test_a_machine_like_its_node(capsys):
+def test_a_machine_like_its_host(capsys):
     make("/etc/x", 0o644, 0, b"new\n")
-    node_file("etc/x")
+    host_file("etc/x")
 
     run()
 
-    assert capsys.readouterr().out == "Node hyper, root /\nNothing differs from the node.\n"
+    assert capsys.readouterr().out == "Host hyper, root /\nNothing differs from the host.\n"
 
 
 def test_lists_what_changed_on_the_machine(capsys):
@@ -42,13 +42,13 @@ def test_lists_what_changed_on_the_machine(capsys):
     make("/etc/c", 0o644, 1000, b"new\n")
     make("/home/alice/.ssh", 0o755, 1000)
     for rel in ("etc/a", "etc/b", "etc/c", "etc/d", "home/alice/.ssh/config"):
-        node_file(rel)
-    node_meta("0700 alice:alice home/alice/.ssh/")
+        host_file(rel)
+    host_meta("0700 alice:alice home/alice/.ssh/")
 
     run()
 
     assert capsys.readouterr().out == (
-        "Node hyper, root /\n"
+        "Host hyper, root /\n"
         "\n"
         "Changes on the machine:\n"
         "  (dotfiles add hyper <path> keeps them; dotfiles install hyper undoes them)\n"
@@ -62,7 +62,7 @@ def test_lists_what_changed_on_the_machine(capsys):
 
 
 def test_a_missing_directory_shows_as_its_files(capsys):
-    node_file("etc/a/b/x")
+    host_file("etc/a/b/x")
 
     run()
 
@@ -72,12 +72,12 @@ def test_a_missing_directory_shows_as_its_files(capsys):
 def test_lists_directories_off_their_defaults_without_a_meta_line(capsys):
     make("/etc/d", 0o750, 0)
     make("/etc/d/x", 0o644, 0, b"new\n")
-    node_file("etc/d/x")
+    host_file("etc/d/x")
 
     run()
 
     assert capsys.readouterr().out == (
-        "Node hyper, root /\n"
+        "Host hyper, root /\n"
         "\n"
         "Directories off their defaults, with no .meta line:\n"
         "  (dotfiles add records them with the next file added under them)\n"
@@ -87,8 +87,8 @@ def test_lists_directories_off_their_defaults_without_a_meta_line(capsys):
 
 def test_shows_the_real_mode_of_a_setuid_file(capsys):
     make("/etc/x", 0o4755, 1000, b"new\n")
-    node_file("etc/x", mode=0o755)
-    node_meta("4755 root:root etc/x")
+    host_file("etc/x", mode=0o755)
+    host_meta("4755 root:root etc/x")
 
     run()
 
@@ -100,16 +100,16 @@ def test_shows_the_real_mode_of_a_setuid_file(capsys):
 def test_verbose_shows_a_diff(capsys):
     make("/etc/x", 0o644, 0, b"one\nthree")
     make("/etc/bin", 0o644, 0, b"\0\1")
-    node_file("etc/x", b"one\ntwo\n")
-    node_file("etc/bin", b"\0\2")
+    host_file("etc/x", b"one\ntwo\n")
+    host_file("etc/bin", b"\0\2")
 
     run(verbose=True)
 
     out = capsys.readouterr().out
     assert out.endswith(
-        "\nBinary files nodes/hyper/etc/bin and /etc/bin differ\n"
+        "\nBinary files hosts/hyper/etc/bin and /etc/bin differ\n"
         "\n"
-        "--- nodes/hyper/etc/x\n"
+        "--- hosts/hyper/etc/x\n"
         "+++ /etc/x\n"
         "@@ -1,2 +1,2 @@\n"
         " one\n"
@@ -121,8 +121,8 @@ def test_verbose_shows_a_diff(capsys):
 
 def test_reads_a_closed_file_with_sudo_and_writes_nothing(capsys):
     make("/etc/key", 0o600, 0, b"old\n")
-    node_file("etc/key")
-    node_meta("0600 root:root etc/key")
+    host_file("etc/key")
+    host_meta("0600 root:root etc/key")
     before = snapshot()
 
     run()
@@ -135,7 +135,7 @@ def test_reads_a_closed_file_with_sudo_and_writes_nothing(capsys):
 
 def test_compares_another_root(capsys):
     make("/mnt/etc", 0o755, 0)
-    node_file("etc/x")
+    host_file("etc/x")
 
     run(root=Path("/mnt"))
 
@@ -145,7 +145,7 @@ def test_compares_another_root(capsys):
 def test_stops_on_what_install_stops_on():
     make("/srv", 0o755, 0)
     as_root(os.symlink)("/srv", "/etc/d")
-    node_file("etc/d/x")
+    host_file("etc/d/x")
 
     with pytest.raises(Error, match="a symlink, not a directory: /etc/d"):
         run()
@@ -153,16 +153,16 @@ def test_stops_on_what_install_stops_on():
 
 def test_shows_where_a_symlink_points(capsys):
     as_root(os.symlink)("/y", "/etc/a")
-    node_link("etc/a", "/x")
+    host_link("etc/a", "/x")
     make("/etc/b", 0o644, 0, b"new\n")
-    node_link("etc/b", "/x")
+    host_link("etc/b", "/x")
     make("/etc/secret", 0o600, 0, b"secret\n")
     as_root(os.symlink)("/etc/secret", "/etc/c")
-    node_file("etc/c")
-    node_link("etc/d", "/x")
+    host_file("etc/c")
+    host_link("etc/d", "/x")
     as_root(os.symlink)("/dangling", "/etc/e")
     own_link("/etc/e", 1000)
-    node_link("etc/e", "/dangling")
+    host_link("etc/e", "/dangling")
 
     run()
 
@@ -179,22 +179,22 @@ def test_command_runs_status(capsys):
     from dotfiles.cli import main
 
     assert main(["status", "nope"]) == 1
-    assert "no such node: nope" in capsys.readouterr().err
+    assert "no such host: nope" in capsys.readouterr().err
 
 
 def test_compares_a_template_filled_in(capsys):
     template.save_value(VALUES, "psk", "s3cret")
     make("/etc/wifi", 0o644, 0, b"psk=s3cret\n")
-    node_file("etc/wifi.tmpl", b"psk={{ psk }}\n")
+    host_file("etc/wifi.tmpl", b"psk={{ psk }}\n")
 
     run()
 
-    assert capsys.readouterr().out == "Node hyper, root /\nNothing differs from the node.\n"
+    assert capsys.readouterr().out == "Host hyper, root /\nNothing differs from the host.\n"
 
 
 def test_a_template_without_its_values(capsys):
     make("/etc/wifi", 0o600, 0, b"psk=s3cret\n")
-    node_file("etc/wifi.tmpl", b"psk={{ psk }} {{ id }}\n")
+    host_file("etc/wifi.tmpl", b"psk={{ psk }} {{ id }}\n")
 
     run()
 
@@ -207,14 +207,14 @@ def test_verbose_shows_a_template_diff_with_its_values_hidden(capsys):
     template.save_value(VALUES, "psk", "s3cret")
     template.save_value(VALUES, "psk_long", "s3cret-and-more")
     make("/etc/wifi", 0o644, 0, b"psk=s3cret\nlong=s3cret-and-more\nmode=b\n")
-    node_file("etc/wifi.tmpl", b"psk={{ psk }}\nlong={{ psk_long }}\nmode=a\n")
+    host_file("etc/wifi.tmpl", b"psk={{ psk }}\nlong={{ psk_long }}\nmode=a\n")
 
     run(verbose=True)
 
     out = capsys.readouterr().out
     assert "s3cret" not in out
     assert out.endswith(
-        "\n--- nodes/hyper/etc/wifi.tmpl\n"
+        "\n--- hosts/hyper/etc/wifi.tmpl\n"
         "+++ /etc/wifi (values hidden)\n"
         "@@ -1,3 +1,3 @@\n"
         " psk={{ psk }}\n"
@@ -228,28 +228,28 @@ def test_lists_the_packages_the_machine_lacks(monkeypatch, capsys):
     from dotfiles import packages
     monkeypatch.setattr(packages, "installed", lambda: {"base"})
     monkeypatch.setattr(packages, "explicit", lambda: {"base"})
-    (REPO / "nodes/hyper/.packages").write_text("base\nniri\n")
+    (REPO / "hosts/hyper/.packages").write_text("base\nniri\n")
 
     run()
 
     assert capsys.readouterr().out == (
-        "Node hyper, root /\n"
+        "Host hyper, root /\n"
         "\nPackages the machine lacks:\n"
         "  (dotfiles install hyper installs them; dotfiles forget hyper --package <name> drops them)\n"
         "        package:   niri\n")
 
 
-def test_lists_the_packages_not_in_the_node(monkeypatch, capsys):
+def test_lists_the_packages_not_in_the_host(monkeypatch, capsys):
     from dotfiles import packages
     monkeypatch.setattr(packages, "installed", lambda: {"base", "git", "niri", "vim"})
     monkeypatch.setattr(packages, "explicit", lambda: {"base", "vim", "git"})
-    (REPO / "nodes/hyper/.packages").write_text("base\nniri\n")
+    (REPO / "hosts/hyper/.packages").write_text("base\nniri\n")
 
     run()
 
     assert capsys.readouterr().out == (
-        "Node hyper, root /\n"
-        "\nPackages not in the node:\n"
+        "Host hyper, root /\n"
+        "\nPackages not in the host:\n"
         "  (dotfiles add hyper --package <name> keeps them; removing them is yours)\n"
         "        package:   git\n"
         "        package:   vim\n")
@@ -259,9 +259,9 @@ def test_another_root_has_no_packages_to_lack(monkeypatch, capsys):
     from dotfiles import packages
     monkeypatch.setattr(packages, "installed", lambda: {"vim"})
     monkeypatch.setattr(packages, "explicit", lambda: {"vim"})
-    (REPO / "nodes/hyper/.packages").write_text("niri\n")
+    (REPO / "hosts/hyper/.packages").write_text("niri\n")
     make("/srv", 0o755, 0)
 
     run(root=Path("/srv"))
 
-    assert capsys.readouterr().out.endswith("Nothing differs from the node.\n")
+    assert capsys.readouterr().out.endswith("Nothing differs from the host.\n")

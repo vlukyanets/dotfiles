@@ -1,1 +1,1 @@
-"""Keeps the copies of my machines' files in nodes/<node>/."""
+"""Keeps the copies of my machines' files in hosts/<host>/."""

@@ -1,6 +1,6 @@
 """dotfiles cleanup: removes the backups dotfiles install keeps in .backups/.
 
-A run's backups are one directory, .backups/<node>/<YYYYmmdd-HHMMSS>/,
+A run's backups are one directory, .backups/<host>/<YYYYmmdd-HHMMSS>/,
 named by the time the run started.
 """
 
@@ -18,7 +18,7 @@ def now() -> datetime:
 
 def cleanup(repo: Path, keep: int | None = None, older_than: int | None = None,
             dry_run: bool = False) -> None:
-    """Removes every run, or all but the last keep runs of each node, or the
+    """Removes every run, or all but the last keep runs of each host, or the
     runs older than older_than days.
 
     Prints each run it removes; with dry_run, prints them and removes none.
@@ -26,10 +26,10 @@ def cleanup(repo: Path, keep: int | None = None, older_than: int | None = None,
     if (keep or 0) < 0 or (older_than or 0) < 0:
         raise Error("the number must not be negative")
     backups = repo / ".backups"
-    nodes = sorted(backups.iterdir()) if backups.is_dir() else []
+    hosts = sorted(backups.iterdir()) if backups.is_dir() else []
     doomed = []
-    for node in nodes:
-        runs = sorted(node.iterdir())
+    for host in hosts:
+        runs = sorted(host.iterdir())
         for run in runs:
             try:
                 datetime.strptime(run.name, STAMP)

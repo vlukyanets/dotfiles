@@ -1,10 +1,10 @@
 #!/bin/sh
 # Stops a commit whose staged changes look like they hold a secret, as this
-# repository is public, or that leaves a node install would stop on.
+# repository is public, or that leaves a host install would stop on.
 # Enabled with: git config core.hooksPath .githooks
 set -e
 uv run --frozen --quiet dotfiles scan --staged
-# NOTE: checks the nodes in the working tree, not only what is staged; CI
+# NOTE: checks the hosts in the working tree, not only what is staged; CI
 # checks what is pushed. To check the index alone, check it out apart first:
 # git checkout-index --all --prefix=<dir>/.
 exec uv run --frozen --quiet dotfiles check

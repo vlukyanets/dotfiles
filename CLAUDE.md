@@ -8,18 +8,18 @@ first change.
 
 | Path | What it holds |
 |---|---|
-| `nodes/<node>/` | One machine: its files at their paths from `/`, one to one (`nodes/hyper/etc/ssh/sshd_config.d/10-local.conf`) |
-| `nodes/<node>/.meta` | Only the files and directories whose owner or mode differ from the defaults below, one per line: `0600 root:root etc/ssh/ssh_host_ed25519_key`; a directory's path ends in a slash: `0700 valentinl:valentinl home/valentinl/` |
-| `nodes/<node>/.hooks` | The commands to run when `install` writes a file, one per line: `etc/ssh/sshd_config.d/* sudo systemctl reload sshd` |
-| `nodes/<node>/.packages` | The packages of the node, a name per line, in its distribution's names |
-| `dotfiles/` | The Python package behind the `dotfiles` command: a subcommand for each job (adding files, installing a node, filling templates, checking what drifted) |
+| `hosts/<host>/` | One machine: its files at their paths from `/`, one to one (`hosts/hyper/etc/ssh/sshd_config.d/10-local.conf`) |
+| `hosts/<host>/.meta` | Only the files and directories whose owner or mode differ from the defaults below, one per line: `0600 root:root etc/ssh/ssh_host_ed25519_key`; a directory's path ends in a slash: `0700 valentinl:valentinl home/valentinl/` |
+| `hosts/<host>/.hooks` | The commands to run when `install` writes a file, one per line: `etc/ssh/sshd_config.d/* sudo systemctl reload sshd` |
+| `hosts/<host>/.packages` | The packages of the host, a name per line, in its distribution's names |
+| `dotfiles/` | The Python package behind the `dotfiles` command: a subcommand for each job (adding files, installing a host, filling templates, checking what drifted) |
 | `tests/` | The tests: `tests/test_add.py` checks `dotfiles add` |
 | `secret_leaks.toml` | The secret rules, read by `dotfiles scan` and `dotfiles add` |
-| `.githooks/`, `.github/workflows/` | The pre-commit hook, which checks for secrets and the nodes, and CI, which checks for secrets and the nodes, runs the tests and checks the lint and the types |
+| `.githooks/`, `.github/workflows/` | The pre-commit hook, which checks for secrets and the hosts, and CI, which checks for secrets and the hosts, runs the tests and checks the lint and the types |
 | `pyproject.toml`, `uv.lock` | The package and its dependencies, pinned; everything runs through `uv` |
 | `docs/` | How it works now, and the decisions with why |
 
-- A file or directory under `nodes/<node>/home/<user>/`, and that directory
+- A file or directory under `hosts/<host>/home/<user>/`, and that directory
   itself, belongs to that user; any other belongs to `root:root`. A file's
   mode is the one git keeps: 0644, or 0755 if executable. A directory's mode
   is 0755.
@@ -29,7 +29,7 @@ first change.
 - A file is a copy, not a template, unless it cannot be: a secret, or a value
   only the machine knows. A template is filled at install time.
 - Keeping the copies current is a job for the owner and the agent, with the
-  drift check's help: it lists what differs between a machine and its node.
+  drift check's help: it lists what differs between a machine and its host.
 
 ## Principles
 
@@ -97,7 +97,7 @@ The agent the owner talks to is the **lead**; the agents it starts are
 **helpers**. The lead stays responsible for everything a helper does.
 
 - **One agent by default.** Start helpers only for work that splits into
-  independent parts: separate files, separate nodes, a search across many
+  independent parts: separate files, separate hosts, a search across many
   files, a review. A small change is done by the lead alone. More than
   five helpers at once only with the owner's approval.
 - **Helpers follow this file.** Every brief tells the helper to read
@@ -123,7 +123,7 @@ The agent the owner talks to is the **lead**; the agents it starts are
 
 ## Files and code
 
-- A file in `nodes/` is the machine's file as it is, comments and all. Do not
+- A file in `hosts/` is the machine's file as it is, comments and all. Do not
   reformat, reorder or "improve" it; a change to it is a change to the
   machine.
 - Copy only what the owner set on purpose. A file a package installed and

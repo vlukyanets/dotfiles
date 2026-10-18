@@ -22,13 +22,13 @@ RUNS = {
 @pytest.fixture(autouse=True)
 def backups(fs, monkeypatch):
     monkeypatch.setattr(cleanup_module, "now", lambda: datetime(2026, 10, 12, 9, 0, 0))
-    for node, runs in RUNS.items():
+    for host, runs in RUNS.items():
         for run in runs:
-            fs.create_file(BACKUPS / node / run / "etc/x", contents="old\n")
+            fs.create_file(BACKUPS / host / run / "etc/x", contents="old\n")
 
 
 def left():
-    return {node: sorted(os.listdir(BACKUPS / node)) for node in RUNS}
+    return {host: sorted(os.listdir(BACKUPS / host)) for host in RUNS}
 
 
 def removed(*runs):
@@ -44,7 +44,7 @@ def test_removes_every_run(capsys):
         "laptop/20261004-120000")
 
 
-def test_keeps_the_last_runs_of_each_node(capsys):
+def test_keeps_the_last_runs_of_each_host(capsys):
     cleanup(REPO, keep=1)
 
     assert left() == {"hyper": ["20261011-213000"], "laptop": ["20261004-120000"]}

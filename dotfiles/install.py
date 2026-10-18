@@ -1,6 +1,6 @@
-"""dotfiles install: puts nodes/<node>/ onto the machine.
+"""dotfiles install: puts hosts/<host>/ onto the machine.
 
-The plan is built first, from the node and the machine, and is written only
+The plan is built first, from the host and the machine, and is written only
 when it is complete, so an error found while building it leaves the machine
 as it was. An error during the writes can leave a partial install; running
 it again completes it. What the user may do is done as the user; the rest
@@ -21,7 +21,7 @@ from pathlib import Path, PurePosixPath
 
 from dotfiles import packages, template
 from dotfiles.add import (
-    NODE_NAME,
+    HOST_NAME,
     OWN,
     Error,
     default_owner,
@@ -34,7 +34,7 @@ from dotfiles.machine import Local, Stat, Sudo
 
 local = Local()
 sudo = Sudo()
-STAMP = "%Y%m%d-%H%M%S"  # the name of a run in .backups/<node>/
+STAMP = "%Y%m%d-%H%M%S"  # the name of a run in .backups/<host>/
 
 
 def uid_of(name: str) -> int:
@@ -103,38 +103,38 @@ def put(item: "Item", mine: bool) -> None:
         call("write", item.path, item.data, item.mode, item.uid, item.gid, as_user=mine)
 
 
-def node_dir_of(repo: Path, node: str, root: Path) -> Path:
-    """repo/nodes/<node>/, once it and root are checked."""
-    node_dir = repo / "nodes" / node
-    if not NODE_NAME.fullmatch(node) or not node_dir.is_dir():
-        raise Error(f"no such node: {node}")
+def host_dir_of(repo: Path, host: str, root: Path) -> Path:
+    """repo/hosts/<host>/, once it and root are checked."""
+    host_dir = repo / "hosts" / host
+    if not HOST_NAME.fullmatch(host) or not host_dir.is_dir():
+        raise Error(f"no such host: {host}")
     if not root.is_dir():
         raise Error(f"no such directory: {root}")
-    return node_dir
+    return host_dir
 
 
-def install(repo: Path, node: str, root: Path = Path("/"), dry_run: bool = False) -> None:
-    """Puts each file of repo/nodes/<node>/ at its path under root, with its
+def install(repo: Path, host: str, root: Path = Path("/"), dry_run: bool = False) -> None:
+    """Puts each file of repo/hosts/<host>/ at its path under root, with its
     owner and mode, and fixes the directories that have a .meta line.
 
     Prints each change; with dry_run, prints them and changes nothing.
     """
-    node_dir = node_dir_of(repo, node, root)
+    host_dir = host_dir_of(repo, host, root)
     try:
-        read_node(node_dir)  # A broken node installs nothing, not even its packages.
+        read_host(host_dir)  # A broken host installs nothing, not even its packages.
         # First, as a package may bring a user or a directory the files need.
-        apply(packages.plan(node_dir, root), dry_run)
-        values = template.values_for(node_dir, ask=not dry_run)
-        apply(make_plan(node_dir, root, values, backup_run(repo, node),
-                        hooks=read_hooks(node_dir / ".hooks")), dry_run)
+        apply(packages.plan(host_dir, root), dry_run)
+        values = template.values_for(host_dir, ask=not dry_run)
+        apply(make_plan(host_dir, root, values, backup_run(repo, host),
+                        hooks=read_hooks(host_dir / ".hooks")), dry_run)
     finally:
         sudo.close()
 
 
-def backup_run(repo: Path, node: str) -> Path:
+def backup_run(repo: Path, host: str) -> Path:
     """Where a run keeps the files it replaces, named by its start, so one
     run has one directory."""
-    return repo / ".backups" / node / now().strftime(STAMP)
+    return repo / ".backups" / host / now().strftime(STAMP)
 
 
 def read_hooks(path: Path) -> list[tuple[str, str]]:
@@ -184,80 +184,80 @@ def apply(plan: list[tuple[str, Callable[[], None]]], dry_run: bool) -> None:
 
 @dataclass
 class Item:
-    """A path of the node: what the node wants there, and what the machine has."""
-    key: str  # its path in the node; a directory's ends in a slash
+    """A path of the host: what the host wants there, and what the machine has."""
+    key: str  # its path in the host; a directory's ends in a slash
     path: str  # its path on the machine
     mode: int
     uid: int
     gid: int
     in_meta: bool
     st: Stat | None  # None when the machine does not have it
-    data: bytes = b""  # a file's contents in the node, a template's filled
+    data: bytes = b""  # a file's contents in the host, a template's filled
     machine_data: bytes = b""  # and on the machine
     missing: tuple[str, ...] = ()  # the values a template lacks; data is empty then
-    link: str | None = None  # a symlink's target in the node
+    link: str | None = None  # a symlink's target in the host
     machine_link: str | None = None  # and on the machine, when it has a symlink there
 
 
 @dataclass
-class Node:
-    """What install reads from a node alone, without the machine."""
+class Host:
+    """What install reads from a host alone, without the machine."""
     files: list[str]  # its files and symlinks, sorted, its own (OWN) left out
     meta: dict[str, tuple[int, str, str]]  # path -> (mode, user, group)
 
 
-def read_node(node_dir: Path) -> Node:
-    """The node at node_dir, once every problem install would stop on that
+def read_host(host_dir: Path) -> Host:
+    """The host at host_dir, once every problem install would stop on that
     needs no machine is found; an error lists them all."""
     files = sorted(
         rel
-        for rel in (str(p.relative_to(node_dir)) for p in node_dir.rglob("*")
+        for rel in (str(p.relative_to(host_dir)) for p in host_dir.rglob("*")
                     if p.is_symlink() or p.is_file())
         if rel not in OWN
     )
-    lines, problems = parse_meta(node_dir / ".meta")
+    lines, problems = parse_meta(host_dir / ".meta")
     meta: dict[str, tuple[int, str, str]] = {}
     for key, line in lines.items():
         mode, owner, _ = line.split(" ", 2)
         user, _, group = owner.partition(":")
-        # The first problem of a line only; a path outside the node is never read.
+        # The first problem of a line only; a path outside the host is never read.
         if key.startswith("/") or ".." in PurePosixPath(key).parts:
-            problems.append(f"{node_dir / '.meta'}: not a path inside the node: {key}")
-        elif (node_dir / key.rstrip("/")).is_symlink():
-            problems.append(f"{node_dir / '.meta'}: a symlink has no owner or mode: {key}")
-        elif symlink_on_the_way(node_dir, key.rstrip("/")):
-            problems.append(f"{node_dir / '.meta'}: under a symlink in the node: {key}")
+            problems.append(f"{host_dir / '.meta'}: not a path inside the host: {key}")
+        elif (host_dir / key.rstrip("/")).is_symlink():
+            problems.append(f"{host_dir / '.meta'}: a symlink has no owner or mode: {key}")
+        elif symlink_on_the_way(host_dir, key.rstrip("/")):
+            problems.append(f"{host_dir / '.meta'}: under a symlink in the host: {key}")
         elif not user or not group:
-            problems.append(f"{node_dir / '.meta'}: bad owner: {line}")
-        elif not (node_dir / key).exists() or key.endswith("/") != (node_dir / key).is_dir():
-            problems.append(f"{node_dir / '.meta'}: the node has no {key}")
+            problems.append(f"{host_dir / '.meta'}: bad owner: {line}")
+        elif not (host_dir / key).exists() or key.endswith("/") != (host_dir / key).is_dir():
+            problems.append(f"{host_dir / '.meta'}: the host has no {key}")
         else:
             meta[key] = (int(mode, 8), user, group)
-    problems += parse_hooks(node_dir / ".hooks")[1]
-    problems += packages.problems(node_dir)
+    problems += parse_hooks(host_dir / ".hooks")[1]
+    problems += packages.problems(host_dir)
     for rel in files:
         target = rel.removesuffix(template.SUFFIX)
         if target == rel:
             continue
-        if (node_dir / rel).is_symlink():
+        if (host_dir / rel).is_symlink():
             problems.append(f"a symlink cannot be a template: {rel}")
         elif target in files:
-            problems.append(f"{node_dir}: both {target} and its template {rel}")
+            problems.append(f"{host_dir}: both {target} and its template {rel}")
         else:
             try:
-                template.text_of(node_dir / rel)
+                template.text_of(host_dir / rel)
             except Error as e:
                 problems.append(str(e))
     if problems:
         raise Error("\n  ".join(problems))
-    return Node(files, meta)
+    return Host(files, meta)
 
 
-def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
-    """Every directory of the node, parents first, then every file, read
-    from the node and the machine; a template is filled with values."""
-    node = read_node(node_dir)
-    files, meta = node.files, node.meta
+def survey(host_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
+    """Every directory of the host, parents first, then every file, read
+    from the host and the machine; a template is filled with values."""
+    host = read_host(host_dir)
+    files, meta = host.files, host.meta
 
     def wanted(key: str, default_mode: int) -> tuple[int, int, int]:
         if key in meta:
@@ -278,21 +278,21 @@ def survey(node_dir: Path, root: Path, values: dict[str, str]) -> list[Item]:
         items.append(Item(key, path, *wanted(key, 0o755), key in meta, st))
 
     for rel in files:
-        if (node_dir / rel).is_symlink():
+        if (host_dir / rel).is_symlink():
             path = str(root / rel)
             st = call("stat", path)
             items.append(Item(rel, path, *wanted(rel, 0o777), False, st,
                               machine_data=machine_data(st, path),
-                              link=os.readlink(node_dir / rel), machine_link=machine_link(st, path)))
+                              link=os.readlink(host_dir / rel), machine_link=machine_link(st, path)))
             continue
         target = rel.removesuffix(template.SUFFIX)
-        data, missing = (node_dir / rel).read_bytes(), tuple[str, ...]()
+        data, missing = (host_dir / rel).read_bytes(), tuple[str, ...]()
         if target != rel:
-            text = template.text_of(node_dir / rel)
+            text = template.text_of(host_dir / rel)
             missing = tuple(name for name in template.names(text) if name not in values)
             data = b"" if missing else template.fill(text, values).encode()
         path = str(root / target)
-        git_mode = 0o755 if (node_dir / rel).stat().st_mode & 0o100 else 0o644
+        git_mode = 0o755 if (host_dir / rel).stat().st_mode & 0o100 else 0o644
         st = call("stat", path)
         items.append(Item(rel, path, *wanted(rel, git_mode), rel in meta, st,
                           data, machine_data(st, path), missing, machine_link=machine_link(st, path)))
@@ -313,18 +313,18 @@ def machine_link(st: Stat | None, path: str) -> str | None:
     return call("readlink", path)
 
 
-def make_plan(node_dir: Path, root: Path, values: dict[str, str], run: Path,
+def make_plan(host_dir: Path, root: Path, values: dict[str, str], run: Path,
               keys: set[str] | None = None, hooks: list[tuple[str, str]] | None = None,
               ) -> list[tuple[str, Callable[[], None]]]:
-    """The lines to print and the actions to do, from reading the node and
+    """The lines to print and the actions to do, from reading the host and
     the machine; a file replaced is kept in run. With keys, only those files
-    of the node, and the directories above them. Last, each of the hooks
+    of the host, and the directories above them. Last, each of the hooks
     whose pattern matches a file written, once."""
     me = (os.getuid(), os.getgid())
     backups = run.parents[1]
     plan: list[tuple[str, Callable[[], None]]] = []
     written: list[str] = []  # the paths of the files written, from the root
-    items = survey(node_dir, root, values)
+    items = survey(host_dir, root, values)
     if keys is not None:
         items = [item for item in items if item.key in keys
                  or item.key.endswith("/") and any(key.startswith(item.key) for key in keys)]

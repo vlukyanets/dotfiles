@@ -1,6 +1,6 @@
-"""dotfiles add: copies machine files into nodes/<node>/ and keeps .meta.
+"""dotfiles add: copies machine files into hosts/<host>/ and keeps .meta.
 
-nodes/<node>/.meta lists, one per line as `<mode> <owner>:<group> <path>`,
+hosts/<host>/.meta lists, one per line as `<mode> <owner>:<group> <path>`,
 the files and the directories above them whose owner or mode differ from
 the defaults: <user>:<user> for home/<user>/ and below, root:root elsewhere;
 0644 for a file, or 0755 if executable; 0755 for a directory. A directory's
@@ -15,14 +15,14 @@ import stat
 import sys
 from pathlib import Path, PurePosixPath
 
-from dotfiles import packages as node_packages
+from dotfiles import packages as host_packages
 from dotfiles import secrets, template
 from dotfiles.machine import Error, Stat, Sudo
 from dotfiles.template import SUFFIX
 
 sudo = Sudo()
-NODE_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")  # a node's name, matched whole
-OWN = (".meta", ".hooks", ".packages")  # the files of a node that are its own, not the machine's
+HOST_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")  # a host's name, matched whole
+OWN = (".meta", ".hooks", ".packages")  # the files of a host that are its own, not the machine's
 
 
 def user_name(uid: int) -> str:
@@ -57,11 +57,11 @@ def default_owner(key: str) -> str:
     return "root:root"
 
 
-def symlink_on_the_way(node_dir: Path, rel: str) -> str | None:
-    """The first directory above rel in the node that is a symlink, so that
+def symlink_on_the_way(host_dir: Path, rel: str) -> str | None:
+    """The first directory above rel in the host that is a symlink, so that
     nothing is read, written or removed through it."""
     return next((str(parent) for parent in reversed(PurePosixPath(rel).parents[:-1])
-                 if (node_dir / parent).is_symlink()), None)
+                 if (host_dir / parent).is_symlink()), None)
 
 
 def parse_meta(path: Path) -> tuple[dict[str, str], list[str]]:
@@ -91,7 +91,7 @@ def read_meta(path: Path) -> dict[str, str]:
 
 def add(
     repo: Path,
-    node: str,
+    host: str,
     paths: list[str],
     root: Path = Path("/"),
     dry_run: bool = False,
@@ -99,54 +99,54 @@ def add(
     as_template: bool = False,
     packages: list[str] | None = None,
 ) -> None:
-    """Copies each path from root into repo/nodes/<node>/ and updates .meta,
+    """Copies each path from root into repo/hosts/<host>/ and updates .meta,
     then adds each of packages, which must be installed, to its .packages.
-    With neither, copies each file and symlink of the node that changed on
+    With neither, copies each file and symlink of the host that changed on
     the machine, and names the changes it cannot copy (status.drifted).
 
     Prints each change; with dry_run, prints them and changes nothing.
     Refuses files that look like they hold a secret, unless force is set.
     With as_template, keeps each as a template instead, its secrets named
-    and moved to the node's values file (template.py).
+    and moved to the host's values file (template.py).
     What the user cannot read goes to one sudo helper (machine.Sudo).
     """
-    if not NODE_NAME.fullmatch(node):
-        raise Error(f"bad node name: {node}")
+    if not HOST_NAME.fullmatch(host):
+        raise Error(f"bad host name: {host}")
     if not paths and not packages:  # Everything that changed on the machine, as status shows it.
         if as_template:
             raise Error("--template needs the paths to make templates of")
         # Imported here: status imports install, which imports add.
         from dotfiles.status import drifted
-        paths, skipped = drifted(repo, node, root)
+        paths, skipped = drifted(repo, host, root)
         for line in skipped:
             print(line)
         if not paths:
-            print("nothing differs from the node")
+            print("nothing differs from the host")
             return
     if packages:
-        have = node_packages.installed()
+        have = host_packages.installed()
         if lacking := [name for name in packages if name not in have]:
             raise Error(f"not installed: {', '.join(lacking)}")
     try:
-        copy(repo, node, paths, root, dry_run, force, as_template)
+        copy(repo, host, paths, root, dry_run, force, as_template)
     finally:
         sudo.close()
     if packages:
-        node_dir = repo / "nodes" / node
-        listed = node_packages.read(node_dir)
+        host_dir = repo / "hosts" / host
+        listed = host_packages.read(host_dir)
         for name in dict.fromkeys(packages):
             print(f"{'unchanged' if name in listed else 'added'} package {name}")
         if not dry_run and not set(packages) <= set(listed):
-            node_packages.write(node_dir, listed + packages)
+            host_packages.write(host_dir, listed + packages)
 
 
-def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, force: bool,
+def copy(repo: Path, host: str, paths: list[str], root: Path, dry_run: bool, force: bool,
          as_template: bool) -> None:
     for path in paths:
         if not path.startswith("/"):
             raise Error(f"not an absolute path: {path}")
         if path.lstrip("/") in OWN:
-            raise Error(f"a node keeps its own {path.lstrip('/')} there: {path}")
+            raise Error(f"a host keeps its own {path.lstrip('/')} there: {path}")
         st_mode = mode_and_ids(root / path.lstrip("/")).mode
         for parent in reversed(PurePosixPath(path.lstrip("/")).parents[:-1]):
             if stat.S_ISLNK(mode_and_ids(root / parent).mode):
@@ -154,14 +154,14 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
         if not stat.S_ISREG(st_mode) and not stat.S_ISLNK(st_mode):
             raise Error(f"not a regular file: {path}")
         if path.endswith(SUFFIX):
-            raise Error(f"a node reads a file ending in {SUFFIX} as a template: {path}")
-        plain = f"nodes/{node}/{path.lstrip('/')}"
-        link = symlink_on_the_way(repo / "nodes" / node, path.lstrip("/"))
+            raise Error(f"a host reads a file ending in {SUFFIX} as a template: {path}")
+        plain = f"hosts/{host}/{path.lstrip('/')}"
+        link = symlink_on_the_way(repo / "hosts" / host, path.lstrip("/"))
         if link:
-            raise Error(f"a symlink in the node, not a directory: nodes/{node}/{link};"
+            raise Error(f"a symlink in the host, not a directory: hosts/{host}/{link};"
                         " dotfiles forget it first")
         if (repo / plain).is_dir() and not (repo / plain).is_symlink():
-            raise Error(f"{plain} is a directory in the node; dotfiles forget its files first")
+            raise Error(f"{plain} is a directory in the host; dotfiles forget its files first")
         if stat.S_ISLNK(st_mode):
             if as_template:
                 raise Error(f"a symlink cannot be a template: {path}")
@@ -174,7 +174,7 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
             raise Error(f"{path} is kept as a template, {plain}{SUFFIX}; use --template")
 
     config = secrets.load(repo / "secret_leaks.toml")
-    values_path = template.values_path(node)
+    values_path = template.values_path(host)
     values = template.read_values(values_path)
     new_values: dict[str, str] = {}
     unnamed: dict[str, int] = {}  # path -> secrets left to name, in a dry run
@@ -215,8 +215,8 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
     for secret in found:
         print(f"warning: copying a secret: {secret}", file=sys.stderr)
 
-    node_dir = repo / "nodes" / node
-    meta_path = node_dir / ".meta"
+    host_dir = repo / "hosts" / host
+    meta_path = host_dir / ".meta"
     meta = read_meta(meta_path)
     old_meta = dict(meta)
 
@@ -224,15 +224,15 @@ def copy(repo: Path, node: str, paths: list[str], root: Path, dry_run: bool, for
         rel = path.lstrip("/")
         src = root / rel
         key = rel + SUFFIX if as_template else rel
-        dest = node_dir / key
+        dest = host_dir / key
         if path in links:
-            copy_link(dest, links[path], f"nodes/{node}/{key}", dry_run)
+            copy_link(dest, links[path], f"hosts/{host}/{key}", dry_run)
             if meta.pop(key, None) is not None:
                 print(f"meta: removed {key}")
         else:
             st = mode_and_ids(src)
             git_mode = 0o755 if st.mode & 0o100 else 0o644
-            copy_file(dest, contents[path], git_mode, unnamed.get(path, 0), f"nodes/{node}/{key}",
+            copy_file(dest, contents[path], git_mode, unnamed.get(path, 0), f"hosts/{host}/{key}",
                       dry_run)
             update_meta(meta, key, st, git_mode)
         for parent in PurePosixPath(rel).parents[:-1]:
