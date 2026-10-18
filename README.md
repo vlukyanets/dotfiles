@@ -2,9 +2,9 @@
 
 The configuration of my machines, kept as plain copies of their files.
 
-- `nodes/<node>/` holds one machine's files at their paths from `/`:
-  `nodes/hyper/etc/ssh/sshd_config.d/10-local.conf`.
-- `nodes/<node>/.meta` lists only the files and directories whose owner or
+- `hosts/<host>/` holds one machine's files at their paths from `/`:
+  `hosts/hyper/etc/ssh/sshd_config.d/10-local.conf`.
+- `hosts/<host>/.meta` lists only the files and directories whose owner or
   mode differ from the defaults, one per line:
   `0600 root:root etc/ssh/ssh_host_ed25519_key`. A directory's path ends in
   a slash: `0700 valentinl:valentinl home/valentinl/`. The defaults are
@@ -35,7 +35,7 @@ dotfiles install --dry-run hyper
 ```
 
 - `uv tool upgrade dotfiles` updates the command;
-  `git -C ~/.local/share/dotfiles pull` updates the nodes.
+  `git -C ~/.local/share/dotfiles pull` updates the hosts.
 - `add` writes into the clone; commit and push from there.
 - `dotfiles init --slim` leaves the old versions of files on GitHub;
   git fetches one when a command needs it (`git log -p`, `git blame`), and
@@ -53,7 +53,7 @@ git config core.hooksPath .githooks
 Here `uv run dotfiles …` works on this clone, whatever `$DOTFILES_REPO`
 says. The last line turns on the pre-commit hook in `.githooks/`, in
 either clone: it stops a commit that holds a secret or leaves a broken
-node. Cloning does not turn it on; that is up to you. Without it, nothing
+host. Cloning does not turn it on; that is up to you. Without it, nothing
 stops a secret before it is pushed.
 
 ## Checking for secrets
@@ -61,7 +61,7 @@ stops a secret before it is pushed.
 ```sh
 uv run dotfiles scan --staged          # the lines the staged changes add
 uv run dotfiles scan --history         # the lines every commit adds
-uv run dotfiles scan nodes/hyper       # whole files, or a directory
+uv run dotfiles scan hosts/hyper       # whole files, or a directory
 ```
 
 The rules are in `secret_leaks.toml`: hundreds of known token formats,
@@ -77,33 +77,33 @@ copies.
 The pre-commit hook runs `dotfiles scan --staged`; CI runs
 `dotfiles scan --history` on every pull request.
 
-## Checking the nodes
+## Checking the hosts
 
 ```sh
-uv run dotfiles check          # every node in nodes/
-uv run dotfiles check hyper    # the nodes named
+uv run dotfiles check          # every host in hosts/
+uv run dotfiles check hyper    # the hosts named
 ```
 
 ```
 hyper: ok
 laptop:
-  …/nodes/laptop/.meta:3: not `<mode> <owner>:<group> <path>`
-  …/nodes/laptop/.meta: the node has no etc/nope
-  …/nodes/laptop/.hooks:2: not `<pattern> <command>`
+  …/hosts/laptop/.meta:3: not `<mode> <owner>:<group> <path>`
+  …/hosts/laptop/.meta: the host has no etc/nope
+  …/hosts/laptop/.hooks:2: not `<pattern> <command>`
 ```
 
-The command finds in each node what would stop `install` without a
+The command finds in each host what would stop `install` without a
 machine: what does not parse in `.meta`, `.hooks` and `.packages`, a
-`.meta` line for a path the node does not have, a symlink or a path under
-a symlinked directory of the node, a file kept beside its template, a
-symlink named like a template, a template that is not UTF-8, and a node
-name `install` refuses. It prints each node in name order, `ok` or its
-problems, and exits with 1 if a node has one. It reads only the
+`.meta` line for a path the host does not have, a symlink or a path under
+a symlinked directory of the host, a file kept beside its template, a
+symlink named like a template, a template that is not UTF-8, and a host
+name `install` refuses. It prints each host in name order, `ok` or its
+problems, and exits with 1 if a host has one. It reads only the
 repository, so it runs anywhere, as any user; whether a user, a group or
 a package exists is for `install` to find on the machine. Why:
 [decision 33](docs/decisions.md).
 
-The pre-commit hook runs it after `dotfiles scan --staged`, on the nodes
+The pre-commit hook runs it after `dotfiles scan --staged`, on the hosts
 as they are in the working tree; CI runs it on every pull request and on
 `master`.
 
@@ -113,8 +113,8 @@ as they are in the working tree; CI runs it on every pull request and on
 uv run dotfiles add hyper /etc/ssh/sshd_config.d/10-local.conf ~/.config/niri/config.kdl
 ```
 
-The command copies each file into `nodes/hyper/` at its path and updates
-`nodes/hyper/.meta` when the owner or mode of the file, or of any directory
+The command copies each file into `hosts/hyper/` at its path and updates
+`hosts/hyper/.meta` when the owner or mode of the file, or of any directory
 above it, is not the default. Running it again updates the copies that
 changed and prints `unchanged` for the rest.
 
@@ -133,21 +133,21 @@ so the password is asked once.
 - `--root DIR` reads the files from `DIR` instead of `/`.
 
 A symlink is kept as a symlink, its target as it is, whatever it points
-to: `added nodes/hyper/etc/localtime -> /usr/share/zoneinfo/UTC`. It gets
+to: `added hosts/hyper/etc/localtime -> /usr/share/zoneinfo/UTC`. It gets
 no `.meta` line and is not checked for secrets, since its target is a path;
 it cannot be a template. A directory, a path through a symlinked
-directory on the machine or in the node, or a path the node keeps as a
+directory on the machine or in the host, or a path the host keeps as a
 directory is an error; so is forgetting a path through a symlinked
-directory in the node.
+directory in the host.
 
 ### Taking back what changed
 
 ```sh
-uv run dotfiles add hyper              # each file of the node changed on the machine
+uv run dotfiles add hyper              # each file of the host changed on the machine
 ```
 
 With no path and no `--package`, the command adds each file and symlink of
-the node that `status` lists as changed on the machine: `modified`,
+the host that `status` lists as changed on the machine: `modified`,
 `target:`, `mode:` or `owner:`. It skips, with a line for each, a file
 missing on the machine, which `forget` drops, and a template, which
 `add --template` with its path remakes. Why:
@@ -161,14 +161,14 @@ uv run dotfiles forget hyper /etc/ssh/sshd_config.d/10-local.conf
 ```
 
 The command removes the file's copy, its template or its symlink from
-`nodes/hyper/` with its line in `.meta`, and so does it for each directory
-of the node left with no files. The machine keeps the file. `--dry-run`
+`hosts/hyper/` with its line in `.meta`, and so does it for each directory
+of the host left with no files. The machine keeps the file. `--dry-run`
 prints what would change and changes nothing.
 
 ## Packages
 
-`nodes/<node>/.packages` lists the packages of the node, a name per line.
-A node is one machine, so the names are those of its distribution:
+`hosts/<host>/.packages` lists the packages of the host, a name per line.
+A host is one machine, so the names are those of its distribution:
 
 | Distribution, by `ID` or `ID_LIKE` in `/etc/os-release` | Installed | Installed on purpose | Installed with |
 |---|---|---|---|
@@ -186,19 +186,19 @@ uv run dotfiles add hyper /etc/hosts --package vim  # paths first
   user or a directory the files need. With `--dry-run` it only prints;
   with `--root` other than `/` it prints `skipped packages`.
 - A package installed on purpose that the list lacks is left alone;
-  `status` lists it, if the node has a list. Removing it is yours. On
+  `status` lists it, if the host has a list. Removing it is yours. On
   Debian, what the installer chose counts as on purpose too.
 - paru and apt ask before they install; nothing answers for you.
 - An AUR package needs paru; without it, pacman fails on it.
 
-## Installing a node
+## Installing a host
 
 ```sh
 uv run dotfiles install --dry-run hyper
 uv run dotfiles install hyper
 ```
 
-The command puts each file of `nodes/hyper/` at its path from `/`, with the
+The command puts each file of `hosts/hyper/` at its path from `/`, with the
 owner and mode from `.meta` or the defaults. It prints each change and
 changes nothing else. Run twice, the second run prints nothing.
 
@@ -213,30 +213,30 @@ changes nothing else. Run twice, the second run prints nothing.
 | Directory without one | Left alone | Nothing |
 | Missing symlink | Made | `installed /etc/localtime -> /usr/share/zoneinfo/UTC` |
 | Symlink to the same target | Nothing | Nothing |
-| Symlink to another target, or a file where the node has a symlink, or the other way round | The old one is kept as a backup, then replaced | `updated /etc/localtime -> /usr/share/zoneinfo/UTC (backup …)` |
+| Symlink to another target, or a file where the host has a symlink, or the other way round | The old one is kept as a backup, then replaced | `updated /etc/localtime -> /usr/share/zoneinfo/UTC (backup …)` |
 
 - A file is written to a temporary file beside it and renamed over the
   target, so it is never missing or half-written. So is a symlink.
-- A symlink in the node is put as it is, its target not rewritten and not
+- A symlink in the host is put as it is, its target not rewritten and not
   needed to exist. Its owner is the default, set when it is made and never
   compared; it has no mode and no `.meta` line. Why:
   [decision 30](docs/decisions.md).
 - The backup is a copy of the old file, made before it is replaced, in
-  `.backups/<node>/<YYYYmmdd-HHMMSS>/` of this repository, at the file's
+  `.backups/<host>/<YYYYmmdd-HHMMSS>/` of this repository, at the file's
   path from `/`. The time is when the run started, in local time, so one
   run keeps all its backups in one directory. A copy is yours and 0600;
   the old file's owner and mode are in that directory's `.meta`, a line
-  for each file, in the format of a node's. A symlink is kept as a
+  for each file, in the format of a host's. A symlink is kept as a
   symlink, with no line. `.backups/` is closed to others (0700) and ignored by
   git; `dotfiles restore` puts it back, and `dotfiles cleanup` removes what
   you no longer need.
 - The command runs as you. What you cannot write goes through one
   `sudo` helper, started at the first need, so the password is asked once.
-- The node is read first, before the packages, and the command stops with
-  an error, having changed nothing, listing every problem of the node at
+- The host is read first, before the packages, and the command stops with
+  an error, having changed nothing, listing every problem of the host at
   once: a `.meta`, `.hooks` or `.packages` file that is not UTF-8, or a
-  line of it that does not parse; a `.meta` line for a path the node does
-  not have, a symlink or a path under a symlinked directory of the node; a
+  line of it that does not parse; a `.meta` line for a path the host does
+  not have, a symlink or a path under a symlinked directory of the host; a
   file kept beside its template; a symlink named like a template; a
   template that is not UTF-8. `status` lists them the same way, and `add`
   and `forget` every `.meta` line that does not parse. Why:
@@ -245,21 +245,21 @@ changes nothing else. Run twice, the second run prints nothing.
   with an error, having changed nothing, at the first problem of the
   machine: a user or group that does not exist, a directory on the way
   that is a symlink, a target that is not a regular file or a symlink or a
-  directory that is not a directory; or when the node or the root does not
+  directory that is not a directory; or when the host or the root does not
   exist.
 - `--dry-run` prints the same lines and changes nothing. It may still read
   through `sudo`.
 - `--root DIR` installs under `DIR` instead of `/`.
 
-It does not remove what the node lacks, show diffs, or enable services.
+It does not remove what the host lacks, show diffs, or enable services.
 
 ### Running commands after a file changes
 
-`nodes/<node>/.hooks` names a command to run when `install` writes a file,
+`hosts/<host>/.hooks` names a command to run when `install` writes a file,
 one line each: a pattern of paths from `/`, then the command.
 
 ```
-# nodes/hyper/.hooks
+# hosts/hyper/.hooks
 etc/ssh/sshd_config.d/*          sudo systemctl reload sshd
 etc/systemd/system/*             sudo systemctl daemon-reload
 home/valentinl/.config/waybar/*  systemctl --user restart waybar
@@ -282,11 +282,11 @@ home/valentinl/.config/waybar/*  systemctl --user restart waybar
 ## Templates
 
 A file that holds a secret, or a value only the machine knows, is kept as a
-template: `nodes/<node>/<path>.tmpl`, with a placeholder in place of each
+template: `hosts/<host>/<path>.tmpl`, with a placeholder in place of each
 value.
 
 ```
-# nodes/hyper/etc/NetworkManager/system-connections/home.nmconnection.tmpl
+# hosts/hyper/etc/NetworkManager/system-connections/home.nmconnection.tmpl
 [wifi-security]
 psk={{ wifi_home_psk }}
 ```
@@ -295,7 +295,7 @@ psk={{ wifi_home_psk }}
   filled in; `name` is `[a-z0-9_]`, and anything else is left as it is.
   Its `.meta` line names the template: `0600 root:root
   etc/NetworkManager/system-connections/home.nmconnection.tmpl`.
-- The values are in `~/.config/dotfiles/<node>.toml` (under
+- The values are in `~/.config/dotfiles/<host>.toml` (under
   `$XDG_CONFIG_HOME` when it is set), outside the repository, a flat TOML
   table of strings, 0600 in a 0700 directory:
   `wifi_home_psk = "…"`. A value can be written there by hand, a
@@ -311,7 +311,7 @@ psk={{ wifi_home_psk }}
   not shown. A value changed on the machine is not one it knows, and shows.
 - A value is never printed. A template is checked for secrets like any
   other file, so one left in it is still caught.
-- A node cannot keep both `x` and `x.tmpl`, and `add` refuses a file kept
+- A host cannot keep both `x` and `x.tmpl`, and `add` refuses a file kept
   as a template, or one whose name ends in `.tmpl`.
 
 ```sh
@@ -332,7 +332,7 @@ uv run dotfiles add --template hyper /etc/NetworkManager/system-connections/home
   written. So is a secret found but not in its line as it is (decoded
   from base64, say): make that template by hand.
 - A file with no secret is copied as it is, to put placeholders in by hand.
-- `--dry-run` asks nothing: `added nodes/hyper/etc/x.tmpl (2 values to name)`.
+- `--dry-run` asks nothing: `added hosts/hyper/etc/x.tmpl (2 values to name)`.
 - A file kept as a plain copy is not turned into a template; `git rm` it
   first.
 
@@ -343,12 +343,12 @@ uv run dotfiles status hyper           # what differs, like git status
 uv run dotfiles status -v hyper        # and a diff of each modified file
 ```
 
-The node plays git's index and the machine its working tree; each arrow
-goes from the node to the machine. The command writes nothing, and exits
+The host plays git's index and the machine its working tree; each arrow
+goes from the host to the machine. The command writes nothing, and exits
 with 0 whether or not something differs.
 
 ```
-Node hyper, root /
+Host hyper, root /
 
 Changes on the machine:
   (dotfiles add hyper <path> keeps them; dotfiles install hyper undoes them)
@@ -366,9 +366,9 @@ Directories off their defaults, with no .meta line:
 - It reads what `install` reads, through `sudo` when needed, and stops on
   the same errors.
 - A missing directory shows as its missing files.
-- The packages of the node the machine lacks are listed after the changes,
+- The packages of the host the machine lacks are listed after the changes,
   as `package:   niri`, then the packages installed on purpose that the
-  node's list lacks, if it has one; neither with `--root`.
+  host's list lacks, if it has one; neither with `--root`.
 - `target:` is a symlink pointing elsewhere, or a symlink on one side and a
   file, shown as `(a file)`, on the other. A symlink's owner and mode are
   not compared, and a target that does not exist is no difference.
@@ -388,9 +388,9 @@ uv run dotfiles restore hyper 20261011-213000      # that run
 uv run dotfiles restore hyper /etc/x /etc/y        # only these files, from the last run
 ```
 
-A run's directory in `.backups/<node>/` is laid out like a node, its
+A run's directory in `.backups/<host>/` is laid out like a host, its
 `.meta` holding a line for every file, so `restore` puts it back the way
-`install` puts a node: each file at its path with its old owner and mode,
+`install` puts a host: each file at its path with its old owner and mode,
 printing the same lines, a symlink put back as a symlink. The files it
 replaces are kept in a new run, so a restore can be undone too. Files the
 run does not hold are left alone.
@@ -398,18 +398,18 @@ run does not hold are left alone.
 - An argument that starts with `/` is a path; the other one, if any, is the
   run. A path the run does not hold is an error.
 - `--dry-run` and `--root DIR` work as they do for `install`, and so do the
-  node's `.hooks`.
+  host's `.hooks`.
 
 ## Removing backups
 
 ```sh
 uv run dotfiles cleanup --dry-run      # what it would remove
 uv run dotfiles cleanup                # every backup
-uv run dotfiles cleanup --keep 3       # all but the last 3 runs of each node
+uv run dotfiles cleanup --keep 3       # all but the last 3 runs of each host
 uv run dotfiles cleanup --older-than 30   # the runs older than 30 days
 ```
 
-It removes whole runs, the directories under `.backups/<node>/`, and
+It removes whole runs, the directories under `.backups/<host>/`, and
 prints each one. It stops with an error, having removed nothing, when a
 directory there is not named like a run.
 

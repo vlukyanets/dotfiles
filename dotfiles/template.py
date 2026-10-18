@@ -1,8 +1,8 @@
-"""Templates: node files ending in .tmpl, filled when they are installed.
+"""Templates: host files ending in .tmpl, filled when they are installed.
 
 A placeholder is `{{ name }}`, name in [a-z0-9_]; the rest of a template is
 kept as it is. The values live outside the repository, in
-~/.config/dotfiles/<node>.toml (under $XDG_CONFIG_HOME when it is set), a
+~/.config/dotfiles/<host>.toml (under $XDG_CONFIG_HOME when it is set), a
 flat TOML table of strings, closed to others. A value is never printed.
 """
 
@@ -19,9 +19,9 @@ SUFFIX = ".tmpl"
 PLACEHOLDER = re.compile(r"\{\{ *([a-z0-9_]+) *\}\}")
 
 
-def values_path(node: str) -> Path:
+def values_path(host: str) -> Path:
     config = os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
-    return Path(config) / "dotfiles" / f"{node}.toml"
+    return Path(config) / "dotfiles" / f"{host}.toml"
 
 
 def read_values(path: Path) -> dict[str, str]:
@@ -68,12 +68,12 @@ def fill(text: str, values: dict[str, str]) -> str:
     return PLACEHOLDER.sub(lambda m: values[m[1]], text)
 
 
-def values_for(node_dir: Path, ask: bool) -> dict[str, str]:
-    """The values of node_dir's templates. With ask, a missing one is asked
+def values_for(host_dir: Path, ask: bool) -> dict[str, str]:
+    """The values of host_dir's templates. With ask, a missing one is asked
     for, without echo, and saved; without, it stays missing."""
-    path = values_path(node_dir.name)
+    path = values_path(host_dir.name)
     values = read_values(path)
-    needed = [name for template in sorted(node_dir.rglob(f"*{SUFFIX}")) if template.is_file()
+    needed = [name for template in sorted(host_dir.rglob(f"*{SUFFIX}")) if template.is_file()
               for name in names(text_of(template))]
     for name in dict.fromkeys(needed):
         if name in values or not ask:

@@ -1,6 +1,6 @@
-"""The packages of a node: nodes/<node>/.packages, one name per line.
+"""The packages of a host: hosts/<host>/.packages, one name per line.
 
-A node is one machine, so the names are those of its distribution, which
+A host is one machine, so the names are those of its distribution, which
 /etc/os-release names. install only installs what is missing; the
 packages installed on purpose that the list lacks are only listed, by
 status, and removing them is the owner's.
@@ -17,14 +17,14 @@ from dotfiles.machine import Error
 FILE = ".packages"
 
 
-def read(node_dir: Path) -> list[str]:
-    path = node_dir / FILE
+def read(host_dir: Path) -> list[str]:
+    path = host_dir / FILE
     return [line.strip() for line in path.read_text().splitlines() if line.strip()] if path.exists() else []
 
 
-def problems(node_dir: Path) -> list[str]:
+def problems(host_dir: Path) -> list[str]:
     """A problem for each line of .packages that is not one name."""
-    path = node_dir / FILE
+    path = host_dir / FILE
     try:
         text = path.read_bytes().decode() if path.exists() else ""
     except UnicodeDecodeError:
@@ -33,11 +33,11 @@ def problems(node_dir: Path) -> list[str]:
             for number, line in enumerate(text.splitlines(), 1) if len(line.split()) > 1]
 
 
-def write(node_dir: Path, names: list[str]) -> None:
+def write(host_dir: Path, names: list[str]) -> None:
     """Writes names sorted, or removes the file when there are none."""
-    path = node_dir / FILE
+    path = host_dir / FILE
     if names:
-        node_dir.mkdir(parents=True, exist_ok=True)
+        host_dir.mkdir(parents=True, exist_ok=True)
         path.write_text("".join(name + "\n" for name in sorted(set(names))))
     else:
         path.unlink(missing_ok=True)
@@ -98,29 +98,29 @@ def install(names: list[str]) -> None:
     run(install_command(names))
 
 
-def missing(node_dir: Path) -> list[str]:
-    """The packages of the node this machine lacks."""
-    names = read(node_dir)
+def missing(host_dir: Path) -> list[str]:
+    """The packages of the host this machine lacks."""
+    names = read(host_dir)
     if not names:
         return []
     have = installed()
     return [name for name in names if name not in have]
 
 
-def extra(node_dir: Path) -> list[str]:
-    """The packages this machine has on purpose and the node's list lacks,
-    sorted; none for a node without a list."""
-    names = read(node_dir)
+def extra(host_dir: Path) -> list[str]:
+    """The packages this machine has on purpose and the host's list lacks,
+    sorted; none for a host without a list."""
+    names = read(host_dir)
     return sorted(explicit() - set(names)) if names else []
 
 
-def plan(node_dir: Path, root: Path) -> list[tuple[str, Callable[[], None]]]:
+def plan(host_dir: Path, root: Path) -> list[tuple[str, Callable[[], None]]]:
     """The line to print and the action to install what the machine lacks."""
-    if not read(node_dir):
+    if not read(host_dir):
         return []
     if str(root) != "/":  # Another root is not this machine's running system.
         return [(f"skipped packages (the root is {root})", lambda: None)]
-    names = missing(node_dir)
+    names = missing(host_dir)
     if not names:
         return []
     return [(f"installed packages {' '.join(names)}",

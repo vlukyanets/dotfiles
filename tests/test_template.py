@@ -20,7 +20,7 @@ from dotfiles.template import (
 
 CONFIG = Path("/home/alice/.config")
 VALUES = CONFIG / "dotfiles/hyper.toml"
-NODE = Path("/repo/nodes/hyper")
+HOST = Path("/repo/hosts/hyper")
 
 
 class Terminal(io.StringIO):
@@ -31,7 +31,7 @@ class Terminal(io.StringIO):
 @pytest.fixture(autouse=True)
 def config(fs, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(CONFIG))
-    fs.create_dir(NODE)
+    fs.create_dir(HOST)
 
 
 def asked(monkeypatch, answers):
@@ -89,34 +89,34 @@ def test_a_broken_values_file_names_no_value():
 
 def test_asks_for_each_missing_value_once_and_saves_it(monkeypatch):
     save_value(VALUES, "known", "k")
-    (NODE / "etc").mkdir(parents=True)
-    (NODE / "etc/a.tmpl").write_text("{{ known }} {{ psk }}\n")
-    (NODE / "etc/b.tmpl").write_text("{{ psk }} {{ token }}\n")
+    (HOST / "etc").mkdir(parents=True)
+    (HOST / "etc/a.tmpl").write_text("{{ known }} {{ psk }}\n")
+    (HOST / "etc/b.tmpl").write_text("{{ psk }} {{ token }}\n")
     prompts = asked(monkeypatch, ["p", "t"])
 
-    assert values_for(NODE, ask=True) == {"known": "k", "psk": "p", "token": "t"}
+    assert values_for(HOST, ask=True) == {"known": "k", "psk": "p", "token": "t"}
     assert prompts == ["value for psk: ", "value for token: "]
     assert read_values(VALUES) == {"known": "k", "psk": "p", "token": "t"}
 
 
 def test_without_ask_a_missing_value_stays_missing(monkeypatch):
-    (NODE / "a.tmpl").write_text("{{ psk }}\n")
+    (HOST / "a.tmpl").write_text("{{ psk }}\n")
     prompts = asked(monkeypatch, [])
 
-    assert values_for(NODE, ask=False) == {}
+    assert values_for(HOST, ask=False) == {}
     assert prompts == []
     assert not VALUES.exists()
 
 
 def test_does_not_ask_without_a_terminal(monkeypatch):
-    (NODE / "a.tmpl").write_text("{{ psk }}\n")
+    (HOST / "a.tmpl").write_text("{{ psk }}\n")
     monkeypatch.setattr(template.sys, "stdin", io.StringIO())
 
     with pytest.raises(Error, match=f"no value for psk in {VALUES}"):
-        values_for(NODE, ask=True)
+        values_for(HOST, ask=True)
 
 
 def test_a_template_must_be_utf8():
-    (NODE / "a.tmpl").write_bytes(b"\xff")
+    (HOST / "a.tmpl").write_bytes(b"\xff")
     with pytest.raises(Error, match="a template must be UTF-8 text"):
-        values_for(NODE, ask=False)
+        values_for(HOST, ask=False)

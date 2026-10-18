@@ -1,4 +1,4 @@
-"""dotfiles check: finds what would stop install in each node, without a machine.
+"""dotfiles check: finds what would stop install in each host, without a machine.
 
 It reads only the repository, so it runs anywhere, as any user: in CI and
 in the pre-commit hook. Problems of the machine are install's to find.
@@ -6,34 +6,34 @@ in the pre-commit hook. Problems of the machine are install's to find.
 
 from pathlib import Path
 
-from dotfiles.add import NODE_NAME
-from dotfiles.install import read_node
+from dotfiles.add import HOST_NAME
+from dotfiles.install import read_host
 from dotfiles.machine import Error
 
 
-def check(repo: Path, nodes: list[str]) -> int:
-    """Prints `<node>: ok`, or the node and each of its problems indented,
-    for each of nodes, or every node when none is named; 1 when a node has
+def check(repo: Path, hosts: list[str]) -> int:
+    """Prints `<host>: ok`, or the host and each of its problems indented,
+    for each of hosts, or every host when none is named; 1 when a host has
     a problem, 0 otherwise."""
-    nodes_dir = repo / "nodes"
-    if not nodes:
-        nodes = sorted(p.name for p in nodes_dir.iterdir() if p.is_dir()) if nodes_dir.is_dir() else []
-        if not nodes:
-            print("no nodes to check")
+    hosts_dir = repo / "hosts"
+    if not hosts:
+        hosts = sorted(p.name for p in hosts_dir.iterdir() if p.is_dir()) if hosts_dir.is_dir() else []
+        if not hosts:
+            print("no hosts to check")
             return 0
     code = 0
-    for node in nodes:
-        if not NODE_NAME.fullmatch(node):
-            print(f"{node}: bad node name")
-        elif not (nodes_dir / node).is_dir():
-            print(f"{node}: no such node")
+    for host in hosts:
+        if not HOST_NAME.fullmatch(host):
+            print(f"{host}: bad host name")
+        elif not (hosts_dir / host).is_dir():
+            print(f"{host}: no such host")
         else:
             try:
-                read_node(nodes_dir / node)
+                read_host(hosts_dir / host)
             except Error as e:
-                print(f"{node}:\n  {e}")
+                print(f"{host}:\n  {e}")
             else:
-                print(f"{node}: ok")
+                print(f"{host}: ok")
                 continue
         code = 1
     return code

@@ -10,10 +10,10 @@ from test_install import (  # noqa: F401
     ROOT,
     STAMP,
     as_root,
+    host_file,
+    host_link,
     machine,
     make,
-    node_file,
-    node_link,
     read,
     state,
 )
@@ -36,8 +36,8 @@ def installed(monkeypatch, capsys, when=None):
 def test_puts_back_what_install_replaced(monkeypatch, capsys):
     make("/etc/x", 0o600, ROOT, b"old\n")
     make("/home/alice/y", 0o755, ALICE, b"old y\n")
-    node_file("etc/x")
-    node_file("home/alice/y")
+    host_file("etc/x")
+    host_file("home/alice/y")
     installed(monkeypatch, capsys)
 
     restore(REPO, "hyper")
@@ -55,7 +55,7 @@ def test_puts_back_what_install_replaced(monkeypatch, capsys):
 
 def test_puts_back_a_replaced_symlink(monkeypatch, capsys):
     as_root(os.symlink)("/usr/share/zoneinfo/A", "/etc/localtime")
-    node_link("etc/localtime", "/usr/share/zoneinfo/B")
+    host_link("etc/localtime", "/usr/share/zoneinfo/B")
     installed(monkeypatch, capsys)
 
     restore(REPO, "hyper", None, ["/etc/localtime"])
@@ -68,7 +68,7 @@ def test_puts_back_a_replaced_symlink(monkeypatch, capsys):
 
 def test_puts_back_a_file_a_symlink_replaced(monkeypatch, capsys):
     make("/etc/x", 0o600, ROOT, b"old\n")
-    node_link("etc/x", "/y")
+    host_link("etc/x", "/y")
     installed(monkeypatch, capsys)
 
     restore(REPO, "hyper")
@@ -84,8 +84,8 @@ def test_puts_back_a_file_a_symlink_replaced(monkeypatch, capsys):
 def test_puts_back_only_the_paths_given(monkeypatch, capsys):
     make("/etc/x", 0o644, ROOT, b"old\n")
     make("/etc/y", 0o644, ROOT, b"old\n")
-    node_file("etc/x")
-    node_file("etc/y")
+    host_file("etc/x")
+    host_file("etc/y")
     installed(monkeypatch, capsys)
 
     restore(REPO, "hyper", paths=["/etc/y"])
@@ -96,9 +96,9 @@ def test_puts_back_only_the_paths_given(monkeypatch, capsys):
 
 def test_puts_back_the_run_named(monkeypatch, capsys):
     make("/etc/x", 0o644, ROOT, b"first\n")
-    node_file("etc/x", b"second\n")
+    host_file("etc/x", b"second\n")
     installed(monkeypatch, capsys)
-    node_file("etc/x", b"third\n")
+    host_file("etc/x", b"third\n")
     installed(monkeypatch, capsys, when=datetime(2026, 10, 13, 8, 0, 0))
 
     restore(REPO, "hyper", STAMP)
@@ -108,9 +108,9 @@ def test_puts_back_the_run_named(monkeypatch, capsys):
 
 def test_puts_back_the_last_run_by_default(monkeypatch, capsys):
     make("/etc/x", 0o644, ROOT, b"first\n")
-    node_file("etc/x", b"second\n")
+    host_file("etc/x", b"second\n")
     installed(monkeypatch, capsys)
-    node_file("etc/x", b"third\n")
+    host_file("etc/x", b"third\n")
     installed(monkeypatch, capsys, when=datetime(2026, 10, 13, 8, 0, 0))
 
     restore(REPO, "hyper")
@@ -118,10 +118,10 @@ def test_puts_back_the_last_run_by_default(monkeypatch, capsys):
     assert read("/etc/x") == b"second\n"
 
 
-def test_runs_the_hooks_of_the_node(monkeypatch, capsys):
+def test_runs_the_hooks_of_the_host(monkeypatch, capsys):
     make("/etc/x", 0o644, ROOT, b"old\n")
-    node_file("etc/x")
-    (REPO / "nodes/hyper/.hooks").write_text("etc/x sudo systemctl reload x\n")
+    host_file("etc/x")
+    (REPO / "hosts/hyper/.hooks").write_text("etc/x sudo systemctl reload x\n")
     monkeypatch.setattr(install_module, "run_hook", lambda command: None)
     installed(monkeypatch, capsys)
     ran = []
@@ -134,7 +134,7 @@ def test_runs_the_hooks_of_the_node(monkeypatch, capsys):
 
 def test_dry_run_changes_nothing(monkeypatch, capsys):
     make("/etc/x", 0o644, ROOT, b"old\n")
-    node_file("etc/x")
+    host_file("etc/x")
     installed(monkeypatch, capsys)
 
     restore(REPO, "hyper", dry_run=True)
@@ -156,7 +156,7 @@ def test_dry_run_changes_nothing(monkeypatch, capsys):
 )
 def test_refuses(monkeypatch, capsys, args, message):
     make("/etc/x", 0o644, ROOT, b"old\n")
-    node_file("etc/x")
+    host_file("etc/x")
     installed(monkeypatch, capsys)
 
     with pytest.raises(Error, match=message):
@@ -165,7 +165,7 @@ def test_refuses(monkeypatch, capsys, args, message):
 
 def test_refuses_a_backup_made_this_second(monkeypatch, capsys):
     make("/etc/x", 0o644, ROOT, b"old\n")
-    node_file("etc/x")
+    host_file("etc/x")
     installed(monkeypatch, capsys, when=datetime(2026, 10, 11, 21, 30, 0))
 
     with pytest.raises(Error, match="made this second"):
