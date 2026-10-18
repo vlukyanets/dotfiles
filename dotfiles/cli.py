@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -36,7 +37,8 @@ def main(argv: list[str] | None = None) -> int:
     add_parser.add_argument(
         "--root", type=Path, default=Path("/"), help="read the files from ROOT instead of /"
     )
-    add_parser.add_argument("host", help="the host's name, as in hosts/<host>/")
+    add_parser.add_argument("--host", help="the host's name, as in hosts/<host>/;"
+                            " this machine's hostname by default")
     add_parser.add_argument("paths", nargs="*", metavar="path",
                             help="an absolute path on the machine; with none and no --package,"
                                  " each file of the host that changed on the machine")
@@ -47,7 +49,8 @@ def main(argv: list[str] | None = None) -> int:
         "forget", help="remove files from hosts/<host>/ and their .meta lines; the machine keeps them"
     )
     forget_parser.add_argument("--dry-run", action="store_true", help="print the changes, make none")
-    forget_parser.add_argument("host", help="the host's name, as in hosts/<host>/")
+    forget_parser.add_argument("--host", help="the host's name, as in hosts/<host>/;"
+                               " this machine's hostname by default")
     forget_parser.add_argument("paths", nargs="*", metavar="path", help="an absolute path on the machine")
     forget_parser.add_argument("--package", nargs="+", default=[], metavar="name", dest="packages",
                                help="remove packages from hosts/<host>/.packages; after the paths")
@@ -59,7 +62,8 @@ def main(argv: list[str] | None = None) -> int:
     install_parser.add_argument(
         "--root", type=Path, default=Path("/"), help="install under ROOT instead of /"
     )
-    install_parser.add_argument("host", help="the host's name, as in hosts/<host>/")
+    install_parser.add_argument("--host", help="the host's name, as in hosts/<host>/;"
+                                " this machine's hostname by default")
 
     restore_parser = commands.add_parser(
         "restore", help="put back the files a run of install replaced, from .backups/<host>/"
@@ -68,7 +72,8 @@ def main(argv: list[str] | None = None) -> int:
     restore_parser.add_argument(
         "--root", type=Path, default=Path("/"), help="restore under ROOT instead of /"
     )
-    restore_parser.add_argument("host", help="the host's name, as in .backups/<host>/")
+    restore_parser.add_argument("--host", help="the host's name, as in .backups/<host>/;"
+                                " this machine's hostname by default")
     restore_parser.add_argument(
         "backup", nargs="*", metavar="run|path",
         help="the run, as in .backups/<host>/<run>/, the last one if none is given;"
@@ -94,7 +99,8 @@ def main(argv: list[str] | None = None) -> int:
     status_parser.add_argument(
         "--root", type=Path, default=Path("/"), help="compare ROOT instead of /"
     )
-    status_parser.add_argument("host", help="the host's name, as in hosts/<host>/")
+    status_parser.add_argument("--host", help="the host's name, as in hosts/<host>/;"
+                               " this machine's hostname by default")
 
     cleanup_parser = commands.add_parser(
         "cleanup", help="remove the backups dotfiles install keeps in .backups/"
@@ -135,6 +141,11 @@ def main(argv: list[str] | None = None) -> int:
             raise Error("run as your user; sudo is used when needed")
         if args.command in ("add", "install", "restore", "status"):
             packages.family()  # These read or write the machine, which must be one supported.
+        if args.command != "cleanup" and args.host is None:
+            args.host = socket.gethostname()
+            # Only a host named on purpose is made by add: a hostname may not be the host's name.
+            if args.command == "add" and not (repo / "hosts" / args.host).is_dir():
+                raise Error(f"no such host: {args.host}; give --host to make it")
         if args.command == "add":
             add(repo, args.host, args.paths, root=args.root, dry_run=args.dry_run, force=args.force,
                 as_template=args.template, packages=args.packages)

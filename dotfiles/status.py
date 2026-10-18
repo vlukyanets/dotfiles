@@ -55,16 +55,16 @@ def status(repo: Path, host: str, root: Path = Path("/"), verbose: bool = False)
         print("Nothing differs from the host.")
     if changed:
         print(f"\nChanges on the machine:\n"
-              f"  (dotfiles add {host} <path> keeps them; dotfiles install {host} undoes them)")
+              f"  (dotfiles add --host {host} <path> keeps them; dotfiles install --host {host} undoes them)")
         print_lines(changed)
     if lacking:
         print(f"\nPackages the machine lacks:\n"
-              f"  (dotfiles install {host} installs them;"
-              f" dotfiles forget {host} --package <name> drops them)")
+              f"  (dotfiles install --host {host} installs them;"
+              f" dotfiles forget --host {host} --package <name> drops them)")
         print_lines([("package", name) for name in lacking])
     if extra:
         print(f"\nPackages not in the host:\n"
-              f"  (dotfiles add {host} --package <name> keeps them; removing them is yours)")
+              f"  (dotfiles add --host {host} --package <name> keeps them; removing them is yours)")
         print_lines([("package", name) for name in extra])
     if dirs:
         print("\nDirectories off their defaults, with no .meta line:\n"
