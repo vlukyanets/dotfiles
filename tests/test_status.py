@@ -51,7 +51,7 @@ def test_lists_what_changed_on_the_machine(capsys):
         "Host hyper, root /\n"
         "\n"
         "Changes on the machine:\n"
-        "  (dotfiles add hyper <path> keeps them; dotfiles install hyper undoes them)\n"
+        "  (dotfiles add --host hyper <path> keeps them; dotfiles install --host hyper undoes them)\n"
         "        mode:      /home/alice/.ssh/  0700 → 0755\n"
         "        modified:  /etc/a\n"
         "        mode:      /etc/b  0644 → 0600\n"
@@ -178,7 +178,7 @@ def test_shows_where_a_symlink_points(capsys):
 def test_command_runs_status(capsys):
     from dotfiles.cli import main
 
-    assert main(["status", "nope"]) == 1
+    assert main(["status", "--host", "nope"]) == 1
     assert "no such host: nope" in capsys.readouterr().err
 
 
@@ -235,7 +235,7 @@ def test_lists_the_packages_the_machine_lacks(monkeypatch, capsys):
     assert capsys.readouterr().out == (
         "Host hyper, root /\n"
         "\nPackages the machine lacks:\n"
-        "  (dotfiles install hyper installs them; dotfiles forget hyper --package <name> drops them)\n"
+        "  (dotfiles install --host hyper installs them; dotfiles forget --host hyper --package <name> drops them)\n"
         "        package:   niri\n")
 
 
@@ -250,7 +250,7 @@ def test_lists_the_packages_not_in_the_host(monkeypatch, capsys):
     assert capsys.readouterr().out == (
         "Host hyper, root /\n"
         "\nPackages not in the host:\n"
-        "  (dotfiles add hyper --package <name> keeps them; removing them is yours)\n"
+        "  (dotfiles add --host hyper --package <name> keeps them; removing them is yours)\n"
         "        package:   git\n"
         "        package:   vim\n")
 

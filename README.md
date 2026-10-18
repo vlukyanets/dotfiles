@@ -31,7 +31,7 @@ clone of this repository. There are two ways to have one.
 sudo pacman -S git uv
 uv tool install git+https://github.com/vlukyanets/dotfiles
 dotfiles init
-dotfiles install --dry-run hyper
+dotfiles install --dry-run
 ```
 
 - `uv tool upgrade dotfiles` updates the command;
@@ -110,8 +110,13 @@ as they are in the working tree; CI runs it on every pull request and on
 ## Adding a file
 
 ```sh
-uv run dotfiles add hyper /etc/ssh/sshd_config.d/10-local.conf ~/.config/niri/config.kdl
+uv run dotfiles add /etc/ssh/sshd_config.d/10-local.conf ~/.config/niri/config.kdl
 ```
+
+Every command that works on one host takes the machine's hostname for it,
+here `hyper`; `--host <host>` names another. A new host is made only when
+named with `--host`: with the hostname alone, `add` refuses a host that
+`hosts/` does not have. Why: [decision 10](docs/decisions.md).
 
 The command copies each file into `hosts/hyper/` at its path and updates
 `hosts/hyper/.meta` when the owner or mode of the file, or of any directory
@@ -143,7 +148,7 @@ directory in the host.
 ### Taking back what changed
 
 ```sh
-uv run dotfiles add hyper              # each file of the host changed on the machine
+uv run dotfiles add  # each file of the host changed on the machine
 ```
 
 With no path and no `--package`, the command adds each file and symlink of
@@ -157,7 +162,7 @@ as above; `--template` needs its paths.
 ## Forgetting a file
 
 ```sh
-uv run dotfiles forget hyper /etc/ssh/sshd_config.d/10-local.conf
+uv run dotfiles forget /etc/ssh/sshd_config.d/10-local.conf
 ```
 
 The command removes the file's copy, its template or its symlink from
@@ -176,9 +181,9 @@ A host is one machine, so the names are those of its distribution:
 | `debian` (Ubuntu too) | `dpkg-query -W`, status `ii` | `apt-mark showmanual` | `sudo apt-get install` |
 
 ```sh
-uv run dotfiles add hyper --package niri paru     # must be installed
-uv run dotfiles forget hyper --package niri       # the machine keeps it
-uv run dotfiles add hyper /etc/hosts --package vim  # paths first
+uv run dotfiles add --package niri paru       # must be installed
+uv run dotfiles forget --package niri         # the machine keeps it
+uv run dotfiles add /etc/hosts --package vim  # paths first
 ```
 
 - `install` installs the packages the machine lacks first, in one command,
@@ -194,8 +199,8 @@ uv run dotfiles add hyper /etc/hosts --package vim  # paths first
 ## Installing a host
 
 ```sh
-uv run dotfiles install --dry-run hyper
-uv run dotfiles install hyper
+uv run dotfiles install --dry-run
+uv run dotfiles install
 ```
 
 The command puts each file of `hosts/hyper/` at its path from `/`, with the
@@ -315,7 +320,7 @@ psk={{ wifi_home_psk }}
   as a template, or one whose name ends in `.tmpl`.
 
 ```sh
-uv run dotfiles add --template hyper /etc/NetworkManager/system-connections/home.nmconnection
+uv run dotfiles add --template /etc/NetworkManager/system-connections/home.nmconnection
 ```
 
 `add --template` makes the template from the machine's file:
@@ -339,8 +344,8 @@ uv run dotfiles add --template hyper /etc/NetworkManager/system-connections/home
 ## Checking what drifted
 
 ```sh
-uv run dotfiles status hyper           # what differs, like git status
-uv run dotfiles status -v hyper        # and a diff of each modified file
+uv run dotfiles status     # what differs, like git status
+uv run dotfiles status -v  # and a diff of each modified file
 ```
 
 The host plays git's index and the machine its working tree; each arrow
@@ -351,7 +356,7 @@ with 0 whether or not something differs.
 Host hyper, root /
 
 Changes on the machine:
-  (dotfiles add hyper <path> keeps them; dotfiles install hyper undoes them)
+  (dotfiles add --host hyper <path> keeps them; dotfiles install --host hyper undoes them)
         modified:  /etc/pacman.conf
         mode:      /etc/ssh/sshd_config.d/10-local.conf  0600 → 0644
         owner:     /etc/x  root:root → alice:alice
@@ -382,10 +387,10 @@ Directories off their defaults, with no .meta line:
 ## Restoring a backup
 
 ```sh
-uv run dotfiles restore --dry-run hyper            # what it would put back
-uv run dotfiles restore hyper                      # the last run
-uv run dotfiles restore hyper 20261011-213000      # that run
-uv run dotfiles restore hyper /etc/x /etc/y        # only these files, from the last run
+uv run dotfiles restore --dry-run        # what it would put back
+uv run dotfiles restore                  # the last run
+uv run dotfiles restore 20261011-213000  # that run
+uv run dotfiles restore /etc/x /etc/y    # only these files, from the last run
 ```
 
 A run's directory in `.backups/<host>/` is laid out like a host, its

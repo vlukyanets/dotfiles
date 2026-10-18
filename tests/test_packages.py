@@ -55,8 +55,8 @@ def test_family_unknown_is_an_error(fs, os_release, name):
         packages.family()
 
 
-@pytest.mark.parametrize("command", [["add", "hyper", "/etc/x"], ["install", "hyper"],
-                                     ["restore", "hyper"], ["status", "hyper"]])
+@pytest.mark.parametrize("command", [["add", "--host", "hyper", "/etc/x"], ["install", "--host", "hyper"],
+                                     ["restore", "--host", "hyper"], ["status", "--host", "hyper"]])
 def test_commands_on_the_machine_refuse_another_distribution(fs, monkeypatch, capsys, command):
     from dotfiles.cli import main
 

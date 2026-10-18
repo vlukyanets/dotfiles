@@ -245,8 +245,28 @@ def test_rejects_a_bad_host_name():
 def test_command_reports_an_error(capsys):
     from dotfiles.cli import main
 
-    assert main(["add", "hyper", "etc/hosts"]) == 1
+    assert main(["add", "--host", "hyper", "etc/hosts"]) == 1
     assert capsys.readouterr().err == "error: not an absolute path: etc/hosts\n"
+
+
+def test_command_takes_the_hostname_for_the_host(fs, monkeypatch):
+    from dotfiles.cli import main
+
+    monkeypatch.setattr("socket.gethostname", lambda: "hyper")
+    fs.create_dir(REPO / "hosts/hyper")
+    assert main(["add", "/etc/hosts"]) == 0
+    assert (REPO / "hosts/hyper/etc/hosts").is_file()
+
+
+def test_command_makes_no_host_for_the_hostname(monkeypatch, capsys):
+    from dotfiles.cli import main
+
+    monkeypatch.setattr("socket.gethostname", lambda: "hyper")
+    assert main(["add", "/etc/hosts"]) == 1
+    assert capsys.readouterr().err == "error: no such host: hyper; give --host to make it\n"
+    assert not (REPO / "hosts").exists()
+    assert main(["add", "--host", "hyper", "/etc/hosts"]) == 0
+    assert (REPO / "hosts/hyper/etc/hosts").is_file()
 
 
 # Built from pieces, so that secret scanners do not flag this file. The
@@ -448,7 +468,7 @@ def test_forget_command_needs_a_path_or_a_package(capsys):
     from dotfiles.cli import main
 
     with pytest.raises(SystemExit):
-        main(["forget", "hyper"])
+        main(["forget", "--host", "hyper"])
     assert "give a path or --package" in capsys.readouterr().err
 
 

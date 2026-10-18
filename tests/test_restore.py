@@ -175,5 +175,5 @@ def test_refuses_a_backup_made_this_second(monkeypatch, capsys):
 def test_command_takes_one_run_at_most(capsys):
     from dotfiles.cli import main
 
-    assert main(["restore", "hyper", "20261011-213000", "20261012-080000"]) == 1
+    assert main(["restore", "--host", "hyper", "20261011-213000", "20261012-080000"]) == 1
     assert "one run at most" in capsys.readouterr().err

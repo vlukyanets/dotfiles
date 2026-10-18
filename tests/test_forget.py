@@ -129,7 +129,7 @@ def test_command(monkeypatch, fs, capsys):
     fs.create_file(REPO / "secret_leaks.toml")
     monkeypatch.setenv("DOTFILES_REPO", str(REPO))
     monkeypatch.setattr(os, "geteuid", lambda: 1000)
-    assert main(["forget", "--dry-run", "hyper", "/etc/ssh/ssh_host_ed25519_key"]) == 0
+    assert main(["forget", "--dry-run", "--host", "hyper", "/etc/ssh/ssh_host_ed25519_key"]) == 0
     assert capsys.readouterr().out.startswith("removed hosts/hyper/etc/ssh/ssh_host_ed25519_key\n")
 
 
