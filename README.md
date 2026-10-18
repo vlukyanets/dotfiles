@@ -107,18 +107,30 @@ The pre-commit hook runs it after `dotfiles scan --staged`, on the hosts
 as they are in the working tree; CI runs it on every pull request and on
 `master`.
 
+## Making a host
+
+```sh
+uv run dotfiles new                # hosts/<hostname>/
+uv run dotfiles new --host hyper   # hosts/hyper/
+```
+
+The command makes the host's directory with an empty `.meta`, which keeps
+the directory in git and lists no exceptions. It leaves a host that exists
+as it is. Why: [decision 36](docs/decisions.md).
+
+Every command that works on one host takes the machine's hostname for it,
+here `hyper`, as it is; `--host <host>` names another. A host's name is a
+hostname: labels of letters, digits and hyphens joined by dots, such as
+`Hyper.local`; why: [decision 35](docs/decisions.md). A new host is made
+only when named: by `new`, or by `add` with `--host`; with the hostname
+alone, `add` refuses a host that `hosts/` does not have. Why:
+[decision 10](docs/decisions.md).
+
 ## Adding a file
 
 ```sh
 uv run dotfiles add /etc/ssh/sshd_config.d/10-local.conf ~/.config/niri/config.kdl
 ```
-
-Every command that works on one host takes the machine's hostname for it,
-here `hyper`, as it is; `--host <host>` names another. A host's name is a
-hostname: labels of letters, digits and hyphens joined by dots, such as
-`Hyper.local`. A new host is made only when
-named with `--host`: with the hostname alone, `add` refuses a host that
-`hosts/` does not have. Why: [decision 10](docs/decisions.md).
 
 The command copies each file into `hosts/hyper/` at its path and updates
 `hosts/hyper/.meta` when the owner or mode of the file, or of any directory
