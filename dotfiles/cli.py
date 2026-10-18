@@ -14,6 +14,7 @@ from dotfiles.cleanup import cleanup
 from dotfiles.forget import forget
 from dotfiles.init import URL, find_repo, init
 from dotfiles.install import install
+from dotfiles.new import new
 from dotfiles.restore import restore
 from dotfiles.status import status
 
@@ -54,6 +55,11 @@ def main(argv: list[str] | None = None) -> int:
     forget_parser.add_argument("paths", nargs="*", metavar="path", help="an absolute path on the machine")
     forget_parser.add_argument("--package", nargs="+", default=[], metavar="name", dest="packages",
                                help="remove packages from hosts/<host>/.packages; after the paths")
+
+    new_parser = commands.add_parser("new", help="make a host, hosts/<host>/, with an empty .meta")
+    new_parser.add_argument("--dry-run", action="store_true", help="print the changes, make none")
+    new_parser.add_argument("--host", help="the host's name, as in hosts/<host>/;"
+                            " this machine's hostname by default")
 
     install_parser = commands.add_parser(
         "install", help="put hosts/<host>/ onto the machine, with its owners and modes"
@@ -145,10 +151,13 @@ def main(argv: list[str] | None = None) -> int:
             args.host = socket.gethostname()
             # Only a host named on purpose is made by add: a hostname may not be the host's name.
             if args.command == "add" and not (repo / "hosts" / args.host).is_dir():
-                raise Error(f"no such host: {args.host}; give --host to make it")
+                raise Error(f"no such host: {args.host};"
+                            " make it with dotfiles new, or name it with --host")
         if args.command == "add":
             add(repo, args.host, args.paths, root=args.root, dry_run=args.dry_run, force=args.force,
                 as_template=args.template, packages=args.packages)
+        elif args.command == "new":
+            new(repo, args.host, dry_run=args.dry_run)
         elif args.command == "forget":
             forget(repo, args.host, args.paths, dry_run=args.dry_run, packages=args.packages)
         elif args.command == "install":

@@ -263,7 +263,7 @@ def test_command_makes_no_host_for_the_hostname(monkeypatch, capsys):
 
     monkeypatch.setattr("socket.gethostname", lambda: "hyper")
     assert main(["add", "/etc/hosts"]) == 1
-    assert capsys.readouterr().err == "error: no such host: hyper; give --host to make it\n"
+    assert capsys.readouterr().err == "error: no such host: hyper; make it with dotfiles new, or name it with --host\n"
     assert not (REPO / "hosts").exists()
     assert main(["add", "--host", "hyper", "/etc/hosts"]) == 0
     assert (REPO / "hosts/hyper/etc/hosts").is_file()
