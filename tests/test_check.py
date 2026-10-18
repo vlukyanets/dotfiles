@@ -74,11 +74,20 @@ def test_a_missing_host(capsys):
 
 
 def test_a_bad_host_name(capsys):
-    host("Laptop")
+    host("laptop_1")
 
     assert check(REPO, []) == 1
-    assert check(REPO, ["../hosts/Laptop"]) == 1
-    assert capsys.readouterr().out == "Laptop: bad host name\n../hosts/Laptop: bad host name\n"
+    assert check(REPO, ["../hosts/laptop_1", "hyper.", "a..b"]) == 1
+    assert capsys.readouterr().out == (
+        "laptop_1: bad host name\n../hosts/laptop_1: bad host name\n"
+        "hyper.: bad host name\na..b: bad host name\n")
+
+
+def test_a_hostname_with_dots_and_capitals(capsys):
+    host("Hyper.local")
+
+    assert check(REPO, []) == 0
+    assert capsys.readouterr().out == "Hyper.local: ok\n"
 
 
 def test_a_file_in_hosts_is_not_a_host(capsys):

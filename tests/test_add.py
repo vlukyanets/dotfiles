@@ -252,10 +252,10 @@ def test_command_reports_an_error(capsys):
 def test_command_takes_the_hostname_for_the_host(fs, monkeypatch):
     from dotfiles.cli import main
 
-    monkeypatch.setattr("socket.gethostname", lambda: "hyper")
-    fs.create_dir(REPO / "hosts/hyper")
+    monkeypatch.setattr("socket.gethostname", lambda: "Hyper.local")
+    fs.create_dir(REPO / "hosts/Hyper.local")
     assert main(["add", "/etc/hosts"]) == 0
-    assert (REPO / "hosts/hyper/etc/hosts").is_file()
+    assert (REPO / "hosts/Hyper.local/etc/hosts").is_file()
 
 
 def test_command_makes_no_host_for_the_hostname(monkeypatch, capsys):

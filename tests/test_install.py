@@ -470,9 +470,9 @@ def test_missing_host():
 
 def test_bad_host_name():
     host_file("etc/x")
-    (REPO / "hosts/Hyper").mkdir()
+    (REPO / "hosts/hyper_1").mkdir()
 
-    for name in ("Hyper", "../hosts/hyper"):
+    for name in ("hyper_1", "../hosts/hyper"):
         with pytest.raises(Error, match="no such host"):
             install(REPO, name)
 
