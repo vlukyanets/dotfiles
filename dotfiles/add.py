@@ -21,7 +21,7 @@ from dotfiles.machine import Error, Stat, Sudo
 from dotfiles.template import SUFFIX
 
 sudo = Sudo()
-HOST_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")  # a host's name, matched whole
+HOST_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*(\.[A-Za-z0-9-]+)*")  # a hostname, matched whole
 OWN = (".meta", ".hooks", ".packages")  # the files of a host that are its own, not the machine's
 
 

@@ -114,7 +114,9 @@ uv run dotfiles add /etc/ssh/sshd_config.d/10-local.conf ~/.config/niri/config.k
 ```
 
 Every command that works on one host takes the machine's hostname for it,
-here `hyper`; `--host <host>` names another. A new host is made only when
+here `hyper`, as it is; `--host <host>` names another. A host's name is a
+hostname: labels of letters, digits and hyphens joined by dots, such as
+`Hyper.local`. A new host is made only when
 named with `--host`: with the hostname alone, `add` refuses a host that
 `hosts/` does not have. Why: [decision 10](docs/decisions.md).
 
